@@ -1,0 +1,13 @@
+{
+  "name": "@avi/example-basic-api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node dist/main.js",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@avi/core": "workspace:*"
+  }
+}
