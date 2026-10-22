@@ -1,9 +1,12 @@
-// Phase 0 smoke check: resolves @avi/core from its built output like a real consumer.
-// This becomes a working HTTP API in Phase 1.
-import assert from 'node:assert/strict';
-import { HTTP_METHODS, type HttpMethod } from '@avi/core';
+import { createApp } from './app.js';
 
-const get: HttpMethod = 'GET';
-assert.ok(HTTP_METHODS.includes(get));
+const app = createApp();
+const port = Number(process.env['PORT'] ?? 3000);
+const { address } = await app.listen(port);
+console.log(`Listening on http://${address === '::' ? 'localhost' : address}:${String(port)}`);
 
-console.log(`@avi/core loaded: ${HTTP_METHODS.join(', ')}`);
+const shutdown = () => {
+  void app.close().then(() => process.exit(0));
+};
+process.once('SIGINT', shutdown);
+process.once('SIGTERM', shutdown);

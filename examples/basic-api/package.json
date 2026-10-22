@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "node dist/main.js",
+    "smoke": "node dist/smoke.js",
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {

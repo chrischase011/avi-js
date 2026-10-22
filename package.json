@@ -15,7 +15,7 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "examples": "pnpm --filter \"./examples/*\" start",
+    "examples": "pnpm --filter \"./examples/*\" smoke",
     "verify": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm build && pnpm test && pnpm examples"
   },
   "devDependencies": {
