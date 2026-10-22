@@ -1,19 +1,39 @@
 import {
   createServer,
   type IncomingMessage,
+  type OutgoingHttpHeaders,
   type Server,
   type ServerOptions as NodeServerOptions,
   type ServerResponse,
 } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { RequestContext } from './context.js';
+import { performance } from 'node:perf_hooks';
+import { RequestContext, type Context } from './context.js';
 import { HttpError, RequestAbortedError } from './errors.js';
 import type { HttpMethod } from './methods.js';
-import { sendError, sendOptions, sendValue } from './respond.js';
-import type { Router } from './router.js';
+import { clearHeaders, sendError, sendOptions, sendValue, statusOf } from './respond.js';
+import type { Handler, Router } from './router.js';
 
 export interface Logger {
   error(message: string, error: unknown): void;
+}
+
+/**
+ * Turns an error into a response value, like a handler. Without its own status the response
+ * uses the error's (`HttpError.status`, else 500). If it throws, the built-in response is used.
+ */
+export type ErrorHandler = (error: unknown, ctx: Context) => unknown;
+
+export interface ResponseInfo {
+  readonly method: string;
+  readonly path: string;
+  /** The matched route pattern, e.g. `/users/:id`. */
+  readonly route: string | undefined;
+  readonly status: number;
+  /** Milliseconds from receiving the request to the end of the response. */
+  readonly duration: number;
+  /** The client disconnected before the response was complete. */
+  readonly aborted: boolean;
 }
 
 export interface ServerOptions {
@@ -27,6 +47,9 @@ export interface ServerOptions {
   headersTimeout?: number;
   /** Receives 5xx errors. Default: `console.error`. */
   logger?: Logger;
+  errorHandler?: ErrorHandler;
+  /** Called after every response. Errors are logged, never sent. */
+  onResponse?: (info: ResponseInfo) => unknown;
 }
 
 const consoleLogger: Logger = {
@@ -35,12 +58,16 @@ const consoleLogger: Logger = {
   },
 };
 
+const NO_PARAMS = Object.freeze(Object.create(null) as Record<string, string>);
+
 export class HttpServer {
   readonly #router: Router;
   readonly #bodyLimit: number;
   readonly #shutdownTimeout: number;
   readonly #nodeOptions: NodeServerOptions;
   readonly #logger: Logger;
+  readonly #errorHandler: ErrorHandler | undefined;
+  readonly #onResponse: ((info: ResponseInfo) => unknown) | undefined;
   #server: Server | undefined;
   #closing: Promise<void> | undefined;
 
@@ -49,6 +76,8 @@ export class HttpServer {
     this.#bodyLimit = nonNegative('bodyLimit', options.bodyLimit ?? 1024 * 1024);
     this.#shutdownTimeout = nonNegative('shutdownTimeout', options.shutdownTimeout ?? 10_000);
     this.#logger = options.logger ?? consoleLogger;
+    this.#errorHandler = optionalFunction('errorHandler', options.errorHandler);
+    this.#onResponse = optionalFunction('onResponse', options.onResponse);
     this.#nodeOptions = {};
     if (options.requestTimeout !== undefined) {
       this.#nodeOptions.requestTimeout = nonNegative('requestTimeout', options.requestTimeout);
@@ -114,80 +143,159 @@ export class HttpServer {
     const queryStart = url.indexOf('?');
     const path = queryStart === -1 ? url : url.slice(0, queryStart);
     const method = req.method ?? 'GET';
-
-    const closing = this.#closing !== undefined;
     const match = this.#router.find(method, path);
-    switch (match.kind) {
-      case 'found':
-        break;
-      case 'not-found':
-        sendError(res, new HttpError(404), closing);
-        return;
-      case 'malformed':
-        sendError(res, new HttpError(400, 'Malformed URL encoding'), closing);
-        return;
-      case 'method-not-allowed':
-        sendError(res, new HttpError(405, undefined, { headers: { allow: match.allow } }), closing);
-        return;
-      case 'options':
-        sendOptions(res, match.allow, closing);
-        return;
+
+    if (this.#onResponse) {
+      this.#observe(res, method, path, match.kind === 'found' ? match.route : undefined);
     }
 
-    const handler = match.handler;
     const ctx = new RequestContext(
       req,
       res,
       method as HttpMethod,
       path,
-      match.params,
+      match.kind === 'found' ? match.params : NO_PARAMS,
       queryStart === -1 ? '' : url.slice(queryStart + 1),
       this.#bodyLimit,
     );
+
+    let handler: Handler;
+    switch (match.kind) {
+      case 'found':
+        handler = match.handler;
+        break;
+      case 'options':
+        sendOptions(res, match.allow, undefined, this.#closing !== undefined);
+        return;
+      case 'not-found':
+        this.#fail(ctx, res, new HttpError(404));
+        return;
+      case 'malformed':
+        this.#fail(ctx, res, new HttpError(400, 'Malformed URL encoding'));
+        return;
+      case 'method-not-allowed':
+        this.#fail(ctx, res, new HttpError(405, undefined, { headers: { allow: match.allow } }));
+        return;
+    }
 
     let result: unknown;
     try {
       result = handler(ctx);
     } catch (error) {
-      this.#fail(res, error, method, path);
+      this.#fail(ctx, res, error);
       return;
     }
 
     if (result instanceof Promise) {
       result.then(
         (value: unknown) => {
-          this.#respond(res, value, method, path);
+          this.#respond(ctx, res, value);
         },
         (error: unknown) => {
-          this.#fail(res, error, method, path);
+          this.#fail(ctx, res, error);
         },
       );
     } else {
-      this.#respond(res, result, method, path);
+      this.#respond(ctx, res, result);
     }
   }
 
-  #respond(res: ServerResponse, value: unknown, method: string, path: string): void {
+  #respond(ctx: RequestContext, res: ServerResponse, value: unknown): void {
     if (res.destroyed) return;
     try {
-      sendValue(res, value, this.#closing !== undefined);
+      sendValue(res, value, { headers: ctx.responseHeaders, close: this.#closing !== undefined });
     } catch (error) {
-      this.#fail(res, error, method, path);
+      clearHeaders(res);
+      this.#fail(ctx, res, error);
     }
   }
 
-  #fail(res: ServerResponse, error: unknown, method: string, path: string): void {
+  #fail(ctx: RequestContext, res: ServerResponse, error: unknown): void {
     const expected =
       error instanceof RequestAbortedError || (error instanceof HttpError && error.status < 500);
-    if (!expected) this.#logger.error(`Request failed: ${method} ${path}`, error);
+    if (!expected) this.#logger.error(`Request failed: ${ctx.method} ${ctx.path}`, error);
     if (res.destroyed) return;
-    sendError(res, error, this.#closing !== undefined);
+
+    const errorHandler = this.#errorHandler;
+    if (!errorHandler) {
+      sendError(res, error, ctx.responseHeaders, this.#closing !== undefined);
+      return;
+    }
+
+    let value: unknown;
+    try {
+      value = errorHandler(error, ctx);
+    } catch (handlerError) {
+      this.#fallback(ctx, res, error, handlerError);
+      return;
+    }
+    if (value instanceof Promise) {
+      value.then(
+        (resolved: unknown) => {
+          this.#sendHandled(ctx, res, error, resolved);
+        },
+        (handlerError: unknown) => {
+          this.#fallback(ctx, res, error, handlerError);
+        },
+      );
+    } else {
+      this.#sendHandled(ctx, res, error, value);
+    }
+  }
+
+  #sendHandled(ctx: RequestContext, res: ServerResponse, error: unknown, value: unknown): void {
+    if (res.destroyed) return;
+    const headers: OutgoingHttpHeaders = { ...ctx.responseHeaders };
+    if (error instanceof HttpError) Object.assign(headers, error.headers);
+    try {
+      clearHeaders(res);
+      sendValue(res, value, {
+        headers,
+        status: statusOf(error),
+        close: this.#closing !== undefined,
+      });
+    } catch (handlerError) {
+      this.#fallback(ctx, res, error, handlerError);
+    }
+  }
+
+  #fallback(ctx: RequestContext, res: ServerResponse, error: unknown, handlerError: unknown): void {
+    this.#logger.error(`errorHandler failed: ${ctx.method} ${ctx.path}`, handlerError);
+    if (!res.destroyed) sendError(res, error, ctx.responseHeaders, this.#closing !== undefined);
+  }
+
+  #observe(res: ServerResponse, method: string, path: string, route: string | undefined): void {
+    const onResponse = this.#onResponse;
+    if (!onResponse) return;
+    const start = performance.now();
+    res.once('close', () => {
+      const info: ResponseInfo = {
+        method,
+        path,
+        route,
+        status: res.statusCode,
+        duration: performance.now() - start,
+        aborted: !res.writableFinished,
+      };
+      Promise.resolve()
+        .then(() => onResponse(info))
+        .catch((error: unknown) => {
+          this.#logger.error('onResponse failed', error);
+        });
+    });
   }
 }
 
 function nonNegative(name: string, value: number): number {
   if (!Number.isInteger(value) || value < 0) {
     throw new RangeError(`${name} must be a non-negative integer, got ${String(value)}`);
+  }
+  return value;
+}
+
+function optionalFunction<F>(name: string, value: F | undefined): F | undefined {
+  if (value !== undefined && typeof value !== 'function') {
+    throw new TypeError(`${name} must be a function`);
   }
   return value;
 }

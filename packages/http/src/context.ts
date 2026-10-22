@@ -1,7 +1,21 @@
-import type { IncomingHttpHeaders, IncomingMessage, ServerResponse } from 'node:http';
+import {
+  validateHeaderName,
+  validateHeaderValue,
+  type IncomingHttpHeaders,
+  type IncomingMessage,
+  type OutgoingHttpHeaders,
+  type ServerResponse,
+} from 'node:http';
 import { HttpError, RequestAbortedError } from './errors.js';
 import type { HttpMethod } from './methods.js';
 import type { Params } from './router.js';
+
+/**
+ * Per-request data shared by middleware, guards and handlers. Apps add typed keys:
+ * `declare module '@avi/core' { interface AviState { user?: User } }`.
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type -- extended by apps
+export interface AviState {}
 
 export interface Context {
   readonly method: HttpMethod;
@@ -14,6 +28,10 @@ export interface Context {
   /** Aborts when the client disconnects before the response is sent. */
   readonly signal: AbortSignal;
   readonly req: IncomingMessage;
+  /** A fresh object for each request. */
+  readonly state: AviState & Record<string, unknown>;
+  /** Adds a response header. Headers from `reply()` or an `HttpError` win on conflict. */
+  setHeader(name: string, value: string | number | readonly string[]): void;
   /** Reads the body as UTF-8 text, up to the body limit. */
   text(): Promise<string>;
   /** Reads and parses a JSON body. Rejects with 415 or 400 on bad input. */
@@ -27,6 +45,8 @@ export class RequestContext implements Context {
   #query: URLSearchParams | undefined;
   #abort: AbortController | undefined;
   #body: Promise<Buffer> | undefined;
+  #state: (AviState & Record<string, unknown>) | undefined;
+  #headers: OutgoingHttpHeaders | undefined;
 
   constructor(
     readonly req: IncomingMessage,
@@ -48,6 +68,22 @@ export class RequestContext implements Context {
 
   get query(): URLSearchParams {
     return (this.#query ??= new URLSearchParams(this.#rawQuery));
+  }
+
+  get state(): AviState & Record<string, unknown> {
+    return (this.#state ??= {});
+  }
+
+  /** Headers collected through `setHeader`, if any. */
+  get responseHeaders(): OutgoingHttpHeaders | undefined {
+    return this.#headers;
+  }
+
+  setHeader(name: string, value: string | number | readonly string[]): void {
+    const stored = typeof value === 'object' ? [...value] : value;
+    validateHeaderName(name);
+    validateHeaderValue(name, stored as string);
+    (this.#headers ??= {})[name.toLowerCase()] = stored;
   }
 
   get signal(): AbortSignal {

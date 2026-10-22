@@ -12,7 +12,13 @@ export interface RouteDefinition {
 export type Params = Readonly<Record<string, string>>;
 
 export type RouteMatch =
-  | { readonly kind: 'found'; readonly handler: Handler; readonly params: Params }
+  | {
+      readonly kind: 'found';
+      readonly handler: Handler;
+      readonly params: Params;
+      /** The registered pattern, e.g. `/users/:id`. */
+      readonly route: string;
+    }
   /** The path exists, but not for this method. `allow` lists the methods that do. */
   | { readonly kind: 'method-not-allowed'; readonly allow: string }
   /** An `OPTIONS` request for a path with no explicit `OPTIONS` route. */
@@ -23,6 +29,7 @@ export type RouteMatch =
 interface Route {
   readonly handler: Handler;
   readonly names: readonly string[];
+  readonly pattern: string;
 }
 
 interface Node {
@@ -64,7 +71,12 @@ export class Router {
       route = match(this.#root, segments, 0, values, (node) => node.routes.get('GET'));
     }
     if (route)
-      return { kind: 'found', handler: route.handler, params: toParams(route.names, values) };
+      return {
+        kind: 'found',
+        handler: route.handler,
+        params: toParams(route.names, values),
+        route: route.pattern,
+      };
 
     const methods = new Set<string>();
     collectMethods(this.#root, segments, 0, methods);
@@ -129,7 +141,7 @@ function insert(root: Node, route: RouteDefinition): void {
   }
 
   if (node.routes.has(route.method)) throw new Error(`Duplicate route: ${route.method} ${path}`);
-  node.routes.set(route.method, { handler: route.handler, names });
+  node.routes.set(route.method, { handler: route.handler, names, pattern: path });
 }
 
 function decodeStatic(segment: string, path: string): string {
