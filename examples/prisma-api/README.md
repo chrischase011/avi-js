@@ -73,5 +73,5 @@ Avi.js code changes.
 
 ## Checking inject lists
 
-`npx avi check` verifies every `static inject` list. Prisma's `PrismaClient` is a generic class,
-which `@avijs/cli` 0.1.0 reports as a mismatch by mistake; the fix ships in the next release.
+`npx avi check` verifies every `static inject` list against its constructor, including the
+generic `PrismaClient` (needs `@avijs/cli` 0.1.1 or newer).
