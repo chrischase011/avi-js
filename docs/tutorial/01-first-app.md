@@ -88,19 +88,20 @@ an empty `202`.
 
 The handler receives one argument, `ctx`:
 
-| Field             | What it is                                                      |
-| ----------------- | --------------------------------------------------------------- |
-| `ctx.method`      | `'GET'`, `'POST'`, …                                            |
-| `ctx.path`        | The path without the query string                               |
-| `ctx.params`      | Route parameters, see [Chapter 2](02-routing.md)                |
-| `ctx.query`       | A `URLSearchParams`: `ctx.query.get('page')`                    |
-| `ctx.headers`     | Request headers, lower-cased                                    |
-| `ctx.signal`      | An `AbortSignal` that fires if the client disconnects           |
-| `ctx.req`         | The raw Node.js `IncomingMessage`, as an escape hatch           |
-| `ctx.state`       | Per-request data, see [Chapter 5](05-request-pipeline.md)       |
-| `ctx.setHeader()` | Adds a response header, see [Chapter 5](05-request-pipeline.md) |
-| `ctx.text()`      | Reads the body as UTF-8 text                                    |
-| `ctx.json()`      | Reads and parses a JSON body                                    |
+| Field             | What it is                                                          |
+| ----------------- | ------------------------------------------------------------------- |
+| `ctx.method`      | `'GET'`, `'POST'`, …                                                |
+| `ctx.path`        | The path without the query string                                   |
+| `ctx.params`      | Route parameters, see [Chapter 2](02-routing.md)                    |
+| `ctx.query`       | A `URLSearchParams`: `ctx.query.get('page')`                        |
+| `ctx.headers`     | Request headers, lower-cased                                        |
+| `ctx.signal`      | An `AbortSignal` that fires if the client disconnects               |
+| `ctx.req`         | The raw Node.js `IncomingMessage`, as an escape hatch               |
+| `ctx.state`       | Per-request data, see [Chapter 5](05-request-pipeline.md)           |
+| `ctx.input`       | Validated params, query and body, see [Chapter 6](06-validation.md) |
+| `ctx.setHeader()` | Adds a response header, see [Chapter 5](05-request-pipeline.md)     |
+| `ctx.text()`      | Reads the body as UTF-8 text                                        |
+| `ctx.json()`      | Reads and parses a JSON body                                        |
 
 The body is only read when you call `text()` or `json()`, and only once. Calling either again
 returns the same result.

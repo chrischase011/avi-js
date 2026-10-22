@@ -4,8 +4,7 @@
 
 **Structure without the overhead.**
 
-A lightweight TypeScript framework for Node.js with NestJS-style modules, controllers and
-dependency injection, without `reflect-metadata` and without the weight.
+A lightweight, TypeScript-first backend framework for Node.js, featuring NestJS-inspired modules, controllers, and dependency injection with optional decorators and no required `reflect-metadata`.
 
 [![CI](https://github.com/chrischase011/avi-js/actions/workflows/ci.yml/badge.svg)](https://github.com/chrischase011/avi-js/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -21,8 +20,8 @@ dependency injection, without `reflect-metadata` and without the weight.
 > [!IMPORTANT]
 > Avi.js is in early development and not on npm yet. Everything shown below works today in the
 > workspace: both API styles, routing, modules and dependency injection, middleware and guards, safe
-> errors and graceful shutdown. Validation comes next. Follow along, try it, and help shape it before
-> 1.0.
+> errors, schema validation with any Standard Schema library, and graceful shutdown. Follow along,
+> try it, and help shape it before 1.0.
 
 ## Two styles, one engine
 

@@ -31,8 +31,9 @@ curl localhost:3000/users/42/posts/7   # {"user":"42","post":"7"}
 - The path is split on `/` **before** decoding, so `%2F` inside a value stays part of it:
   `/files/a%2Fb` gives `name: 'a/b'`.
 - A parameter never matches an empty segment.
-- Typed params (`ctx.params.id` as `string`) arrive with validation in
-  [Chapter 6](06-validation.md). Until then, `ctx.params` is a `Record<string, string>`.
+- In a plain route object, `ctx.params` is a `Record<string, string>`: write `ctx.params['id']`.
+  Wrap the route in `route({...})` and `ctx.params.id` is typed from the path; see
+  [Chapter 6](06-validation.md#typed-path-parameters).
 
 ## Catch-all
 
