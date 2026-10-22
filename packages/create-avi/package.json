@@ -1,0 +1,56 @@
+{
+  "name": "create-avi",
+  "version": "0.1.0",
+  "description": "Create an Avi.js project: npm create avi@latest my-app",
+  "keywords": [
+    "avi",
+    "avi.js",
+    "create",
+    "scaffolding",
+    "template"
+  ],
+  "license": "MIT",
+  "author": "Christopher Robin Chase",
+  "homepage": "https://github.com/chrischase011/avi-js#readme",
+  "bugs": {
+    "url": "https://github.com/chrischase011/avi-js/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chrischase011/avi-js.git",
+    "directory": "packages/create-avi"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "sideEffects": false,
+  "bin": {
+    "create-avi": "./dist/bin.js"
+  },
+  "exports": {
+    ".": {
+      "@avijs/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@avijs/cli": "workspace:*"
+  },
+  "peerDependencies": {
+    "typescript": ">=5.8"
+  }
+}

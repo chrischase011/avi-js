@@ -83,7 +83,9 @@ for (const tarball of tarballs) {
 const work = mkdtempSync(path.join(tmpdir(), 'avi-artifacts-'));
 const local = Object.fromEntries(
   tarballs.map((file) => [
-    `@avijs/${/^avijs-(.+?)-\d/.exec(file)[1]}`,
+    file.startsWith('avijs-')
+      ? `@avijs/${/^avijs-(.+?)-\d/.exec(file)[1]}`
+      : /^(.+?)-\d/.exec(file)[1],
     `file:${path.join(artifacts, file).replaceAll('\\', '/')}`,
   ]),
 );
@@ -189,6 +191,16 @@ step('TypeScript 7 accepts the published types', () =>
     consumer,
   ),
 );
+
+step('create-avi scaffolds a project', () => {
+  run(
+    process.execPath,
+    ['node_modules/create-avi/dist/bin.js', 'created', '--template', 'minimal', '--dir', work],
+    consumer,
+    { quiet: true },
+  );
+  readdirSync(path.join(work, 'created', 'src'));
+});
 
 // 4. Both templates, installed from the tarballs.
 for (const template of ['modular', 'minimal']) {

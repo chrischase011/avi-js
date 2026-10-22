@@ -31,6 +31,7 @@ export default defineConfig({
     alias: {
       '@avijs/cli': src('cli'),
       '@avijs/compiler': src('compiler'),
+      'create-avi': src('create-avi'),
       '@avijs/core': src('core'),
       '@avijs/di': src('di'),
       '@avijs/http': src('http'),

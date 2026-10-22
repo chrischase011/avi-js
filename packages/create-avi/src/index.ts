@@ -1,0 +1,47 @@
+import { main } from '@avijs/cli';
+import { stdin, stdout } from 'node:process';
+import { createInterface } from 'node:readline/promises';
+import { parseArgs } from 'node:util';
+
+/** Asks a question and returns the answer, or `fallback` for an empty one. */
+export type Ask = (question: string, fallback: string) => Promise<string>;
+
+/**
+ * `avi new` for `npm create avi`. Asks for the project name and template when they are missing
+ * and `ask` is given; by default it asks only in an interactive terminal.
+ */
+export async function create(
+  argv: readonly string[],
+  ask: Ask | undefined = stdin.isTTY ? prompt : undefined,
+): Promise<number> {
+  const args = [...argv];
+  const { values, positionals } = parseArgs({
+    args,
+    allowPositionals: true,
+    strict: false,
+    options: {
+      template: { type: 'string' },
+      dir: { type: 'string' },
+      'avi-version': { type: 'string' },
+      from: { type: 'string' },
+    },
+  });
+
+  if (positionals.length === 0 && ask) {
+    args.unshift(await ask('Project name', 'my-avi-app'));
+    if (values.template === undefined) {
+      args.push('--template', await ask('Template, modular or minimal', 'modular'));
+    }
+  }
+  return main(['new', ...args]);
+}
+
+async function prompt(question: string, fallback: string): Promise<string> {
+  const rl = createInterface({ input: stdin, output: stdout });
+  try {
+    const answer = await rl.question(`${question} (${fallback}): `);
+    return answer.trim() || fallback;
+  } finally {
+    rl.close();
+  }
+}
