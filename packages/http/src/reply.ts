@@ -21,3 +21,7 @@ export function reply(body: unknown, init: ReplyInit = {}): Reply {
   }
   return new Reply(body, status, headers);
 }
+
+export function isReply(value: unknown): value is Reply {
+  return value instanceof Reply;
+}

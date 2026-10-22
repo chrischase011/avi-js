@@ -10,6 +10,7 @@ interface ErrorBody {
   statusCode: number;
   error: string;
   message?: string;
+  details?: unknown;
 }
 
 export interface SendOptions {
@@ -67,7 +68,10 @@ export function sendError(
 
   const status = statusOf(error);
   const body: ErrorBody = { statusCode: status, error: STATUS_CODES[status] ?? 'Error' };
-  if (status < 500 && error instanceof HttpError) body.message = error.message;
+  if (status < 500 && error instanceof HttpError) {
+    body.message = error.message;
+    if (error.details !== undefined) body.details = error.details;
+  }
 
   try {
     if (extra) setHeaders(res, extra);
@@ -76,7 +80,18 @@ export function sendError(
     clearHeaders(res);
   }
 
-  finish(res, status, JSON.stringify(body), JSON_TYPE, close || status === 413);
+  finish(res, status, stringifyError(body), JSON_TYPE, close || status === 413);
+}
+
+// Details come from user code and may not serialize; the response must still go out.
+function stringifyError(body: ErrorBody): string {
+  try {
+    return JSON.stringify(body);
+  } catch {
+    const rest = { ...body };
+    delete rest.details;
+    return JSON.stringify(rest);
+  }
 }
 
 /** `204` with an `Allow` header, for `OPTIONS` requests without their own route. */

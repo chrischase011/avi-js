@@ -17,17 +17,27 @@ import type { Params } from './router.js';
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type -- extended by apps
 export interface AviState {}
 
-export interface Context {
+/** The `input` type of a route without schemas. */
+// eslint-disable-next-line @typescript-eslint/no-generated-empty-object-type -- deliberately has no keys
+export type NoInput = Record<never, never>;
+
+/**
+ * The request as handlers see it. `I` types `ctx.input` (validated data) and `P` types
+ * `ctx.params`; both are filled in by `route()` and schemas.
+ */
+export interface Context<I extends object = NoInput, P extends object = Params> {
   readonly method: HttpMethod;
   /** Raw path without the query string. */
   readonly path: string;
   /** Decoded route parameters. A trailing `*` is available as `params['*']`. */
-  readonly params: Params;
+  readonly params: P;
   readonly query: URLSearchParams;
   readonly headers: IncomingHttpHeaders;
   /** Aborts when the client disconnects before the response is sent. */
   readonly signal: AbortSignal;
   readonly req: IncomingMessage;
+  /** Validated `params`, `query` and `body`, for routes with a schema. */
+  readonly input: Readonly<I>;
   /** A fresh object for each request. */
   readonly state: AviState & Record<string, unknown>;
   /** Adds a response header. Headers from `reply()` or an `HttpError` win on conflict. */
@@ -38,6 +48,8 @@ export interface Context {
   json(): Promise<unknown>;
 }
 
+const EMPTY_INPUT: NoInput = Object.freeze({});
+
 export class RequestContext implements Context {
   readonly #res: ServerResponse;
   readonly #rawQuery: string;
@@ -47,6 +59,8 @@ export class RequestContext implements Context {
   #body: Promise<Buffer> | undefined;
   #state: (AviState & Record<string, unknown>) | undefined;
   #headers: OutgoingHttpHeaders | undefined;
+  /** Set once by the validation step, before the handler runs. */
+  input: NoInput = EMPTY_INPUT;
 
   constructor(
     readonly req: IncomingMessage,

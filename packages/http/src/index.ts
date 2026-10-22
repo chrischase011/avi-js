@@ -1,11 +1,11 @@
 export { compose } from './compose.js';
 export type { Guard, Middleware, Next } from './compose.js';
-export type { AviState, Context } from './context.js';
+export type { AviState, Context, NoInput } from './context.js';
 export { HttpError } from './errors.js';
 export type { HttpErrorOptions } from './errors.js';
 export { HTTP_METHODS } from './methods.js';
 export type { HttpMethod } from './methods.js';
-export { reply } from './reply.js';
+export { isReply, reply } from './reply.js';
 export type { Reply, ReplyInit } from './reply.js';
 export { Router } from './router.js';
 export type { Handler, Params, RouteDefinition, RouteMatch } from './router.js';
