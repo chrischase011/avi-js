@@ -1,0 +1,5 @@
+CLAUDE.md
+PROMPT.md
+pnpm-lock.yaml
+dist/
+coverage/

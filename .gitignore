@@ -1,0 +1,10 @@
+PROMPT.md
+CLAUDE.md
+docs/adr/
+
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+*.log
+.DS_Store
