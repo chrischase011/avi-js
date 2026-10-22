@@ -63,3 +63,26 @@ export class Dynamic {
 export class NotDi {
   constructor(readonly anything: string) {}
 }
+
+// Generic constructors, like Prisma's PrismaClient: the token's instance type has type
+// parameters, the constructor parameter uses the defaults.
+interface Client<T = string> {
+  value: T;
+}
+declare const Client: new <T = string>() => Client<T>;
+class Repo<T = number> {
+  item?: T;
+}
+
+export class PrismaLike {
+  static inject = [Client, Repo] as const;
+  constructor(
+    readonly client: Client,
+    readonly repo: Repo,
+  ) {}
+}
+
+export class GenericMismatch {
+  static inject = [Client] as const;
+  constructor(readonly db: Db) {}
+}

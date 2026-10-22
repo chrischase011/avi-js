@@ -49,6 +49,16 @@ describe('checkInjectLists', () => {
     ]);
   });
 
+  it('matches generic constructors against their own class', () => {
+    expect(forClass('PrismaLike')).toEqual([]);
+    expect(forClass('GenericMismatch')).toEqual([
+      expect.objectContaining({
+        code: 'AVI004',
+        message: 'GenericMismatch.inject[0] provides Client<T>, but parameter "db" expects Db',
+      }),
+    ]);
+  });
+
   it('warns about lists it cannot check', () => {
     expect(forClass('Dynamic')).toEqual([
       expect.objectContaining({ code: 'AVI002', severity: 'warning' }),
@@ -106,7 +116,7 @@ describe('cli', () => {
   it('exits 1 when inject lists have errors', async () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
     expect(await main(['check', '--project', project])).toBe(1);
-    expect(log).toHaveBeenLastCalledWith('4 error(s), 1 warning(s) in static inject lists');
+    expect(log).toHaveBeenLastCalledWith('5 error(s), 1 warning(s) in static inject lists');
     log.mockRestore();
   });
 

@@ -102,8 +102,8 @@ function checkClass(
   params.forEach((param, i) => {
     const element = list.elements[i];
     if (!element || param.dotDotDotToken) return;
-    const provided = tokenType(element, checker);
-    if (!provided) {
+    const token = tokenType(element, checker);
+    if (!token) {
       report(
         element,
         'warning',
@@ -112,8 +112,12 @@ function checkClass(
       );
       return;
     }
+    const { type: provided, generic } = token;
     const expected = checker.getTypeAtLocation(param);
-    if (!checker.isTypeAssignableTo(provided, expected)) {
+    // A generic constructor returns its type with open type parameters; a parameter typed as the
+    // same class (with its defaults) is a match.
+    const sameClass = generic && provided.getSymbol() === expected.getSymbol();
+    if (!sameClass && !checker.isTypeAssignableTo(provided, expected)) {
       report(
         element,
         'error',
@@ -139,12 +143,21 @@ function unwrap(expression: ts.Expression | undefined): ts.Expression | undefine
 }
 
 /** A class token resolves to its instance type; an `InjectionToken<T>` to `T`. */
-function tokenType(element: ts.Expression, checker: ts.TypeChecker): ts.Type | undefined {
+function tokenType(
+  element: ts.Expression,
+  checker: ts.TypeChecker,
+): { type: ts.Type; generic: boolean } | undefined {
   const type = checker.getTypeAtLocation(element);
   const construct = type.getConstructSignatures()[0];
-  if (construct) return construct.getReturnType();
+  if (construct) {
+    return {
+      type: construct.getReturnType(),
+      generic: (construct.typeParameters?.length ?? 0) > 0,
+    };
+  }
   if (type.getSymbol()?.getName() === 'InjectionToken') {
-    return checker.getTypeArguments(type as ts.TypeReference)[0];
+    const value = checker.getTypeArguments(type as ts.TypeReference)[0];
+    return value && { type: value, generic: false };
   }
   return undefined;
 }
