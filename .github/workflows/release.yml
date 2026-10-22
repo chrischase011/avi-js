@@ -1,0 +1,48 @@
+name: Release
+
+# Runs only when started by hand. Without `publish`, it verifies and uploads the package
+# tarballs; with it, it publishes them to npm. See RELEASING.md before using it.
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish to npm (needs the NPM_TOKEN secret and no private packages)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm verify
+      - run: pnpm verify:artifacts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages
+          path: artifacts/*.tgz
+      - name: Refuse to publish private packages
+        if: inputs.publish
+        run: |
+          if grep -l '"private": true' packages/*/package.json; then
+            echo "Remove \"private\": true from the packages above first (see RELEASING.md)."
+            exit 1
+          fi
+      - name: Publish to npm
+        if: inputs.publish
+        run: pnpm -r --filter "./packages/*" publish --access public --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
