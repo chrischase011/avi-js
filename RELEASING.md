@@ -8,7 +8,8 @@ workflow with `publish` turned on.
 - All packages share one version (lockstep), set with `pnpm release:version <version>`.
 - [Semantic Versioning](https://semver.org). Before 1.0, minor versions may contain breaking changes;
   every one is listed in `CHANGELOG.md`.
-- Git tags start at 1.0.0.
+- Every release gets a `v<version>` git tag and a GitHub release; 0.x releases are marked as
+  pre-releases.
 
 ## One-time setup
 
@@ -38,7 +39,8 @@ workflow with `publish` turned on.
 8. Alternatively, publish from a maintainer's machine after `npm login`:
    `pnpm -r --filter "./packages/*" publish --access public`. Provenance needs CI, so a local
    publish goes out without it.
-9. From 1.0.0 on: tag the release commit `v<version>` and push the tag.
+9. Tag the release commit `v<version>`, push the tag, and create a GitHub release from it with
+   the highlights and the version's `CHANGELOG.md` section. Mark 0.x releases as pre-releases.
 10. Smoke-test from the registry: `npx @avijs/cli new check-release && cd check-release && npm install && npm test`.
 
 ## If something goes wrong
