@@ -1,0 +1,30 @@
+{
+  "name": "@avi/di",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Explicit, reflection-free dependency injection for Avi.js.",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chrischase011/avi-js.git",
+    "directory": "packages/di"
+  },
+  "engines": {
+    "node": ">=22.12"
+  },
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "@avi/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  }
+}
