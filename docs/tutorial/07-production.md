@@ -1,20 +1,49 @@
 # 7. Running in production
 
-> **Status: Partly runnable.** Rows marked _Available_ work today. The rest are planned for
-> Phases 7 and 10.
+> **Status: Runnable.** Everything on this page works today.
 
 These defaults are part of Avi.js from the start, not add-ons:
 
-| Concern            | Default behavior                                                                | Status    |
-| ------------------ | ------------------------------------------------------------------------------- | --------- |
-| Request bodies     | Limited to 1 MiB (`bodyLimit`). Oversized bodies get `413`, never read past it. | Available |
-| Error responses    | Generic 5xx bodies in every environment. Details go to your logger.             | Available |
-| Client disconnects | `ctx.signal` aborts so handlers can stop work early.                            | Available |
-| Shutdown           | `app.close()` drains in-flight requests, then forces after `shutdownTimeout`.   | Available |
-| Timeouts           | `requestTimeout` and `headersTimeout` are passed to `node:http`.                | Available |
-| Malformed paths    | Bad URL encodings are rejected with `400`.                                      | Available |
-| Provider cleanup   | Providers are disposed in reverse dependency order on `close()`.                | Available |
-| Streaming          | Streamed responses with backpressure.                                           | Phase 7   |
+| Concern            | Default behavior                                                                                                   |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| Request bodies     | Limited to 1 MiB (`bodyLimit`). Oversized bodies get `413`, never read past it.                                    |
+| Error responses    | Generic 5xx bodies in every environment. Details go to your logger.                                                |
+| Client disconnects | `ctx.signal` aborts so handlers can stop work early; streams stop being read.                                      |
+| Shutdown           | `app.close()` drains in-flight requests, forces after `shutdownTimeout`, then disposes providers in reverse order. |
+| Slow clients       | `headersTimeout` and `requestTimeout` close connections that send too slowly.                                      |
+| Malformed input    | Bad URL encodings get `400`; Node rejects broken HTTP and oversized headers (`431`).                               |
+| Streaming          | Streamed responses respect backpressure from slow clients.                                                         |
+
+## Streaming responses
+
+Return a stream instead of a value. Avi.js sends it chunked, reads from it only as fast as the
+client receives, and stops reading if the client disconnects:
+
+```ts
+import { createReadStream } from 'node:fs';
+import { reply } from '@avi/core';
+
+route({
+  method: 'GET',
+  path: '/export.csv',
+  handler: () =>
+    reply(createReadStream('./export.csv'), {
+      headers: { 'content-type': 'text/csv; charset=utf-8' },
+    }),
+});
+```
+
+Supported return values:
+
+| Return                 | Sent as                                                         |
+| ---------------------- | --------------------------------------------------------------- |
+| a Node `Readable`      | chunked, `application/octet-stream` unless you set a type       |
+| a web `ReadableStream` | the same                                                        |
+| a web `Response`       | its status, headers and body; `ctx.setHeader` headers are added |
+
+`HEAD` requests get the headers without reading the stream. If a stream fails after the response
+has started, the status can no longer change: Avi.js logs the error and closes the connection, so
+the client sees a truncated response instead of a silently wrong one.
 
 ## A production entry point
 
@@ -24,7 +53,12 @@ import { createAvi } from '@avi/core';
 const app = createAvi({
   bodyLimit: 256 * 1024,
   shutdownTimeout: 15_000,
+  headersTimeout: 10_000,
+  requestTimeout: 30_000,
   logger: { error: (message, error) => console.error(message, error) },
+  onResponse: ({ method, route, status, duration }) => {
+    metrics.observe({ method, route, status }, duration);
+  },
 });
 
 // app.register(...)
@@ -38,13 +72,18 @@ process.once('SIGINT', shutdown);
 process.once('SIGTERM', shutdown);
 ```
 
-Set `shutdownTimeout` below your platform's kill grace period (Kubernetes defaults to 30 seconds)
-so in-flight requests finish before the process is killed.
+- Set `shutdownTimeout` below your platform's kill grace period (Kubernetes defaults to 30 seconds)
+  so in-flight requests finish before the process is killed.
+- Behind a load balancer, set `keepAliveTimeout` above the balancer's idle timeout so it never
+  reuses a connection Node has just closed.
+- `requestTimeout`, `headersTimeout`, `keepAliveTimeout` and `connectionsCheckingInterval` are
+  passed straight to `node:http`.
 
 ## Performance
 
-Avi.js aims for low overhead and will publish benchmarks against `node:http`, Fastify, Hono and
-NestJS, with the full methodology. Until those exist, this project makes no speed claims.
+The repository's `benchmarks/` folder measures routing, startup, HTTP throughput and validation
+overhead, with the method and machine for every number. They are local measurements, not
+comparisons with other frameworks; Avi.js makes no speed claims until those exist.
 
 ## Next
 

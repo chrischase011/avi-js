@@ -20,7 +20,7 @@ status line:
 | [4](04-controllers.md)       | Controllers: explicit and decorator styles | Runnable        |
 | [5](05-request-pipeline.md)  | Middleware, guards and errors              | Runnable        |
 | [6](06-validation.md)        | Validation and typed input                 | Runnable        |
-| [7](07-production.md)        | Running in production                      | Partly runnable |
+| [7](07-production.md)        | Running in production                      | Runnable        |
 | [8](08-testing.md)           | Testing your app                           | Partly runnable |
 | [9](09-project-structure.md) | Project structure: modular and minimal     | Partly runnable |
 
