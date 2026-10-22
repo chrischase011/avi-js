@@ -1,4 +1,5 @@
 import { STATUS_CODES, type OutgoingHttpHeaders, type ServerResponse } from 'node:http';
+import { Readable, pipeline } from 'node:stream';
 import { HttpError } from './errors.js';
 import { Reply } from './reply.js';
 
@@ -19,6 +20,8 @@ export interface SendOptions {
   /** Status when the value does not set one. Default: 200, or 204 without a body. */
   status?: number;
   close: boolean;
+  /** Called if a streamed body fails after the response has started. */
+  onStreamError?: (error: unknown) => void;
 }
 
 /** Writes a handler result. Throws before touching `res` if the value cannot be serialized. */
@@ -29,6 +32,28 @@ export function sendValue(res: ServerResponse, value: unknown, options: SendOpti
   if (value instanceof Reply) {
     ({ body, status, headers } = value);
   }
+
+  if (body instanceof Response) {
+    status ??= body.status;
+    if (options.headers) setHeaders(res, options.headers);
+    if (headers) setHeaders(res, headers);
+    for (const [name, headerValue] of body.headers) res.setHeader(name, headerValue);
+    if (body.body) {
+      sendStream(res, Readable.fromWeb(body.body), status, options);
+    } else {
+      finish(res, status, undefined, undefined, options.close);
+    }
+    return;
+  }
+
+  if (body instanceof Readable || body instanceof ReadableStream) {
+    if (options.headers) setHeaders(res, options.headers);
+    if (headers) setHeaders(res, headers);
+    const source = body instanceof Readable ? body : Readable.fromWeb(body);
+    sendStream(res, source, status ?? options.status ?? 200, options);
+    return;
+  }
+
   status ??= options.status ?? (body === undefined ? 204 : 200);
 
   let payload: string | Uint8Array | undefined;
@@ -141,4 +166,33 @@ function finish(
     typeof payload === 'string' ? Buffer.byteLength(payload) : payload.byteLength,
   );
   res.end(payload);
+}
+
+// Streams without a known length are sent chunked. pipeline() handles backpressure and
+// destroys the source if the client goes away.
+function sendStream(
+  res: ServerResponse,
+  source: Readable,
+  status: number,
+  options: SendOptions,
+): void {
+  res.statusCode = status;
+  res.setHeader('x-content-type-options', 'nosniff');
+  if (options.close) res.setHeader('connection', 'close');
+  if (!res.hasHeader('content-type')) res.setHeader('content-type', BINARY_TYPE);
+
+  if (res.req.method === 'HEAD' || status === 204 || status === 304) {
+    source.destroy();
+    res.end();
+    return;
+  }
+  pipeline(source, res, (error) => {
+    if (error && !res.writableFinished && !isClientAbort(error)) {
+      options.onStreamError?.(error);
+    }
+  });
+}
+
+function isClientAbort(error: Error): boolean {
+  return (error as NodeJS.ErrnoException).code === 'ERR_STREAM_PREMATURE_CLOSE';
 }

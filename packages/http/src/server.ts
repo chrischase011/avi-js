@@ -45,12 +45,23 @@ export interface ServerOptions {
   requestTimeout?: number;
   /** Passed to `node:http`. */
   headersTimeout?: number;
+  /** Passed to `node:http`. */
+  keepAliveTimeout?: number;
+  /** How often `node:http` enforces the timeouts above, in ms. Passed to `node:http`. */
+  connectionsCheckingInterval?: number;
   /** Receives 5xx errors. Default: `console.error`. */
   logger?: Logger;
   errorHandler?: ErrorHandler;
   /** Called after every response. Errors are logged, never sent. */
   onResponse?: (info: ResponseInfo) => unknown;
 }
+
+const PASSED_THROUGH = [
+  'requestTimeout',
+  'headersTimeout',
+  'keepAliveTimeout',
+  'connectionsCheckingInterval',
+] as const;
 
 const consoleLogger: Logger = {
   error(message, error) {
@@ -79,11 +90,9 @@ export class HttpServer {
     this.#errorHandler = optionalFunction('errorHandler', options.errorHandler);
     this.#onResponse = optionalFunction('onResponse', options.onResponse);
     this.#nodeOptions = {};
-    if (options.requestTimeout !== undefined) {
-      this.#nodeOptions.requestTimeout = nonNegative('requestTimeout', options.requestTimeout);
-    }
-    if (options.headersTimeout !== undefined) {
-      this.#nodeOptions.headersTimeout = nonNegative('headersTimeout', options.headersTimeout);
+    for (const name of PASSED_THROUGH) {
+      const value = options[name];
+      if (value !== undefined) this.#nodeOptions[name] = nonNegative(name, value);
     }
   }
 
@@ -203,7 +212,13 @@ export class HttpServer {
   #respond(ctx: RequestContext, res: ServerResponse, value: unknown): void {
     if (res.destroyed) return;
     try {
-      sendValue(res, value, { headers: ctx.responseHeaders, close: this.#closing !== undefined });
+      sendValue(res, value, {
+        headers: ctx.responseHeaders,
+        close: this.#closing !== undefined,
+        onStreamError: (error) => {
+          this.#logger.error(`Response stream failed: ${ctx.method} ${ctx.path}`, error);
+        },
+      });
     } catch (error) {
       clearHeaders(res);
       this.#fail(ctx, res, error);

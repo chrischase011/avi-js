@@ -180,6 +180,19 @@ describe('methods', () => {
     expect(resolve(own, 'HEAD', '/a')).toMatchObject({ route: 'HEAD /a' });
   });
 
+  it('prefers an explicit HEAD route, even a parameter one, over a static GET', () => {
+    const r2 = router(['GET', '/a'], ['HEAD', '/:x']);
+    expect(resolve(r2, 'HEAD', '/a')).toEqual({ route: 'HEAD /:x', params: { x: 'a' } });
+    expect(resolve(r2, 'GET', '/a')).toMatchObject({ route: 'GET /a' });
+  });
+
+  it('matches static routes with or without one trailing slash', () => {
+    const r2 = router(['GET', '/'], ['GET', '/a/b']);
+    expect(resolve(r2, 'GET', '/a/b/')).toMatchObject({ route: 'GET /a/b' });
+    expect(resolve(r2, 'GET', '//')).toEqual({ kind: 'not-found' });
+    expect(resolve(r2, 'GET', '/a//b')).toEqual({ kind: 'not-found' });
+  });
+
   it('answers OPTIONS automatically unless OPTIONS has its own route', () => {
     expect(resolve(r, 'OPTIONS', '/items/7')).toEqual({
       kind: 'options',

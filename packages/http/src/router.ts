@@ -50,17 +50,42 @@ const PARAM_NAME = /^[A-Za-z_$][\w$]*$/;
 export class Router {
   #definitions: RouteDefinition[] = [];
   #root: Node = createNode();
+  #static = new Map<string, Map<string, RouteMatch>>();
 
   /** Adds all routes, or none if any of them is invalid or conflicts. */
   add(routes: readonly RouteDefinition[]): void {
     const definitions = [...this.#definitions, ...routes];
     const root = createNode();
     for (const route of definitions) insert(root, route);
+
+    const fast = new Map<string, Map<string, RouteMatch>>();
+    for (const { method, path, handler } of definitions) {
+      const key = staticKey(path);
+      if (key === undefined) continue;
+      let byMethod = fast.get(key);
+      if (!byMethod) fast.set(key, (byMethod = new Map<string, RouteMatch>()));
+      byMethod.set(method, { kind: 'found', handler, params: NO_PARAMS, route: path });
+    }
+
     this.#definitions = definitions;
     this.#root = root;
+    this.#static = fast;
   }
 
   find(method: string, path: string): RouteMatch {
+    return this.#findStatic(method, path) ?? this.#findDynamic(method, path);
+  }
+
+  // Fully static routes always win, so an exact hit can skip the trie. Static keys never
+  // contain `%` or `//`, so encoded paths and empty segments miss and take the slow path.
+  #findStatic(method: string, path: string): RouteMatch | undefined {
+    const last = path.length - 1;
+    const trailingSlash = last > 0 && path.charCodeAt(last) === 47;
+    if (trailingSlash && path.charCodeAt(last - 1) === 47) return undefined;
+    return this.#static.get(trailingSlash ? path.slice(0, last) : path)?.get(method);
+  }
+
+  #findDynamic(method: string, path: string): RouteMatch {
     const segments = splitPath(path);
     if (segments === undefined) return NOT_FOUND;
     if (segments === null) return MALFORMED;
@@ -250,4 +275,12 @@ function toParams(names: readonly string[], values: readonly string[]): Params {
   const params: Record<string, string> = Object.create(null) as Record<string, string>;
   for (let i = 0; i < names.length; i++) params[names[i] as string] = values[i] as string;
   return params;
+}
+
+const NO_PARAMS: Params = Object.freeze(Object.create(null) as Record<string, string>);
+
+/** The lookup key of a route without parameters, as a request path would spell it. */
+function staticKey(path: string): string | undefined {
+  if (path.includes(':') || path.includes('*') || path.includes('%')) return undefined;
+  return path.length > 1 && path.endsWith('/') ? path.slice(0, -1) : path;
 }
