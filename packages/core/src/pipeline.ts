@@ -30,6 +30,16 @@ export interface Route extends RouteDefinition {
   readonly middleware?: readonly MiddlewareRef[];
   readonly guards?: readonly GuardRef[];
   readonly schema?: RouteSchema;
+  readonly openapi?: RouteDocs;
+}
+
+/** Documentation for OpenAPI. It has no effect on how the route runs. */
+export interface RouteDocs {
+  readonly summary?: string;
+  readonly description?: string;
+  readonly tags?: readonly string[];
+  readonly operationId?: string;
+  readonly deprecated?: boolean;
 }
 
 /** A route whose handler is typed from its path and schema. Created with `route()`. */
@@ -37,6 +47,7 @@ export interface TypedRoute<P extends string, S extends RouteSchema> {
   readonly method: HttpMethod;
   readonly path: P;
   readonly schema?: S;
+  readonly openapi?: RouteDocs;
   readonly middleware?: readonly MiddlewareRef[];
   readonly guards?: readonly GuardRef[];
   readonly handler: (ctx: Context<InputOf<S>, PathParams<P>>) => ResultOf<S>;

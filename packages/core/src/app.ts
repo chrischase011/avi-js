@@ -1,14 +1,15 @@
-import { Container, type Token, type TokenType } from '@avi/di';
+import { Container, type Provider, type Token, type TokenType } from '@avi/di';
 import {
   HttpServer,
   Router,
   compose,
   type Guard,
+  type HttpMethod,
   type Middleware,
   type RouteDefinition,
   type ServerOptions,
 } from '@avi/http';
-import { withValidation } from '@avi/validation';
+import { withValidation, type RouteSchema } from '@avi/validation';
 import type { AddressInfo } from 'node:net';
 import { joinPath } from './controller.js';
 import { checkConsumers, injectOf } from './consumers.js';
@@ -27,6 +28,7 @@ import {
   type GuardRef,
   type MiddlewareClass,
   type MiddlewareRef,
+  type RouteDocs,
 } from './pipeline.js';
 
 export interface AviOptions extends ServerOptions {
@@ -39,6 +41,11 @@ export interface AviOptions extends ServerOptions {
    * matches it, so a stale build artifact cannot ship unnoticed.
    */
   manifest?: AppDescription;
+  /**
+   * Providers that replace the provider for the same token anywhere in the app, for tests.
+   * An override that matches no provider is an error.
+   */
+  overrides?: readonly Provider[];
 }
 
 export interface AviApp {
@@ -50,8 +57,19 @@ export interface AviApp {
   listen(port: number, host?: string): Promise<AddressInfo>;
   /** Resolves a provider visible to the root modules. For tests and scripts, not app code. */
   get<K extends Token>(token: K): TokenType<K>;
+  /** Every registered route, including runtime-created ones. Available after `init()`. */
+  routes(): readonly RouteInfo[];
   /** Stops accepting connections, waits for in-flight requests, then disposes providers. */
   close(): Promise<void>;
+}
+
+export interface RouteInfo {
+  readonly method: HttpMethod;
+  readonly path: string;
+  readonly module: string;
+  readonly controller: string;
+  readonly schema: RouteSchema | undefined;
+  readonly openapi: RouteDocs | undefined;
 }
 
 export function createAvi(options: AviOptions = {}): AviApp {
@@ -76,7 +94,9 @@ class Application implements AviApp {
   readonly #middleware: readonly MiddlewareRef[];
   readonly #guards: readonly GuardRef[];
   readonly #manifest: AppDescription | undefined;
+  readonly #overrides: readonly Provider[];
   #container: Container | undefined;
+  #routes: readonly RouteInfo[] | undefined;
   #init: Promise<void> | undefined;
 
   constructor(options: AviOptions) {
@@ -84,6 +104,7 @@ class Application implements AviApp {
     this.#middleware = checkRefs(options.middleware, 'use', 'App middleware');
     this.#guards = checkRefs(options.guards, 'canActivate', 'App guards');
     this.#manifest = options.manifest;
+    this.#overrides = options.overrides ?? [];
   }
 
   register(module: ModuleRef | ModuleOptions): this {
@@ -109,13 +130,18 @@ class Application implements AviApp {
     return this.#container.get(token) as TokenType<K>;
   }
 
+  routes(): readonly RouteInfo[] {
+    if (!this.#routes) throw new Error('Call await app.init() before app.routes()');
+    return this.#routes;
+  }
+
   async close(): Promise<void> {
     await this.#server.close();
     await this.#container?.dispose();
   }
 
   async #start(): Promise<void> {
-    const container = new Container(this.#roots);
+    const container = new Container(this.#roots, { overrides: this.#overrides });
     const modules = container.modules as AviModule[];
     checkConsumers(container);
 
@@ -126,6 +152,7 @@ class Application implements AviApp {
       const appGuards = appScope.guards(this.#guards);
 
       const routes: RouteDefinition[] = [];
+      const infos: RouteInfo[] = [];
       for (const module of modules) {
         const scope = new Pipeline((token) => container.resolve(module, token));
         const moduleMiddleware = [...appMiddleware, ...scope.middleware(module.middleware)];
@@ -138,9 +165,18 @@ class Application implements AviApp {
           const guards = [...moduleGuards, ...scope.guards(controller.guards)];
 
           for (const route of controller.createRoutes(deps)) {
+            const path = joinPath(base, route.path);
+            infos.push({
+              method: route.method,
+              path,
+              module: module.name,
+              controller: controller.name,
+              schema: route.schema,
+              openapi: route.openapi,
+            });
             routes.push({
               method: route.method,
-              path: joinPath(base, route.path),
+              path,
               handler: compose(
                 [...middleware, ...scope.middleware(route.middleware ?? [])],
                 [...guards, ...scope.guards(route.guards ?? [])],
@@ -151,6 +187,7 @@ class Application implements AviApp {
         }
       }
       this.#router.add(routes);
+      this.#routes = Object.freeze(infos);
       if (this.#manifest) {
         const difference = firstDifference(this.#manifest, describeModules(container));
         if (difference) {

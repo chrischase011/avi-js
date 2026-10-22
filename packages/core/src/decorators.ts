@@ -2,7 +2,7 @@ import type { Class, ResolveTokens, Scope, Token } from '@avi/di';
 import type { Context, HttpMethod, NoInput } from '@avi/http';
 import { checkRouteSchema, type InputOf, type PathParams, type RouteSchema } from '@avi/validation';
 import { defineModule, type ModuleOptions } from './module.js';
-import { checkRefs, type GuardRef, type MiddlewareRef } from './pipeline.js';
+import { checkRefs, type GuardRef, type MiddlewareRef, type RouteDocs } from './pipeline.js';
 import {
   GUARDS,
   METHOD_GUARDS,
@@ -99,7 +99,7 @@ function routeDecorator(method: HttpMethod) {
   const label = `@${method.charAt(0)}${method.slice(1).toLowerCase()}`;
   return <const P extends string = '', S extends RouteSchema = NoInput>(
     path?: P,
-    options: { schema?: S } = {},
+    options: { schema?: S; openapi?: RouteDocs } = {},
   ) => {
     const routePath: string = path ?? '';
     if (typeof routePath !== 'string') throw usage(label);
@@ -119,6 +119,7 @@ function routeDecorator(method: HttpMethod) {
         path: routePath,
         name,
         schema,
+        openapi: options.openapi,
         get: (instance) => context.access.get(instance as This),
       });
     };

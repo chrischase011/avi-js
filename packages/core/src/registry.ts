@@ -4,13 +4,20 @@ import type { HttpMethod } from '@avi/http';
 import type { RouteSchema } from '@avi/validation';
 import type { ControllerDefinition } from './controller.js';
 import type { AviModule } from './module.js';
-import { checkRefs, type GuardRef, type MiddlewareRef, type Route } from './pipeline.js';
+import {
+  checkRefs,
+  type GuardRef,
+  type MiddlewareRef,
+  type Route,
+  type RouteDocs,
+} from './pipeline.js';
 
 export interface RouteEntry {
   readonly method: HttpMethod;
   readonly path: string;
   readonly name: string;
   readonly schema: RouteSchema | undefined;
+  readonly openapi: RouteDocs | undefined;
   readonly get: (instance: object) => unknown;
 }
 
@@ -124,6 +131,7 @@ export function controllerFromClass(cls: Class): ControllerDefinition {
             middleware,
             guards,
             schema: entry.schema,
+            openapi: entry.openapi,
           };
         }),
       );

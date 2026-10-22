@@ -1,7 +1,7 @@
 import './decorators.js';
 
 export { AviFactory, createAvi } from './app.js';
-export type { AviApp, AviOptions } from './app.js';
+export type { AviApp, AviOptions, RouteInfo } from './app.js';
 export { defineController } from './controller.js';
 export { describeApp } from './describe.js';
 export type {
@@ -35,6 +35,7 @@ export type {
   MiddlewareClass,
   MiddlewareRef,
   Route,
+  RouteDocs,
   TypedRoute,
 } from './pipeline.js';
 export type {
