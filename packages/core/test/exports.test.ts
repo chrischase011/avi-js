@@ -32,6 +32,7 @@ describe('@avi/core', () => {
       'createToken',
       'defineController',
       'defineModule',
+      'describeApp',
       'reply',
       'route',
     ]);

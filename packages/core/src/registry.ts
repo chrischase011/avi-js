@@ -99,7 +99,9 @@ export function controllerFromClass(cls: Class): ControllerDefinition {
 
   const Ctor = cls as unknown as new (...args: unknown[]) => object;
   return Object.freeze({
+    name: cls.name,
     prefix: meta.prefix,
+    staticRoutes: Object.freeze(entries.map(({ method, path }) => ({ method, path }))),
     inject: Object.freeze([...(inject as Token[])]),
     middleware: checkRefs(
       collect<MiddlewareRef>(metadata, MIDDLEWARE),

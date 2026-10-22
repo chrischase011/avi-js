@@ -1,8 +1,11 @@
 import type { ResolveTokens, Token } from '@avi/di';
+import type { HttpMethod } from '@avi/http';
 import { checkRouteSchema } from '@avi/validation';
 import { checkRefs, type GuardRef, type MiddlewareRef, type Route } from './pipeline.js';
 
 export interface ControllerOptions<K extends readonly Token[] = []> {
+  /** Used in manifests and error messages. Default: 'controller <prefix>'. */
+  name?: string;
   /** Path prefix for every route. Default: `/`. */
   prefix?: string;
   /** Dependencies passed to `routes`, in order. */
@@ -15,11 +18,19 @@ export interface ControllerOptions<K extends readonly Token[] = []> {
 }
 
 /** The normalized shape both controller styles produce. */
+export interface StaticRoute {
+  readonly method: HttpMethod;
+  readonly path: string;
+}
+
 export interface ControllerDefinition {
+  readonly name: string;
   readonly prefix: string;
   readonly inject: readonly Token[];
   readonly middleware: readonly MiddlewareRef[];
   readonly guards: readonly GuardRef[];
+  /** Routes known without creating the controller; 'dynamic' for a routes factory. */
+  readonly staticRoutes: readonly StaticRoute[] | 'dynamic';
   createRoutes(deps: readonly unknown[]): readonly Route[];
 }
 
@@ -33,11 +44,20 @@ export function defineController<const K extends readonly Token[] = []>(
   const inject: readonly Token[] = Object.freeze([...(options.inject ?? [])]);
   const middleware = checkRefs(options.middleware, 'use', `Controller ${prefix} middleware`);
   const guards = checkRefs(options.guards, 'canActivate', `Controller ${prefix} guards`);
+  const name = options.name ?? `controller ${prefix}`;
   const { routes } = options;
 
   if (typeof routes !== 'function') {
     const fixed = checkRoutes(routes);
-    return Object.freeze({ prefix, inject, middleware, guards, createRoutes: () => fixed });
+    return Object.freeze({
+      name,
+      prefix,
+      inject,
+      middleware,
+      guards,
+      staticRoutes: Object.freeze(fixed.map(({ method, path }) => ({ method, path }))),
+      createRoutes: () => fixed,
+    });
   }
   if (routes.length > inject.length) {
     throw new TypeError(
@@ -46,10 +66,12 @@ export function defineController<const K extends readonly Token[] = []>(
   }
   const factory = routes as (...deps: unknown[]) => readonly Route[];
   return Object.freeze({
+    name,
     prefix,
     inject,
     middleware,
     guards,
+    staticRoutes: 'dynamic' as const,
     createRoutes: (deps: readonly unknown[]) => checkRoutes(factory(...deps)),
   });
 }

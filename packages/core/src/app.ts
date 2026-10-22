@@ -11,6 +11,8 @@ import {
 import { withValidation } from '@avi/validation';
 import type { AddressInfo } from 'node:net';
 import { joinPath } from './controller.js';
+import { checkConsumers, injectOf } from './consumers.js';
+import { describeModules, firstDifference, type AppDescription } from './describe.js';
 import {
   defineModule,
   toModule,
@@ -32,6 +34,11 @@ export interface AviOptions extends ServerOptions {
   middleware?: readonly MiddlewareRef[];
   /** Checked first, for every route. */
   guards?: readonly GuardRef[];
+  /**
+   * A manifest from `describeApp()` or `avi-compile manifest`. `init()` fails if the app no longer
+   * matches it, so a stale build artifact cannot ship unnoticed.
+   */
+  manifest?: AppDescription;
 }
 
 export interface AviApp {
@@ -68,6 +75,7 @@ class Application implements AviApp {
   readonly #roots: AviModule[] = [];
   readonly #middleware: readonly MiddlewareRef[];
   readonly #guards: readonly GuardRef[];
+  readonly #manifest: AppDescription | undefined;
   #container: Container | undefined;
   #init: Promise<void> | undefined;
 
@@ -75,6 +83,7 @@ class Application implements AviApp {
     this.#server = new HttpServer(this.#router, options);
     this.#middleware = checkRefs(options.middleware, 'use', 'App middleware');
     this.#guards = checkRefs(options.guards, 'canActivate', 'App guards');
+    this.#manifest = options.manifest;
   }
 
   register(module: ModuleRef | ModuleOptions): this {
@@ -108,20 +117,7 @@ class Application implements AviApp {
   async #start(): Promise<void> {
     const container = new Container(this.#roots);
     const modules = container.modules as AviModule[];
-    for (const module of modules) {
-      for (const ref of [...module.middleware, ...module.guards]) {
-        if (isClass(ref))
-          container.check(module, injectOf(ref as GuardClass), `${module.name} ${ref.name}`);
-      }
-      for (const controller of module.controllers) {
-        const label = `${module.name} controller ${controller.prefix}`;
-        container.check(module, controller.inject, label);
-        for (const ref of [...controller.middleware, ...controller.guards]) {
-          if (isClass(ref))
-            container.check(module, injectOf(ref as GuardClass), `${label} ${ref.name}`);
-        }
-      }
-    }
+    checkConsumers(container);
 
     await container.init();
     try {
@@ -155,6 +151,14 @@ class Application implements AviApp {
         }
       }
       this.#router.add(routes);
+      if (this.#manifest) {
+        const difference = firstDifference(this.#manifest, describeModules(container));
+        if (difference) {
+          throw new Error(
+            `The app does not match its manifest (first difference at ${difference}). Regenerate the manifest.`,
+          );
+        }
+      }
       this.#container = container;
     } catch (error) {
       await container.dispose().catch(() => undefined);
@@ -200,8 +204,4 @@ class Pipeline {
     }
     return instance;
   }
-}
-
-function injectOf(cls: { readonly inject?: readonly Token[] }): readonly Token[] {
-  return cls.inject ?? [];
 }

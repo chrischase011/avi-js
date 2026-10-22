@@ -3,7 +3,14 @@ import './decorators.js';
 export { AviFactory, createAvi } from './app.js';
 export type { AviApp, AviOptions } from './app.js';
 export { defineController } from './controller.js';
-export type { ControllerDefinition, ControllerOptions } from './controller.js';
+export { describeApp } from './describe.js';
+export type {
+  AppDescription,
+  ControllerDescription,
+  ModuleSummary,
+  RouteSummary,
+} from './describe.js';
+export type { ControllerDefinition, ControllerOptions, StaticRoute } from './controller.js';
 export {
   Controller,
   Delete,
