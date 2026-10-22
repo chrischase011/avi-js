@@ -15,7 +15,7 @@ A lightweight, TypeScript-first backend framework for Node.js, featuring NestJS-
 [![npm](https://img.shields.io/npm/v/@avijs/core.svg)](https://www.npmjs.com/package/@avijs/core)
 [![Status](https://img.shields.io/badge/status-pre--alpha-orange.svg)](#try-it-now)
 
-[Tutorial](docs/tutorial/README.md) · [Project structure](#project-structure) · [Why Avi.js](#why-avijs) · [Try it](#try-it-now)
+[Website](https://chrischase011.github.io/avi-js/) · [Tutorial](docs/tutorial/README.md) · [Project structure](#project-structure) · [Why Avi.js](#why-avijs) · [Try it](#try-it-now)
 
 </div>
 

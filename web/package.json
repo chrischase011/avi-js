@@ -1,0 +1,16 @@
+{
+  "name": "@avijs/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "sync": "node scripts/sync.mjs",
+    "dev": "node scripts/sync.mjs && vitepress dev src",
+    "build": "node scripts/sync.mjs && vitepress build src",
+    "preview": "vitepress preview src",
+    "typecheck": "node scripts/sync.mjs && tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "vitepress": "2.0.0-alpha.20"
+  }
+}

@@ -1,0 +1,28 @@
+/* Brand colours from brand/: Avi Teal on light, Sky Teal on dark. */
+:root {
+  --vp-c-brand-1: #0f766e;
+  --vp-c-brand-2: #115e59;
+  --vp-c-brand-3: #0f766e;
+  --vp-c-brand-soft: rgba(15, 118, 110, 0.14);
+  --vp-home-hero-name-color: #0f766e;
+  --vp-home-hero-image-background-image: linear-gradient(135deg, #2dd4bf55 10%, #0f766e33 90%);
+  --vp-home-hero-image-filter: blur(56px);
+}
+
+.dark {
+  --vp-c-brand-1: #2dd4bf;
+  --vp-c-brand-2: #5eead4;
+  --vp-c-brand-soft: rgba(45, 212, 191, 0.16);
+  --vp-home-hero-name-color: #2dd4bf;
+}
+
+/* White text on Avi Teal passes contrast in both modes. */
+:root,
+.dark {
+  --vp-button-brand-bg: #0f766e;
+  --vp-button-brand-hover-bg: #115e59;
+  --vp-button-brand-active-bg: #134e4a;
+  --vp-button-brand-text: #fff;
+  --vp-button-brand-hover-text: #fff;
+  --vp-button-brand-active-text: #fff;
+}

@@ -27,19 +27,20 @@ example apps. If it passes, your setup is ready.
 
 ### Day-to-day commands
 
-| Command                                            | What it does                                                           |
-| -------------------------------------------------- | ---------------------------------------------------------------------- |
-| `pnpm test:watch`                                  | Runs tests on every change. Tests use package sources, no build needed |
-| `pnpm test`                                        | Runs all tests once (Vitest: `*.test.ts` and type tests `*.test-d.ts`) |
-| `pnpm typecheck`                                   | Type-checks every package, including tests                             |
-| `pnpm lint`                                        | ESLint with type-aware rules                                           |
-| `pnpm format`                                      | Formats everything with Prettier (`format:check` only checks)          |
-| `pnpm build`                                       | Builds every package into `dist/` with `tsc -b`                        |
-| `pnpm examples`                                    | Runs the example apps' smoke checks against the build                  |
-| `pnpm verify`                                      | All of the above, as CI does                                           |
-| `pnpm verify:artifacts`                            | Packs the packages and tests them as an npm user would (needs network) |
-| `pnpm avi <command>`                               | Runs the `avi` CLI from the workspace, e.g. `pnpm avi new my-api`      |
-| `pnpm bench:router`, `bench:http`, `bench:startup` | Local benchmarks, see `benchmarks/README.md`                           |
+| Command                                            | What it does                                                                           |
+| -------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `pnpm test:watch`                                  | Runs tests on every change. Tests use package sources, no build needed                 |
+| `pnpm test`                                        | Runs all tests once (Vitest: `*.test.ts` and type tests `*.test-d.ts`)                 |
+| `pnpm typecheck`                                   | Type-checks every package, including tests                                             |
+| `pnpm lint`                                        | ESLint with type-aware rules                                                           |
+| `pnpm format`                                      | Formats everything with Prettier (`format:check` only checks)                          |
+| `pnpm build`                                       | Builds every package into `dist/` with `tsc -b`                                        |
+| `pnpm examples`                                    | Runs the example apps' smoke checks against the build                                  |
+| `pnpm verify`                                      | All of the above, as CI does                                                           |
+| `pnpm verify:artifacts`                            | Packs the packages and tests them as an npm user would (needs network)                 |
+| `pnpm avi <command>`                               | Runs the `avi` CLI from the workspace, e.g. `pnpm avi new my-api`                      |
+| `pnpm bench:router`, `bench:http`, `bench:startup` | Local benchmarks, see `benchmarks/README.md`                                           |
+| `pnpm --filter @avijs/web dev`                     | The documentation website at http://localhost:5173/avi-js/, built from `docs/tutorial` |
 
 ### Editor
 
@@ -61,7 +62,8 @@ packages/
   cli/          @avijs/cli: the avi command and project templates
 examples/       apps built from the published entry points
 benchmarks/     router, HTTP and startup benchmarks
-docs/tutorial/  the tutorial
+docs/tutorial/  the tutorial, also published as the website
+web/            the VitePress website
 scripts/        release and artifact tooling
 ```
 
