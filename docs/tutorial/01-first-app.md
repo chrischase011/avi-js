@@ -91,6 +91,7 @@ The handler receives one argument, `ctx`:
 | ------------- | ----------------------------------------------------- |
 | `ctx.method`  | `'GET'`, `'POST'`, …                                  |
 | `ctx.path`    | The path without the query string                     |
+| `ctx.params`  | Route parameters, see [Chapter 2](02-routing.md)      |
 | `ctx.query`   | A `URLSearchParams`: `ctx.query.get('page')`          |
 | `ctx.headers` | Request headers, lower-cased                          |
 | `ctx.signal`  | An `AbortSignal` that fires if the client disconnects |
@@ -130,6 +131,7 @@ validation arrives in [Chapter 6](06-validation.md).
 | `ctx.json()` with malformed JSON               | `400`                                                              |
 | a body larger than `bodyLimit`                 | `413`, and the connection is closed                                |
 | no matching route                              | `404`                                                              |
+| route exists for another method                | `405` with an `Allow` header                                       |
 
 Messages from 4xx `HttpError`s reach the client. Messages from 5xx and unexpected errors never
 do, in any environment. They go to the logger instead:
@@ -165,14 +167,6 @@ process.once('SIGTERM', shutdown);
 `close()` stops accepting connections, closes idle keep-alive connections, lets in-flight
 requests finish, and resolves. Requests still running after `shutdownTimeout` are cut off.
 Avi.js does not install signal handlers for you.
-
-## Current limits
-
-The router matches exact paths only. These arrive in [Chapter 2](02-routing.md):
-
-- route parameters such as `/users/:id`
-- deliberate trailing-slash handling (today `/users/` does not match `/users`)
-- `405 Method Not Allowed`, automatic `HEAD` and `OPTIONS`
 
 ## Next
 

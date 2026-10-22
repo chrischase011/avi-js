@@ -15,7 +15,7 @@ status line:
 | ---------------------------- | ------------------------------------------ | ----------------- |
 | [0](00-getting-started.md)   | Getting started with the workspace         | Runnable          |
 | [1](01-first-app.md)         | Your first app                             | Runnable          |
-| [2](02-routing.md)           | Routing: params, query, precedence         | Planned (Phase 2) |
+| [2](02-routing.md)           | Routing: params, query, precedence         | Runnable          |
 | [3](03-modules-and-di.md)    | Modules and dependency injection           | Planned (Phase 3) |
 | [4](04-controllers.md)       | Controllers: explicit and decorator styles | Planned (Phase 4) |
 | [5](05-request-pipeline.md)  | Middleware, guards and errors              | Planned (Phase 5) |
