@@ -12,7 +12,7 @@ dependency injection, without `reflect-metadata` and without the weight.
 [![Node.js](https://img.shields.io/badge/node-%E2%89%A522.12-339933.svg)](package.json)
 [![Status](https://img.shields.io/badge/status-pre--alpha-orange.svg)](#roadmap)
 
-[Tutorial](docs/tutorial/README.md) · [Architecture](docs/architecture.md) · [API contract](docs/api-contract.md) · [Roadmap](#roadmap)
+[Tutorial](docs/tutorial/README.md) · [Why Avi.js](#why-avijs) · [Roadmap](#roadmap) · [Try it](#try-it-now)
 
 </div>
 

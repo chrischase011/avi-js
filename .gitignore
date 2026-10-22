@@ -1,6 +1,7 @@
 PROMPT.md
 CLAUDE.md
-docs/adr/
+docs/*
+!docs/tutorial/
 
 node_modules/
 dist/
