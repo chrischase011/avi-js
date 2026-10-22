@@ -1,0 +1,14 @@
+{
+  "name": "@avi/example-modular-api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node dist/main.js",
+    "smoke": "node dist/smoke.js",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@avi/core": "workspace:*"
+  }
+}

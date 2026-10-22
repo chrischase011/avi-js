@@ -5,6 +5,7 @@
     { "path": "./packages/http/tsconfig.build.json" },
     { "path": "./packages/core/tsconfig.build.json" },
     { "path": "./examples/basic-api/tsconfig.build.json" },
+    { "path": "./examples/modular-api/tsconfig.build.json" },
     { "path": "./benchmarks/tsconfig.build.json" }
   ]
 }
