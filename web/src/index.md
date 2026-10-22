@@ -1,5 +1,8 @@
 ---
 layout: home
+title: Avi.js, a TypeScript framework for Node.js
+titleTemplate: false
+description: A TypeScript framework for Node.js with modules, controllers and dependency injection, without reflect-metadata. Decorators or plain functions, one engine.
 
 hero:
   name: Avi.js

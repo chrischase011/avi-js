@@ -1,11 +1,13 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { defineConfig, type DefaultTheme } from 'vitepress';
+import { defineConfig, type DefaultTheme, type HeadConfig } from 'vitepress';
 
 const repo = 'https://github.com/chrischase011/avi-js';
 const npm = 'https://www.npmjs.com/package/@avijs/core';
 // GitHub Pages serves the site under /avi-js/; set DOCS_BASE=/ for a custom domain.
 const base = process.env['DOCS_BASE'] ?? '/avi-js/';
+// The public address, for canonical links, link previews and the sitemap.
+const site = process.env['DOCS_URL'] ?? 'https://chrischase011.github.io/avi-js/';
 
 const { version } = JSON.parse(
   readFileSync(new URL('../../../packages/core/package.json', import.meta.url), 'utf8'),
@@ -23,6 +25,23 @@ function chapters(): DefaultTheme.SidebarItem[] {
     });
 }
 
+/** A page's first prose paragraph, as plain text for its meta description. */
+function summary(markdown: string): string | undefined {
+  const paragraph = markdown
+    .replace(/^---\n[\s\S]*?\n---\n/, '')
+    .replace(/^```[\s\S]*?^```/gm, '')
+    .split(/\n\s*\n/)
+    .map((block) => block.trim())
+    .find((block) => block.length >= 70 && !/^(#|>|```|\||-|\*|\d+\.|<|:::)/.test(block));
+  if (!paragraph) return undefined;
+  const text = paragraph
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/`([^`]*)`/g, '$1')
+    .replace(/\*\*|__/g, '')
+    .replace(/\s+/g, ' ');
+  return text.length <= 160 ? text : `${text.slice(0, 157).replace(/\s+\S*$/, '')}…`;
+}
+
 export default defineConfig({
   title: 'Avi.js',
   description:
@@ -36,9 +55,55 @@ export default defineConfig({
     ['link', { rel: 'icon', href: `${base}favicon.svg`, type: 'image/svg+xml' }],
     ['link', { rel: 'apple-touch-icon', href: `${base}apple-touch-icon.png` }],
     ['meta', { name: 'theme-color', content: '#0F766E' }],
-    ['meta', { property: 'og:title', content: 'Avi.js: structure without the overhead' }],
-    ['meta', { property: 'og:image', content: `${base}icon-512.png` }],
+    ['meta', { property: 'og:site_name', content: 'Avi.js' }],
+    ['meta', { name: 'twitter:card', content: 'summary_large_image' }],
   ],
+  sitemap: { hostname: site },
+  transformPageData(pageData, { siteConfig }) {
+    if (pageData.frontmatter['description']) return;
+    const markdown = readFileSync(`${siteConfig.srcDir}/${pageData.relativePath}`, 'utf8');
+    const description = summary(markdown);
+    if (description) pageData.description = description;
+  },
+  transformHead({ pageData, title, description }) {
+    if (pageData.isNotFound) return;
+    const path = pageData.relativePath.replace(/(^|\/)index\.md$/, '$1').replace(/\.md$/, '');
+    const url = new URL(path, site).href;
+    const image = new URL('social.png', site).href;
+    const head: HeadConfig[] = [
+      ['link', { rel: 'canonical', href: url }],
+      ['meta', { property: 'og:type', content: path === '' ? 'website' : 'article' }],
+      ['meta', { property: 'og:url', content: url }],
+      ['meta', { property: 'og:title', content: title }],
+      ['meta', { property: 'og:description', content: description }],
+      ['meta', { property: 'og:image', content: image }],
+      ['meta', { property: 'og:image:width', content: '1200' }],
+      ['meta', { property: 'og:image:height', content: '630' }],
+      ['meta', { property: 'og:image:alt', content: 'Avi.js: structure without the overhead.' }],
+      ['meta', { name: 'twitter:title', content: title }],
+      ['meta', { name: 'twitter:description', content: description }],
+      ['meta', { name: 'twitter:image', content: image }],
+    ];
+    if (path === '') {
+      head.push([
+        'script',
+        { type: 'application/ld+json' },
+        JSON.stringify({
+          '@context': 'https://schema.org',
+          '@type': 'SoftwareSourceCode',
+          name: 'Avi.js',
+          description,
+          url: site,
+          codeRepository: repo,
+          programmingLanguage: 'TypeScript',
+          runtimePlatform: 'Node.js',
+          license: 'https://opensource.org/licenses/MIT',
+          version,
+        }),
+      ]);
+    }
+    return head;
+  },
   themeConfig: {
     logo: { light: '/mark.svg', dark: '/mark-dark.svg', alt: '' },
     nav: [
