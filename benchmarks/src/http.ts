@@ -8,11 +8,21 @@ const WARMUP = Number(process.env['BENCH_WARMUP'] ?? 3);
 const RUNS = Number(process.env['BENCH_RUNS'] ?? 3);
 const CONNECTIONS = Number(process.env['BENCH_CONNECTIONS'] ?? 100);
 
-const SERVERS = ['node', 'avi'] as const;
-const CASES = [
-  ['JSON hello', '/'],
-  ['JSON with param', '/users/123'],
-] as const;
+interface Case {
+  name: string;
+  path: string;
+  servers: readonly string[];
+  body?: string;
+}
+
+const USER = JSON.stringify({ name: 'Ada', email: 'ada@example.com', age: 36 });
+
+const CASES: readonly Case[] = [
+  { name: 'JSON hello', path: '/', servers: ['node', 'avi'] },
+  { name: 'JSON with param', path: '/users/123', servers: ['node', 'avi'] },
+  { name: 'POST JSON, no schema', path: '/echo', servers: ['avi'], body: USER },
+  { name: 'POST JSON, validated', path: '/validated', servers: ['avi'], body: USER },
+];
 
 interface Row {
   server: string;
@@ -48,8 +58,16 @@ async function startServer(name: string) {
   };
 }
 
-function load(url: string, duration: number) {
-  return autocannon({ url, connections: CONNECTIONS, duration, pipelining: 1 });
+function load(url: string, duration: number, body?: string) {
+  return autocannon({
+    url,
+    connections: CONNECTIONS,
+    duration,
+    pipelining: 1,
+    ...(body === undefined
+      ? {}
+      : { method: 'POST' as const, body, headers: { 'content-type': 'application/json' } }),
+  });
 }
 
 const median = (values: number[]) =>
@@ -63,14 +81,14 @@ console.log(
 );
 
 const rows: Row[] = [];
-for (const [caseName, path] of CASES) {
-  for (const name of SERVERS) {
+for (const { name: caseName, path, servers, body } of CASES) {
+  for (const name of servers) {
     const server = await startServer(name);
     const url = `http://127.0.0.1:${String(server.port)}${path}`;
-    await load(url, WARMUP);
+    await load(url, WARMUP, body);
 
     const results = [];
-    for (let i = 0; i < RUNS; i++) results.push(await load(url, DURATION));
+    for (let i = 0; i < RUNS; i++) results.push(await load(url, DURATION, body));
     await server.stop();
 
     rows.push({

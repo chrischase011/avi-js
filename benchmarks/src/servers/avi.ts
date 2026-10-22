@@ -1,7 +1,14 @@
-import { createAvi, defineController } from '@avi/core';
+import { createAvi, defineController, route } from '@avi/core';
+import * as v from 'valibot';
 import { ROUTES } from '../routes.js';
 
 const filler = ROUTES.filter(([, path]) => path !== '/' && path !== '/users/:id');
+
+const CreateUser = v.object({
+  name: v.pipe(v.string(), v.minLength(1)),
+  email: v.pipe(v.string(), v.email()),
+  age: v.pipe(v.number(), v.integer(), v.minValue(0)),
+});
 
 const app = createAvi().register({
   controllers: [
@@ -9,6 +16,13 @@ const app = createAvi().register({
       routes: [
         { method: 'GET', path: '/', handler: () => ({ hello: 'world' }) },
         { method: 'GET', path: '/users/:id', handler: (ctx) => ({ id: ctx.params['id'] }) },
+        { method: 'POST', path: '/echo', handler: (ctx) => ctx.json() },
+        route({
+          method: 'POST',
+          path: '/validated',
+          schema: { body: CreateUser },
+          handler: (ctx) => ctx.input.body,
+        }),
         ...filler.map(([method, path]) => ({ method, path, handler: () => null })),
       ],
     }),

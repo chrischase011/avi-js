@@ -38,7 +38,15 @@ on the same machine. Both servers answer the same two requests with identical bo
 The Avi server also registers the rest of the 40-route table, so the router does real work. The
 `node:http` server uses `if` checks and string slicing instead of a router.
 
-## Baseline results (Phase 2)
+Two more cases run on the Avi server only, to measure validation overhead. Both `POST` the same
+body, `{"name":"Ada","email":"ada@example.com","age":36}`, and echo it back:
+
+| Case                 | Route             | Work                                                   |
+| -------------------- | ----------------- | ------------------------------------------------------ |
+| POST JSON, no schema | `POST /echo`      | `ctx.json()`                                           |
+| POST JSON, validated | `POST /validated` | Valibot `object` with string, email and integer checks |
+
+## Baseline results
 
 Recorded on 2026-10-22. Windows 11 laptop, 13th Gen Intel Core i5-13420H (12 logical CPUs),
 Node.js 24.21.0, on mains power, other applications open.
@@ -67,6 +75,27 @@ Node.js 24.21.0, on mains power, other applications open.
 | JSON with param | `node:http` | 51,865 | 1 ms | 2 ms | 5 ms |      0 |
 | JSON with param | Avi.js      | 50,169 | 1 ms | 2 ms | 4 ms |      0 |
 
+### Validation overhead (Phase 6)
+
+Recorded on 2026-10-22, same machine and settings, after middleware and validation were added.
+
+| Case                 | Server      |  Req/s | p50  | p90  | p99   | Errors |
+| -------------------- | ----------- | -----: | ---- | ---- | ----- | -----: |
+| JSON hello           | `node:http` | 50,329 | 1 ms | 2 ms | 4 ms  |      0 |
+| JSON hello           | Avi.js      | 51,009 | 1 ms | 2 ms | 4 ms  |      0 |
+| JSON with param      | `node:http` | 53,654 | 1 ms | 2 ms | 3 ms  |      0 |
+| JSON with param      | Avi.js      | 43,444 | 1 ms | 3 ms | 7 ms  |      0 |
+| POST JSON, no schema | Avi.js      | 38,457 | 2 ms | 3 ms | 4 ms  |      0 |
+| POST JSON, validated | Avi.js      | 29,056 | 2 ms | 5 ms | 10 ms |      0 |
+
+On this run, validating the three-field body cost about 25% of throughput against the same route
+without a schema. Treat that as an order of magnitude, not a figure: the param case moved by about
+20% between this run and the Phase 2 baseline with no related code change.
+
+A run just before this one was discarded: `node:http` fell to 19,680 req/s on the hello case and
+the validated route came out faster than the unvalidated one, which only happens when something
+else is competing for the CPU.
+
 ## Reading these numbers
 
 - Run-to-run noise on this machine is large. Between two router runs, the encoded-param probe
@@ -80,7 +109,7 @@ Node.js 24.21.0, on mains power, other applications open.
 - Hello-world workloads say little about real applications. Phase 7 adds realistic workloads,
   allocation profiling and repeated runs on a quiet machine.
 
-## Known costs to revisit in Phase 7
+## Known costs to revisit in the future
 
 - `find` allocates per request: the split segment array, the params object and the match result.
 - Static routes walk the trie segment by segment; a direct lookup for fully static paths could skip

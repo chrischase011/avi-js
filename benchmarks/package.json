@@ -10,11 +10,13 @@
   },
   "dependencies": {
     "@avi/core": "workspace:*",
-    "@avi/http": "workspace:*"
+    "@avi/http": "workspace:*",
+    "@avi/validation": "workspace:*"
   },
   "devDependencies": {
     "@types/autocannon": "7.12.7",
     "autocannon": "8.0.0",
-    "mitata": "1.0.34"
+    "mitata": "1.0.34",
+    "valibot": "1.5.0"
   }
 }
