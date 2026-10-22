@@ -1,6 +1,6 @@
 // Runs the decorator-based app from its tsc build output, then shuts down.
 import assert from 'node:assert/strict';
-import { AviFactory } from '@avi/core';
+import { AviFactory } from '@avijs/core';
 import { AppModule } from './app.module.js';
 import { UsersService } from './modules/users/users.service.js';
 

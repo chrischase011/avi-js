@@ -2,7 +2,7 @@
 
 > **Status: Runnable.** Everything on this page works today.
 
-`@avi/testing` starts your app on a random local port and gives you a small client for it. Tests
+`@avijs/testing` starts your app on a random local port and gives you a small client for it. Tests
 talk to the app over real HTTP, so they exercise routing, middleware, guards, validation and
 serialization exactly as production does.
 
@@ -14,7 +14,7 @@ runner works the same way.
 ```ts
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
-import { createTestClient, type TestClient } from '@avi/testing';
+import { createTestClient, type TestClient } from '@avijs/testing';
 import { AppModule } from '../app.module.js';
 
 let client: TestClient;

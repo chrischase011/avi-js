@@ -1,4 +1,4 @@
-import type { HttpMethod } from '@avi/http';
+import type { HttpMethod } from '@avijs/http';
 
 /** A REST-style route table: 40 routes mixing static, parameter and catch-all paths. */
 export const ROUTES: [HttpMethod, string][] = [
@@ -35,3 +35,6 @@ export const PROBES: [string, string][] = [
   ['trailing slash', '/users/123/'],
   ['miss (404)', '/nope/nothing/here'],
 ];
+
+/** Routes every server registers besides the ones a benchmark case hits. */
+export const FILLER = ROUTES.filter(([, path]) => path !== '/' && path !== '/users/:id');

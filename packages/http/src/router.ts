@@ -91,10 +91,8 @@ export class Router {
     if (segments === null) return MALFORMED;
 
     const values: string[] = [];
-    let route = match(this.#root, segments, 0, values, (node) => node.routes.get(method));
-    if (!route && method === 'HEAD') {
-      route = match(this.#root, segments, 0, values, (node) => node.routes.get('GET'));
-    }
+    let route = match(this.#root, segments, 0, values, method);
+    if (!route && method === 'HEAD') route = match(this.#root, segments, 0, values, 'GET');
     if (route)
       return {
         kind: 'found',
@@ -202,13 +200,13 @@ function match(
   segments: readonly string[],
   index: number,
   values: string[],
-  pick: (node: Node) => Route | undefined,
+  method: string,
 ): Route | undefined {
   if (index === segments.length) {
-    const route = pick(node);
+    const route = node.routes.get(method);
     if (route) return route;
     if (node.wildcard) {
-      const wild = pick(node.wildcard);
+      const wild = node.wildcard.routes.get(method);
       if (wild) {
         values.push('');
         return wild;
@@ -220,19 +218,19 @@ function match(
   const segment = segments[index] as string;
   const child = node.statics.get(segment);
   if (child) {
-    const route = match(child, segments, index + 1, values, pick);
+    const route = match(child, segments, index + 1, values, method);
     if (route) return route;
   }
 
   if (node.param && segment !== '') {
     values.push(segment);
-    const route = match(node.param.node, segments, index + 1, values, pick);
+    const route = match(node.param.node, segments, index + 1, values, method);
     if (route) return route;
     values.pop();
   }
 
   if (node.wildcard && !hasEmptySegment(segments, index)) {
-    const route = pick(node.wildcard);
+    const route = node.wildcard.routes.get(method);
     if (route) {
       values.push(segments.slice(index).join('/'));
       return route;

@@ -1,7 +1,6 @@
 {
-  "name": "@avi/cli",
-  "version": "0.0.0",
-  "private": true,
+  "name": "@avijs/cli",
+  "version": "0.1.0",
   "description": "The avi command: project scaffolding, dev mode and build checks.",
   "keywords": [
     "avi",
@@ -30,7 +29,7 @@
   },
   "exports": {
     ".": {
-      "@avi/source": "./src/index.ts",
+      "@avijs/source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     }
@@ -42,14 +41,13 @@
     "LICENSE"
   ],
   "publishConfig": {
-    "access": "public",
-    "provenance": true
+    "access": "public"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@avi/compiler": "workspace:*"
+    "@avijs/compiler": "workspace:*"
   },
   "peerDependencies": {
     "typescript": ">=5.8"

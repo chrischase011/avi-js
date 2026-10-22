@@ -212,7 +212,7 @@ describe('@Injectable', () => {
   });
 
   it('rejects an unknown scope', () => {
-    expect(() => Injectable({ scope: 'request' as never })).toThrow('Invalid scope "request"');
+    expect(() => Injectable({ scope: 'session' as never })).toThrow('Invalid scope "session"');
   });
 });
 

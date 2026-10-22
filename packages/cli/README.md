@@ -1,9 +1,9 @@
-# @avi/cli
+# @avijs/cli
 
 The avi command: avi new, avi dev, avi check and avi manifest.
 
 ```sh
-npm install -D @avi/cli
+npm install -D @avijs/cli
 ```
 
 Part of [Avi.js](https://github.com/chrischase011/avi-js), a TypeScript framework for Node.js with

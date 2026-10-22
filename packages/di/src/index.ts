@@ -4,6 +4,7 @@ export type {
   ModuleDefinition,
   ModuleDescription,
   ProviderDescription,
+  RequestScope,
 } from './container.js';
 export type { ClassProvider, FactoryProvider, Provider, Scope, ValueProvider } from './provider.js';
 export { createToken } from './token.js';

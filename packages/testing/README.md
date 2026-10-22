@@ -1,9 +1,9 @@
-# @avi/testing
+# @avijs/testing
 
 A test client for Avi.js apps, with provider overrides.
 
 ```sh
-npm install @avi/testing
+npm install @avijs/testing
 ```
 
 Part of [Avi.js](https://github.com/chrischase011/avi-js), a TypeScript framework for Node.js with

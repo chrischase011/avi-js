@@ -3,7 +3,7 @@
 All notable changes are listed here. Avi.js follows [Semantic Versioning](https://semver.org); all
 packages share one version.
 
-## Unreleased
+## 0.1.0 - 2026-10-22
 
 The first release. Everything below is new.
 
@@ -14,6 +14,7 @@ The first release. Everything below is new.
   (Node `Readable`, web `ReadableStream`) and web `Response`, with backpressure.
 - Safe errors: `HttpError` with `headers` and `details`; 5xx details never sent.
 - Request bodies read on demand with a size limit; `ctx.text()`, `ctx.json()`.
+- `onRequest` hooks that run before routing, for every request including 404s and `OPTIONS`.
 - Segment-trie router: `:params`, trailing `*`, deterministic precedence with backtracking, `405`
   with `Allow`, automatic `HEAD` and `OPTIONS`, a direct lookup for static routes.
 
@@ -22,6 +23,8 @@ The first release. Everything below is new.
 - `defineModule` / `@Module` with imports, exports, re-exports and prefixes.
 - Class, value and factory providers; singleton and transient scopes; async factories; reverse-order
   disposal. Explicit `static inject`, no `reflect-metadata`.
+- Request scope: `scope: 'request'` and the `REQUEST` token. Controllers that depend on a
+  request-scoped provider are created per request; request instances are disposed afterwards.
 - Startup checks with full dependency chains: missing or hidden providers, cycles, duplicates.
 - `overrides` to replace providers in tests.
 
@@ -37,10 +40,14 @@ The first release. Everything below is new.
 - Route schemas with any Standard Schema library; typed `ctx.input` and path params; response
   schemas that drop undeclared fields.
 
+### Security
+
+- `@avijs/security`: `cors()` and `securityHeaders()` as `onRequest` hooks.
+
 ### Tooling
 
-- `@avi/compiler`: `avi-compile check` for `static inject` lists and `manifest` for app manifests;
+- `@avijs/compiler`: `avi-compile check` for `static inject` lists and `manifest` for app manifests;
   `createAvi({ manifest })` refuses to start on a stale one.
-- `@avi/testing`: a test client.
-- `@avi/openapi`: OpenAPI 3.1 documents from routes and schemas.
-- `@avi/cli`: `avi new` (modular and minimal templates), `avi dev`, `avi check`, `avi manifest`.
+- `@avijs/testing`: a test client.
+- `@avijs/openapi`: OpenAPI 3.1 documents from routes and schemas.
+- `@avijs/cli`: `avi new` (modular and minimal templates), `avi dev`, `avi check`, `avi manifest`.

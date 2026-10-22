@@ -5,7 +5,7 @@ import {
   defineModule,
   route,
   type Middleware,
-} from '@avi/core';
+} from '@avijs/core';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createTestClient, type TestClient } from '../src/index.js';
 

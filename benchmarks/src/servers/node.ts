@@ -1,4 +1,4 @@
-// Hand-written node:http server with the same two responses as the Avi server.
+// Hand-written node:http server with the same responses as the Avi server.
 import { createServer, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
@@ -21,6 +21,12 @@ const server = createServer((req, res) => {
     json(res, 200, { hello: 'world' });
   } else if (req.method === 'GET' && path.startsWith('/users/') && !path.includes('/', 7)) {
     json(res, 200, { id: decodeURIComponent(path.slice(7)) });
+  } else if (req.method === 'POST' && path === '/echo') {
+    const chunks: Buffer[] = [];
+    req.on('data', (chunk: Buffer) => chunks.push(chunk));
+    req.on('end', () => {
+      json(res, 200, JSON.parse(Buffer.concat(chunks).toString('utf8')));
+    });
   } else {
     json(res, 404, { statusCode: 404, error: 'Not Found' });
   }

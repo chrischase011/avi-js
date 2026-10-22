@@ -1,4 +1,4 @@
-import type { AviApp, RouteInfo, StandardSchemaV1 } from '@avi/core';
+import type { AviApp, RouteInfo, StandardSchemaV1 } from '@avijs/core';
 
 export type JsonSchema = Record<string, unknown>;
 

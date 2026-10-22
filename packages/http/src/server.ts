@@ -12,7 +12,7 @@ import { RequestContext, type Context } from './context.js';
 import { HttpError, RequestAbortedError } from './errors.js';
 import type { HttpMethod } from './methods.js';
 import { clearHeaders, sendError, sendOptions, sendValue, statusOf } from './respond.js';
-import type { Handler, Router } from './router.js';
+import type { Handler, RouteMatch, Router } from './router.js';
 
 export interface Logger {
   error(message: string, error: unknown): void;
@@ -23,6 +23,12 @@ export interface Logger {
  * uses the error's (`HttpError.status`, else 500). If it throws, the built-in response is used.
  */
 export type ErrorHandler = (error: unknown, ctx: Context) => unknown;
+
+/**
+ * Runs for every request before routing, including 404s and automatic `OPTIONS`. Return
+ * `undefined` to continue, or a value to send it as the response, like a handler.
+ */
+export type RequestHook = (ctx: Context) => unknown;
 
 export interface ResponseInfo {
   readonly method: string;
@@ -52,6 +58,8 @@ export interface ServerOptions {
   /** Receives 5xx errors. Default: `console.error`. */
   logger?: Logger;
   errorHandler?: ErrorHandler;
+  /** Run in order before routing, for every request. */
+  onRequest?: readonly RequestHook[];
   /** Called after every response. Errors are logged, never sent. */
   onResponse?: (info: ResponseInfo) => unknown;
 }
@@ -78,6 +86,7 @@ export class HttpServer {
   readonly #nodeOptions: NodeServerOptions;
   readonly #logger: Logger;
   readonly #errorHandler: ErrorHandler | undefined;
+  readonly #hooks: readonly RequestHook[] | undefined;
   readonly #onResponse: ((info: ResponseInfo) => unknown) | undefined;
   #server: Server | undefined;
   #closing: Promise<void> | undefined;
@@ -89,6 +98,7 @@ export class HttpServer {
     this.#logger = options.logger ?? consoleLogger;
     this.#errorHandler = optionalFunction('errorHandler', options.errorHandler);
     this.#onResponse = optionalFunction('onResponse', options.onResponse);
+    this.#hooks = hookList(options.onRequest);
     this.#nodeOptions = {};
     for (const name of PASSED_THROUGH) {
       const value = options[name];
@@ -168,13 +178,54 @@ export class HttpServer {
       this.#bodyLimit,
     );
 
+    if (this.#hooks) this.#runHooks(this.#hooks, 0, ctx, res, match);
+    else this.#dispatch(ctx, res, match);
+  }
+
+  #runHooks(
+    hooks: readonly RequestHook[],
+    start: number,
+    ctx: RequestContext,
+    res: ServerResponse,
+    match: RouteMatch,
+  ): void {
+    for (let i = start; i < hooks.length; i++) {
+      let result: unknown;
+      try {
+        result = hooks[i]?.(ctx);
+      } catch (error) {
+        this.#fail(ctx, res, error);
+        return;
+      }
+      if (result instanceof Promise) {
+        result.then(
+          (value: unknown) => {
+            if (res.destroyed) return;
+            if (value === undefined) this.#runHooks(hooks, i + 1, ctx, res, match);
+            else this.#respond(ctx, res, value);
+          },
+          (error: unknown) => {
+            this.#fail(ctx, res, error);
+          },
+        );
+        return;
+      }
+      if (result !== undefined) {
+        this.#respond(ctx, res, result);
+        return;
+      }
+    }
+    this.#dispatch(ctx, res, match);
+  }
+
+  #dispatch(ctx: RequestContext, res: ServerResponse, match: RouteMatch): void {
     let handler: Handler;
     switch (match.kind) {
       case 'found':
         handler = match.handler;
         break;
       case 'options':
-        sendOptions(res, match.allow, undefined, this.#closing !== undefined);
+        sendOptions(res, match.allow, ctx.responseHeaders, this.#closing !== undefined);
         return;
       case 'not-found':
         this.#fail(ctx, res, new HttpError(404));
@@ -306,6 +357,15 @@ function nonNegative(name: string, value: number): number {
     throw new RangeError(`${name} must be a non-negative integer, got ${String(value)}`);
   }
   return value;
+}
+
+function hookList(hooks: readonly RequestHook[] | undefined): readonly RequestHook[] | undefined {
+  if (hooks === undefined) return undefined;
+  const value: unknown = hooks;
+  if (!Array.isArray(value) || value.some((hook: unknown) => typeof hook !== 'function')) {
+    throw new TypeError('onRequest must be an array of functions');
+  }
+  return hooks.length === 0 ? undefined : [...hooks];
 }
 
 function optionalFunction<F>(name: string, value: F | undefined): F | undefined {

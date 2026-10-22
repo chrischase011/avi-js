@@ -1,6 +1,11 @@
-import type { Class, ResolveTokens, Scope, Token } from '@avi/di';
-import type { Context, HttpMethod, NoInput } from '@avi/http';
-import { checkRouteSchema, type InputOf, type PathParams, type RouteSchema } from '@avi/validation';
+import type { Class, ResolveTokens, Scope, Token } from '@avijs/di';
+import type { Context, HttpMethod, NoInput } from '@avijs/http';
+import {
+  checkRouteSchema,
+  type InputOf,
+  type PathParams,
+  type RouteSchema,
+} from '@avijs/validation';
 import { defineModule, type ModuleOptions } from './module.js';
 import { checkRefs, type GuardRef, type MiddlewareRef, type RouteDocs } from './pipeline.js';
 import {
@@ -78,7 +83,12 @@ export function Injectable(options: { scope?: Scope } = {}) {
   if (typeof options !== 'object') throw usage('@Injectable');
   const { scope } = options;
   const given: unknown = scope;
-  if (given !== undefined && given !== 'singleton' && given !== 'transient') {
+  if (
+    given !== undefined &&
+    given !== 'singleton' &&
+    given !== 'transient' &&
+    given !== 'request'
+  ) {
     throw new TypeError(`Invalid scope ${JSON.stringify(given)} in @Injectable`);
   }
   return <C extends Class & CheckInject<C>>(value: C, context: ClassDecoratorContext<C>): void => {

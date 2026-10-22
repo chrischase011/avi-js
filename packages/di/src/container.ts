@@ -1,4 +1,4 @@
-import { normalizeProvider, type Provider, type ProviderSpec } from './provider.js';
+import { normalizeProvider, type Provider, type ProviderSpec, type Scope } from './provider.js';
 import { isToken, tokenName, type Token } from './token.js';
 
 export interface ModuleDefinition {
@@ -15,12 +15,25 @@ export interface ContainerOptions {
    * tests. An override that matches nothing is an error.
    */
   readonly overrides?: readonly Provider[];
+  /**
+   * Tokens whose values each request supplies through `requestScope()`, such as the request
+   * itself. Visible in every module, as request-scoped providers.
+   */
+  readonly requestTokens?: readonly Token[];
+}
+
+/** Request-scoped instances for one request. */
+export interface RequestScope {
+  /** Like `Container.resolve`, but request-scoped providers are created once for this scope. */
+  resolve(module: ModuleDefinition, token: Token): unknown;
+  /** Disposes this scope's instances in reverse creation order. */
+  dispose(): Promise<void>;
 }
 
 export interface ProviderDescription {
   readonly token: string;
   readonly kind: 'class' | 'value' | 'factory';
-  readonly scope: 'singleton' | 'transient';
+  readonly scope: Scope;
   readonly inject: readonly string[];
 }
 
@@ -34,6 +47,10 @@ export interface ModuleDescription {
 interface ProviderRecord extends ProviderSpec {
   readonly module: ModuleRecord;
   links: ProviderRecord[];
+  /** Request-scoped, or transient with a request-scoped dependency. Set by `#check`. */
+  requestBound: boolean;
+  /** Supplied per request, see `requestTokens`. */
+  supplied: boolean;
   state: 'unchecked' | 'checking' | 'checked';
   instance: unknown;
   ready: Promise<void> | undefined;
@@ -49,6 +66,20 @@ interface ModuleRecord {
 
 type Lookup = ProviderRecord | { ambiguous: string[] } | undefined;
 
+interface ScopeState {
+  readonly values: ReadonlyMap<Token, unknown>;
+  readonly instances: Map<ProviderRecord, unknown>;
+  readonly created: { record: ProviderRecord; value: unknown }[];
+}
+
+const REQUEST_MODULE: ModuleRecord = {
+  definition: { name: 'request' },
+  name: 'request',
+  imports: [],
+  own: new Map(),
+  exported: new Map(),
+};
+
 /**
  * Builds and validates the module graph on construction. `init()` creates every singleton,
  * `dispose()` tears them down in reverse creation order.
@@ -59,6 +90,7 @@ export class Container {
   readonly #created: ProviderRecord[] = [];
   readonly #overrides = new Map<Token, ProviderSpec>();
   readonly #overridden = new Set<Token>();
+  readonly #supplied = new Map<Token, ProviderRecord>();
   #state: 'new' | 'initializing' | 'ready' | 'disposed' = 'new';
 
   constructor(roots: readonly ModuleDefinition[], options: ContainerOptions = {}) {
@@ -69,6 +101,24 @@ export class Container {
       }
       this.#overrides.set(spec.token, spec);
     });
+
+    for (const token of options.requestTokens ?? []) {
+      this.#supplied.set(token, {
+        token,
+        kind: 'value',
+        scope: 'request',
+        deps: [],
+        create: () => undefined,
+        dispose: undefined,
+        module: REQUEST_MODULE,
+        links: [],
+        requestBound: true,
+        supplied: true,
+        state: 'checked',
+        instance: undefined,
+        ready: undefined,
+      });
+    }
 
     this.#roots = roots.map((root, i) => this.#collect(root, [], `root module ${String(i)}`));
     for (const token of this.#overrides.keys()) {
@@ -108,6 +158,23 @@ export class Container {
       const target = this.#lookupOrThrow(record, token, [label]);
       this.#check(target, [label, tokenName(token)]);
     }
+  }
+
+  /** True if resolving any of `tokens` from `module` needs a request scope. */
+  needsRequest(module: ModuleDefinition, tokens: readonly Token[]): boolean {
+    const record = this.#module(module);
+    return tokens.some((token) => this.#lookupOrThrow(record, token, []).requestBound);
+  }
+
+  /** Starts a request scope. `values` supplies the `requestTokens`. */
+  requestScope(values: ReadonlyMap<Token, unknown>): RequestScope {
+    this.#assertReady();
+    const scope: ScopeState = { values, instances: new Map(), created: [] };
+    return {
+      resolve: (module, token) =>
+        this.#instance(this.#lookupOrThrow(this.#module(module), token, []), scope),
+      dispose: () => disposeAll(scope.created.splice(0)),
+    };
   }
 
   async init(): Promise<void> {
@@ -152,17 +219,7 @@ export class Container {
 
   async dispose(): Promise<void> {
     this.#state = 'disposed';
-    const errors: unknown[] = [];
-    for (const record of this.#created.splice(0).reverse()) {
-      try {
-        await disposeValue(record);
-      } catch (error) {
-        errors.push(error);
-      }
-    }
-    if (errors.length > 0) {
-      throw new AggregateError(errors, `Failed to dispose ${String(errors.length)} provider(s)`);
-    }
+    await disposeAll(this.#created.splice(0).map((record) => ({ record, value: record.instance })));
   }
 
   #collect(definition: ModuleDefinition, stack: ModuleDefinition[], where: string): ModuleRecord {
@@ -198,6 +255,8 @@ export class Container {
         ...spec,
         module: record,
         links: [],
+        requestBound: false,
+        supplied: false,
         state: 'unchecked',
         instance: undefined,
         ready: undefined,
@@ -216,7 +275,7 @@ export class Container {
   }
 
   #lookupOrThrow(module: ModuleRecord, token: Token, path: string[]): ProviderRecord {
-    const hit = lookup(module, token);
+    const hit = lookup(module, token) ?? this.#supplied.get(token);
     const chain = [...path, tokenName(token)].join(' → ');
     if (!hit) {
       const imports = module.imports.map((m) => m.name).join(', ') || 'none';
@@ -245,6 +304,17 @@ export class Container {
       this.#check(target, [...path, tokenName(token)]);
       return target;
     });
+    record.requestBound =
+      record.scope === 'request' ||
+      (record.scope === 'transient' && record.links.some((link) => link.requestBound));
+    const bound = record.scope === 'singleton' && record.links.find((link) => link.requestBound);
+    if (bound) {
+      const name = tokenName(record.token);
+      const chain = [...path, tokenName(bound.token)].join(' → ');
+      throw new Error(
+        `Singleton ${name} in ${record.module.name} depends on request-scoped ${tokenName(bound.token)} (${chain}). A singleton outlives the request; make ${name} request-scoped or transient.`,
+      );
+    }
     record.state = 'checked';
   }
 
@@ -272,8 +342,8 @@ export class Container {
     }
   }
 
-  #create(record: ProviderRecord): unknown {
-    const deps = record.links.map((dep) => this.#instance(dep));
+  #create(record: ProviderRecord, scope?: ScopeState): unknown {
+    const deps = record.links.map((dep) => this.#instance(dep, scope));
     try {
       return record.create(deps);
     } catch (error) {
@@ -281,13 +351,36 @@ export class Container {
     }
   }
 
-  #instance(record: ProviderRecord): unknown {
+  #instance(record: ProviderRecord, scope?: ScopeState): unknown {
     if (record.scope === 'singleton') return record.instance;
-    const value = this.#create(record);
+    if (record.scope === 'request') {
+      if (!scope) {
+        throw new Error(
+          `${tokenName(record.token)} is request-scoped and can only be resolved while handling a request`,
+        );
+      }
+      if (record.supplied) {
+        if (!scope.values.has(record.token)) {
+          throw new Error(`This request scope has no value for ${tokenName(record.token)}`);
+        }
+        return scope.values.get(record.token);
+      }
+      if (scope.instances.has(record)) return scope.instances.get(record);
+      const value = this.#createSync(record, scope);
+      scope.instances.set(record, value);
+      scope.created.push({ record, value });
+      return value;
+    }
+    return this.#createSync(record, scope);
+  }
+
+  #createSync(record: ProviderRecord, scope: ScopeState | undefined): unknown {
+    const value = this.#create(record, scope);
     if (record.kind === 'factory' && value instanceof Promise) {
       (value as Promise<unknown>).catch(() => undefined);
+      const kind = record.scope === 'request' ? 'Request-scoped' : 'Transient';
       throw new Error(
-        `Transient provider ${tokenName(record.token)} in ${record.module.name} returned a Promise; only singletons may be async`,
+        `${kind} provider ${tokenName(record.token)} in ${record.module.name} returned a Promise; only singletons may be async`,
       );
     }
     return value;
@@ -336,12 +429,29 @@ function exportEntry(module: ModuleRecord, entry: unknown): void {
   module.exported.set(entry, hit);
 }
 
-async function disposeValue(record: ProviderRecord): Promise<void> {
+/** Disposes in reverse order, continuing past failures. */
+async function disposeAll(
+  created: readonly { record: ProviderRecord; value: unknown }[],
+): Promise<void> {
+  const errors: unknown[] = [];
+  for (const { record, value } of [...created].reverse()) {
+    try {
+      await disposeValue(record, value);
+    } catch (error) {
+      errors.push(error);
+    }
+  }
+  if (errors.length > 0) {
+    throw new AggregateError(errors, `Failed to dispose ${String(errors.length)} provider(s)`);
+  }
+}
+
+async function disposeValue(record: ProviderRecord, instance: unknown): Promise<void> {
   if (record.dispose) {
-    await record.dispose(record.instance);
+    await record.dispose(instance);
     return;
   }
-  const value = record.instance as Partial<AsyncDisposable & Disposable> | null | undefined;
+  const value = instance as Partial<AsyncDisposable & Disposable> | null | undefined;
   const asyncDispose = value?.[Symbol.asyncDispose];
   const syncDispose = value?.[Symbol.dispose];
   if (typeof asyncDispose === 'function') await asyncDispose.call(value);

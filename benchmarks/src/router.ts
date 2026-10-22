@@ -1,4 +1,4 @@
-import { Router } from '@avi/http';
+import { Router } from '@avijs/http';
 import { bench, do_not_optimize, run, summary } from 'mitata';
 import { PROBES, ROUTES } from './routes.js';
 

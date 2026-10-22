@@ -1,4 +1,4 @@
-# 12. Avi.js for NestJS developers
+# 13. Avi.js for NestJS developers
 
 > **Status: Runnable.** A map of familiar NestJS ideas to their Avi.js equivalents.
 
@@ -95,9 +95,9 @@ request.
 | `@Global()` modules                             | Imports are always explicit                                                      |
 | `forwardRef()`                                  | Dependency cycles are reported at startup instead                                |
 | `onModuleInit`, `onModuleDestroy`               | Async factories, `Symbol.asyncDispose` or a `dispose` callback                   |
-| Request-scoped providers                        | Not available yet; `ctx.state` carries per-request data                          |
+| Request-scoped providers                        | `scope: 'request'` and the `REQUEST` token                                       |
 | `Test.createTestingModule().overrideProvider()` | `createTestClient(AppModule, { overrides })`                                     |
-| `@nestjs/swagger`                               | `@avi/openapi`                                                                   |
+| `@nestjs/swagger`                               | `@avijs/openapi`                                                                 |
 | Express or Fastify adapter                      | Native `node:http`                                                               |
 
 ## Trying Avi.js with NestJS experience

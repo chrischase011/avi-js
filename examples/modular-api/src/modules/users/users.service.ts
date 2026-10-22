@@ -1,4 +1,4 @@
-import { Injectable } from '@avi/core';
+import { Injectable } from '@avijs/core';
 import type { CreateUserDto } from './dto/create-user.dto.js';
 
 export interface User {

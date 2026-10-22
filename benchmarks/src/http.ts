@@ -17,10 +17,22 @@ interface Case {
 
 const USER = JSON.stringify({ name: 'Ada', email: 'ada@example.com', age: 36 });
 
+// Server name → compiled file in servers/ and its extra arguments.
+const SERVERS: Record<string, [file: string, ...args: string[]]> = {
+  node: ['node'],
+  avi: ['avi'],
+  fastify: ['fastify'],
+  hono: ['hono'],
+  'nest-express': ['nest', 'express'],
+  'nest-fastify': ['nest', 'fastify'],
+};
+const ALL = Object.keys(SERVERS);
+const ONLY = process.env['BENCH_SERVERS']?.split(',');
+
 const CASES: readonly Case[] = [
-  { name: 'JSON hello', path: '/', servers: ['node', 'avi'] },
-  { name: 'JSON with param', path: '/users/123', servers: ['node', 'avi'] },
-  { name: 'POST JSON, no schema', path: '/echo', servers: ['avi'], body: USER },
+  { name: 'JSON hello', path: '/', servers: ALL },
+  { name: 'JSON with param', path: '/users/123', servers: ALL },
+  { name: 'POST JSON echo', path: '/echo', servers: ALL, body: USER },
   { name: 'POST JSON, validated', path: '/validated', servers: ['avi'], body: USER },
 ];
 
@@ -35,7 +47,10 @@ interface Row {
 }
 
 async function startServer(name: string) {
-  const child = fork(new URL(`./servers/${name}.js`, import.meta.url), [], { stdio: 'inherit' });
+  const [file, ...args] = SERVERS[name] ?? [name];
+  const child = fork(new URL(`./servers/${file}.js`, import.meta.url), ['0', ...args], {
+    stdio: 'inherit',
+  });
   const port = await new Promise<number>((resolve, reject) => {
     child.once('message', (message) => {
       resolve((message as { port: number }).port);
@@ -82,7 +97,7 @@ console.log(
 
 const rows: Row[] = [];
 for (const { name: caseName, path, servers, body } of CASES) {
-  for (const name of servers) {
+  for (const name of servers.filter((server) => !ONLY || ONLY.includes(server))) {
     const server = await startServer(name);
     const url = `http://127.0.0.1:${String(server.port)}${path}`;
     await load(url, WARMUP, body);

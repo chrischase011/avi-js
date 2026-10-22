@@ -6,7 +6,7 @@ import {
   defineModule,
   describeApp,
   type AviModule,
-} from '@avi/core';
+} from '@avijs/core';
 import { performance } from 'node:perf_hooks';
 
 const MODULES = Number(process.env['BENCH_MODULES'] ?? 100);

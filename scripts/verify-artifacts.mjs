@@ -83,7 +83,7 @@ for (const tarball of tarballs) {
 const work = mkdtempSync(path.join(tmpdir(), 'avi-artifacts-'));
 const local = Object.fromEntries(
   tarballs.map((file) => [
-    `@avi/${/^avi-(.+?)-\d/.exec(file)[1]}`,
+    `@avijs/${/^avijs-(.+?)-\d/.exec(file)[1]}`,
     `file:${path.join(artifacts, file).replaceAll('\\', '/')}`,
   ]),
 );
@@ -123,9 +123,10 @@ writeFileSync(
 writeFileSync(
   path.join(consumer, 'src/app.ts'),
   `import assert from 'node:assert/strict';
-import { AviFactory, Controller, Get, Injectable, Module, createToken, route, defineController, type Context } from '@avi/core';
-import { createTestClient } from '@avi/testing';
-import { generateOpenApi } from '@avi/openapi';
+import { AviFactory, Controller, Get, Injectable, Module, createToken, route, defineController, type Context } from '@avijs/core';
+import { createTestClient } from '@avijs/testing';
+import { generateOpenApi } from '@avijs/openapi';
+import { cors } from '@avijs/security';
 import * as v from 'valibot';
 
 const Greeting = createToken<string>('Greeting');
@@ -153,10 +154,11 @@ const items = defineController({
 @Module({ providers: [Greeter, { provide: Greeting, useValue: 'Hello' }], controllers: [GreetController, items] })
 class AppModule {}
 
-const app = await AviFactory.create(AppModule);
+const app = await AviFactory.create(AppModule, { onRequest: [cors({ origin: 'https://a.example' })] });
 const client = await createTestClient(app);
 assert.deepEqual((await client.get('/greet/Ada')).body, { message: 'Hello, Ada!' });
 assert.equal((await client.post('/items', {})).status, 400);
+assert.equal((await client.get('/greet/Ada', { headers: { origin: 'https://a.example' } })).headers.get('access-control-allow-origin'), 'https://a.example');
 assert.ok(generateOpenApi(app, { info: { title: 'T', version: '1' } }).paths['/greet/{name}']);
 await client.close();
 console.log('consumer app ok');
@@ -165,9 +167,9 @@ console.log('consumer app ok');
 writeFileSync(
   path.join(consumer, 'require.cjs'),
   `const assert = require('node:assert/strict');
-const core = require('@avi/core');
+const core = require('@avijs/core');
 assert.equal(typeof core.createAvi, 'function');
-assert.equal(typeof require('@avi/testing').createTestClient, 'function');
+assert.equal(typeof require('@avijs/testing').createTestClient, 'function');
 console.log('require(esm) ok');
 `,
 );

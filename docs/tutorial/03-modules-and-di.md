@@ -9,7 +9,7 @@ Avi.js does not use `reflect-metadata` and never guesses constructor types. A cl
 needs in `static inject`, in constructor order:
 
 ```ts
-import { createToken } from '@avi/core';
+import { createToken } from '@avijs/core';
 
 export interface GreeterConfig {
   greeting: string;
@@ -35,7 +35,7 @@ than `inject` lists, startup fails and names the class.
 ## Modules group providers
 
 ```ts
-import { defineModule } from '@avi/core';
+import { defineModule } from '@avijs/core';
 
 export const GreetingModule = defineModule({
   name: 'GreetingModule',
@@ -51,7 +51,7 @@ message.
 ## Using a service from a controller
 
 ```ts
-import { createAvi, defineController } from '@avi/core';
+import { createAvi, defineController } from '@avijs/core';
 
 const greetings = defineController({
   prefix: '/greet',
@@ -108,6 +108,46 @@ Annotate factory parameters yourself: inside a `providers` array TypeScript cann
 | --------------------- | ------------------------------------------------------------------------ |
 | `singleton` (default) | Created once at startup and shared                                       |
 | `transient`           | A new instance on every injection. Inside a singleton, created just once |
+| `request`             | One instance per request, disposed after the handler                     |
+
+## Request scope
+
+A request-scoped provider gets a fresh instance for each request, shared by everything that
+injects it during that request. Inject `REQUEST` to read the request itself:
+
+```ts
+import { Injectable, REQUEST, type Context } from '@avijs/core';
+
+@Injectable({ scope: 'request' })
+class CurrentUser {
+  static inject = [REQUEST, UsersService] as const;
+  readonly id: string;
+  constructor(ctx: Context, users: UsersService) {
+    this.id = users.idFromToken(ctx.headers.authorization);
+  }
+}
+
+// or as a factory, which may return a plain value
+{ provide: TenantId, useFactory: (ctx: Context) => ctx.headers['x-tenant'], inject: [REQUEST], scope: 'request' }
+```
+
+A controller that injects a request-scoped provider, directly or through a transient, is created
+for each request. Other controllers are still created once. Use request scope where you need it, not
+by default: each request then builds the controller and its request providers.
+
+The rules are checked at startup:
+
+- A singleton cannot depend on a request-scoped provider, since it would keep the first request's
+  instance forever. Make it request-scoped or transient.
+- Middleware and guard classes are created once, so they cannot use request scope. Read the
+  request from `ctx`, and pass data along with `ctx.state`.
+- A controller may only use a request-scoped dependency inside its route handlers, not in its
+  constructor.
+
+Request-scoped instances are disposed with `Symbol.dispose`, `Symbol.asyncDispose` or a factory's
+`dispose` after the handler returns or throws. A disposal error is logged and does not change the
+response. A streamed response may still be sending when that happens, so don't hand a
+request-scoped resource to a stream.
 
 ## Async setup
 
@@ -125,7 +165,8 @@ Singleton factories can be `async`. Avi.js awaits them before the server starts:
 }
 ```
 
-Transient factories must stay synchronous; an async one fails at startup.
+Transient and request-scoped factories must stay synchronous; an async one fails when it is first
+used.
 
 ## Cleanup on shutdown
 
@@ -144,6 +185,7 @@ class Db {
 ```
 
 Avi.js only disposes what it created: `useValue` values and transients are left alone.
+Request-scoped instances are disposed at the end of each request instead.
 
 ## Configurable modules
 

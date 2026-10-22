@@ -1,4 +1,4 @@
-import { Controller, Get } from '@avi/core';
+import { Controller, Get } from '@avijs/core';
 
 @Controller()
 export class HealthController {

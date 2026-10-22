@@ -1,17 +1,19 @@
-import { Container, type Provider, type Token, type TokenType } from '@avi/di';
+import { Container, type Provider, type Token, type TokenType } from '@avijs/di';
 import {
   HttpServer,
   Router,
   compose,
   type Guard,
+  type Handler,
   type HttpMethod,
+  type Logger,
   type Middleware,
   type RouteDefinition,
   type ServerOptions,
-} from '@avi/http';
-import { withValidation, type RouteSchema } from '@avi/validation';
+} from '@avijs/http';
+import { withValidation, type RouteSchema } from '@avijs/validation';
 import type { AddressInfo } from 'node:net';
-import { joinPath } from './controller.js';
+import { joinPath, type ControllerDefinition } from './controller.js';
 import { checkConsumers, injectOf } from './consumers.js';
 import { describeModules, firstDifference, type AppDescription } from './describe.js';
 import {
@@ -30,6 +32,7 @@ import {
   type MiddlewareRef,
   type RouteDocs,
 } from './pipeline.js';
+import { REQUEST, REQUEST_TOKENS } from './request.js';
 
 export interface AviOptions extends ServerOptions {
   /** Runs first, for every route. */
@@ -95,6 +98,7 @@ class Application implements AviApp {
   readonly #guards: readonly GuardRef[];
   readonly #manifest: AppDescription | undefined;
   readonly #overrides: readonly Provider[];
+  readonly #logger: Logger;
   #container: Container | undefined;
   #routes: readonly RouteInfo[] | undefined;
   #init: Promise<void> | undefined;
@@ -105,6 +109,11 @@ class Application implements AviApp {
     this.#guards = checkRefs(options.guards, 'canActivate', 'App guards');
     this.#manifest = options.manifest;
     this.#overrides = options.overrides ?? [];
+    this.#logger = options.logger ?? {
+      error(message, error) {
+        console.error(message, error);
+      },
+    };
   }
 
   register(module: ModuleRef | ModuleOptions): this {
@@ -141,7 +150,10 @@ class Application implements AviApp {
   }
 
   async #start(): Promise<void> {
-    const container = new Container(this.#roots, { overrides: this.#overrides });
+    const container = new Container(this.#roots, {
+      overrides: this.#overrides,
+      requestTokens: REQUEST_TOKENS,
+    });
     const modules = container.modules as AviModule[];
     checkConsumers(container);
 
@@ -159,12 +171,20 @@ class Application implements AviApp {
         const moduleGuards = [...appGuards, ...scope.guards(module.guards)];
 
         for (const controller of module.controllers) {
-          const deps = controller.inject.map((token) => container.resolve(module, token));
+          const perRequest = container.needsRequest(module, controller.inject);
+          const deps = controller.inject.map((token) =>
+            perRequest && container.needsRequest(module, [token])
+              ? placeholder(token, controller.name)
+              : container.resolve(module, token),
+          );
           const base = joinPath(module.prefix, controller.prefix);
           const middleware = [...moduleMiddleware, ...scope.middleware(controller.middleware)];
           const guards = [...moduleGuards, ...scope.guards(controller.guards)];
 
-          for (const route of controller.createRoutes(deps)) {
+          for (const [index, route] of controller.createRoutes(deps).entries()) {
+            const handler = perRequest
+              ? this.#perRequest(container, module, controller, index)
+              : route.handler;
             const path = joinPath(base, route.path);
             infos.push({
               method: route.method,
@@ -180,7 +200,7 @@ class Application implements AviApp {
               handler: compose(
                 [...middleware, ...scope.middleware(route.middleware ?? [])],
                 [...guards, ...scope.guards(route.guards ?? [])],
-                route.schema ? withValidation(route.schema, route.handler) : route.handler,
+                route.schema ? withValidation(route.schema, handler) : handler,
               ),
             });
           }
@@ -202,6 +222,63 @@ class Application implements AviApp {
       throw error;
     }
   }
+
+  /** Builds the controller for each request, so its request-scoped dependencies are fresh. */
+  #perRequest(
+    container: Container,
+    module: AviModule,
+    controller: ControllerDefinition,
+    index: number,
+  ): Handler {
+    return async (ctx) => {
+      const scope = container.requestScope(new Map([[REQUEST, ctx]]));
+      try {
+        const deps = controller.inject.map((token) => scope.resolve(module, token));
+        const route = controller.createRoutes(deps)[index];
+        if (!route) {
+          throw new Error(
+            `${controller.name} returned fewer routes for this request than at startup`,
+          );
+        }
+        return await route.handler(ctx);
+      } finally {
+        await scope.dispose().catch((error: unknown) => {
+          this.#logger.error(
+            `Failed to dispose request-scoped providers: ${ctx.method} ${ctx.path}`,
+            error,
+          );
+        });
+      }
+    };
+  }
+}
+
+function tokenLabel(token: Token): string {
+  return typeof token === 'function' ? token.name : token.description;
+}
+
+/** Stands in for request-scoped dependencies while a controller's routes are read at startup. */
+function placeholder(token: Token, owner: string): unknown {
+  const fail = (): never => {
+    throw new Error(
+      `${owner} used request-scoped ${tokenLabel(token)} while being created at startup. Use it inside route handlers only.`,
+    );
+  };
+  return new Proxy(
+    function placeholder() {
+      return undefined;
+    },
+    {
+      get: fail,
+      set: fail,
+      has: fail,
+      apply: fail,
+      construct: fail,
+      ownKeys: fail,
+      defineProperty: fail,
+      deleteProperty: fail,
+    },
+  );
 }
 
 /** Turns middleware and guard refs into functions, building each class once per scope. */

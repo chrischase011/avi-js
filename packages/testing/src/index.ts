@@ -4,7 +4,7 @@ import {
   type AviOptions,
   type ModuleOptions,
   type ModuleRef,
-} from '@avi/core';
+} from '@avijs/core';
 
 export interface TestRequest {
   /** Objects are sent as JSON; strings and bytes as they are. */

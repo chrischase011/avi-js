@@ -21,7 +21,7 @@ client receives, and stops reading if the client disconnects:
 
 ```ts
 import { createReadStream } from 'node:fs';
-import { reply } from '@avi/core';
+import { reply } from '@avijs/core';
 
 route({
   method: 'GET',
@@ -48,7 +48,7 @@ the client sees a truncated response instead of a silently wrong one.
 ## A production entry point
 
 ```ts
-import { createAvi } from '@avi/core';
+import { createAvi } from '@avijs/core';
 
 const app = createAvi({
   bodyLimit: 256 * 1024,

@@ -1,4 +1,4 @@
-import { main as compile } from '@avi/compiler';
+import { main as compile } from '@avijs/compiler';
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdir, readdir, writeFile } from 'node:fs/promises';
@@ -7,11 +7,14 @@ import path from 'node:path';
 import { parseArgs } from 'node:util';
 import { templateFiles } from './templates.js';
 
+const { version } = createRequire(import.meta.url)('../package.json') as { version: string };
+
 const USAGE = `Usage:
-  avi new <name> [--template modular|minimal] [--dir .] [--avi-version latest] [--from <dir>]
+  avi new <name> [--template modular|minimal] [--dir .] [--avi-version ^x.y.z] [--from <dir>]
       Create a project. The modular template (default) uses modules and decorators;
       minimal uses plain routes and services. --from points at a folder of packed
-      @avi tarballs (pnpm pack) to install instead of the registry.
+      @avijs tarballs (pnpm pack) to install instead of the registry. --avi-version
+      defaults to this CLI's version.
   avi dev [--project tsconfig.json] [--entry dist/main.js]
       Compile, then recompile and restart on every change.
   avi check [--project tsconfig.json]
@@ -42,7 +45,7 @@ async function create(args: readonly string[]): Promise<number> {
     options: {
       template: { type: 'string', default: 'modular' },
       dir: { type: 'string', default: '.' },
-      'avi-version': { type: 'string', default: 'latest' },
+      'avi-version': { type: 'string', default: `^${version}` },
       from: { type: 'string' },
     },
   });
@@ -142,11 +145,11 @@ async function localPackages(dir: string, project: string): Promise<Record<strin
   const folder = path.resolve(dir);
   const specs: Record<string, string> = {};
   for (const file of await readdir(folder)) {
-    const match = /^avi-([a-z-]+?)-\d+\.\d+\.\d+.*\.tgz$/.exec(file);
+    const match = /^avijs-([a-z-]+?)-\d+\.\d+\.\d+.*\.tgz$/.exec(file);
     if (!match?.[1]) continue;
     const relative = path.relative(project, path.join(folder, file)).replaceAll(path.sep, '/');
-    specs[`@avi/${match[1]}`] = `file:${relative}`;
+    specs[`@avijs/${match[1]}`] = `file:${relative}`;
   }
-  if (!specs['@avi/core']) throw new Error(`No @avi package tarballs found in ${folder}`);
+  if (!specs['@avijs/core']) throw new Error(`No @avijs package tarballs found in ${folder}`);
   return specs;
 }

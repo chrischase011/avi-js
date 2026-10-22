@@ -1,4 +1,4 @@
-import { Controller, Get, HttpError, Post, reply, type Context } from '@avi/core';
+import { Controller, Get, HttpError, Post, reply, type Context } from '@avijs/core';
 import { parseCreateUser } from './dto/create-user.dto.js';
 import { UsersService } from './users.service.js';
 

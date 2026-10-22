@@ -1,6 +1,6 @@
-import type { ResolveTokens, Token } from '@avi/di';
-import type { HttpMethod } from '@avi/http';
-import { checkRouteSchema } from '@avi/validation';
+import type { ResolveTokens, Token } from '@avijs/di';
+import type { HttpMethod } from '@avijs/http';
+import { checkRouteSchema } from '@avijs/validation';
 import { checkRefs, type GuardRef, type MiddlewareRef, type Route } from './pipeline.js';
 
 export interface ControllerOptions<K extends readonly Token[] = []> {

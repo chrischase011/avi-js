@@ -13,7 +13,7 @@ Give the route a `schema` with any of `params`, `query` and `body`. Wrap it in `
 TypeScript infers the types:
 
 ```ts
-import { defineController, route } from '@avi/core';
+import { defineController, route } from '@avijs/core';
 import * as v from 'valibot';
 
 const CreateUser = v.object({

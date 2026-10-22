@@ -1,7 +1,7 @@
 // Decorated classes map to the same definitions the explicit API produces.
-import type { Class, Scope, Token } from '@avi/di';
-import type { HttpMethod } from '@avi/http';
-import type { RouteSchema } from '@avi/validation';
+import type { Class, Scope, Token } from '@avijs/di';
+import type { HttpMethod } from '@avijs/http';
+import type { RouteSchema } from '@avijs/validation';
 import type { ControllerDefinition } from './controller.js';
 import type { AviModule } from './module.js';
 import {

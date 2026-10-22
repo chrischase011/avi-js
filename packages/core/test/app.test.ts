@@ -137,4 +137,31 @@ describe('createAvi', () => {
     const url = await serve(createAvi({ bodyLimit: 4 }).register({ controllers: [echo] }));
     expect((await fetch(url, { method: 'POST', body: '12345' })).status).toBe(413);
   });
+
+  it('runs onRequest hooks before app middleware, also for 404s', async () => {
+    const order: string[] = [];
+    const users = defineController({
+      routes: [{ method: 'GET', path: '/', handler: () => order.push('handler') }],
+    });
+    const url = await serve(
+      createAvi({
+        onRequest: [
+          (ctx) => {
+            order.push('hook');
+            ctx.setHeader('x-hook', '1');
+          },
+        ],
+        middleware: [
+          (_ctx, next) => {
+            order.push('middleware');
+            return next();
+          },
+        ],
+      }).register({ controllers: [users] }),
+    );
+
+    expect((await fetch(url)).headers.get('x-hook')).toBe('1');
+    expect(order).toEqual(['hook', 'middleware', 'handler']);
+    expect((await fetch(`${url}/missing`)).headers.get('x-hook')).toBe('1');
+  });
 });

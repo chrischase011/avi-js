@@ -2,7 +2,7 @@
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "noEmit": true,
-    "customConditions": ["@avi/source"]
+    "customConditions": ["@avijs/source"]
   },
   "include": ["packages/*/src", "packages/*/test"]
 }

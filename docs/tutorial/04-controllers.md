@@ -12,7 +12,7 @@ them in one app, even in one module.
 No decorators and no classes required:
 
 ```ts
-import { createAvi, defineController, defineModule } from '@avi/core';
+import { createAvi, defineController, defineModule } from '@avijs/core';
 
 const users = defineController({
   prefix: '/users',
@@ -30,7 +30,7 @@ await createAvi().register(AppModule).listen(3000);
 ## Decorator style
 
 ```ts
-import { AviFactory, Controller, Get, Injectable, Module, type Context } from '@avi/core';
+import { AviFactory, Controller, Get, Injectable, Module, type Context } from '@avijs/core';
 
 @Injectable()
 class UsersService {
@@ -155,7 +155,7 @@ Avi.js is inspired by NestJS, so the decorators will look familiar. A few work d
 | `forwardRef()`                               | Cycles are reported at startup instead |
 
 Standard decorators have no parameter decorators, so handlers read everything from `ctx`.
-[Chapter 12](12-from-nestjs.md) has the full concept map.
+[Chapter 13](13-from-nestjs.md) has the full concept map.
 
 ## Tooling setup
 

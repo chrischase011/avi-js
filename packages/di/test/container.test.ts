@@ -186,9 +186,9 @@ describe('validation', () => {
       'an unknown scope',
       () =>
         new Container([
-          mod('App', { providers: [{ provide: Db, useClass: Db, scope: 'request' as never }] }),
+          mod('App', { providers: [{ provide: Db, useClass: Db, scope: 'session' as never }] }),
         ]),
-      'Invalid scope "request"',
+      'Invalid scope "session"',
     ],
     [
       'a duplicate provider',
@@ -483,5 +483,181 @@ describe('overrides', () => {
           ],
         }),
     ).toThrow('Db is overridden twice');
+  });
+});
+
+describe('request scope', () => {
+  const Request = createToken<{ id: number }>('Request');
+  const UserId = createToken<string>('UserId');
+
+  class Session {
+    static inject = [Request, Db] as const;
+    constructor(
+      readonly request: { id: number },
+      readonly db: Db,
+    ) {}
+  }
+
+  class Handler {
+    static inject = [Session] as const;
+    constructor(readonly session: Session) {}
+  }
+
+  async function startScoped(...roots: ModuleDefinition[]) {
+    const container = new Container(roots, { requestTokens: [Request] });
+    await container.init();
+    return container;
+  }
+
+  it('creates one instance per scope and shares singletons', async () => {
+    const app = mod('App', {
+      providers: [
+        Db,
+        { provide: Session, useClass: Session, scope: 'request' },
+        { provide: Handler, useClass: Handler, scope: 'transient' },
+      ],
+    });
+    const c = await startScoped(app);
+
+    const first = c.requestScope(new Map([[Request, { id: 1 }]]));
+    const a = first.resolve(app, Session) as Session;
+    expect(first.resolve(app, Session)).toBe(a);
+    expect((first.resolve(app, Handler) as Handler).session).toBe(a);
+    expect(a.request).toEqual({ id: 1 });
+
+    const second = c.requestScope(new Map([[Request, { id: 2 }]]));
+    const b = second.resolve(app, Session) as Session;
+    expect(b).not.toBe(a);
+    expect(b.request).toEqual({ id: 2 });
+    expect(b.db).toBe(a.db);
+  });
+
+  it('supports request-scoped factories returning plain values', async () => {
+    const app = mod('App', {
+      providers: [
+        {
+          provide: UserId,
+          useFactory: (req: { id: number }) => `user-${String(req.id)}`,
+          inject: [Request],
+          scope: 'request',
+        },
+      ],
+    });
+    const c = await startScoped(app);
+    expect(c.requestScope(new Map([[Request, { id: 7 }]])).resolve(app, UserId)).toBe('user-7');
+  });
+
+  it('reports which tokens need a request', async () => {
+    const app = mod('App', {
+      providers: [Db, { provide: Session, useClass: Session, scope: 'request' }],
+    });
+    const c = await startScoped(app);
+    expect(c.needsRequest(app, [Db])).toBe(false);
+    expect(c.needsRequest(app, [Db, Session])).toBe(true);
+    expect(c.needsRequest(app, [Request])).toBe(true);
+  });
+
+  it('rejects a singleton that depends on request scope, through transients too', () => {
+    expect(
+      () =>
+        new Container(
+          [
+            mod('App', {
+              providers: [
+                Db,
+                { provide: Session, useClass: Session, scope: 'request' },
+                { provide: Handler, useClass: Handler, scope: 'transient' },
+                {
+                  provide: Service,
+                  useFactory: (handler: Handler) => handler,
+                  inject: [Handler],
+                },
+              ],
+            }),
+          ],
+          { requestTokens: [Request] },
+        ),
+    ).toThrow(
+      'Singleton Service in App depends on request-scoped Handler (Service → Handler). A singleton outlives the request; make Service request-scoped or transient.',
+    );
+  });
+
+  it('refuses request-scoped resolution outside a request', async () => {
+    const app = mod('App', {
+      providers: [Db, { provide: Session, useClass: Session, scope: 'request' }],
+    });
+    const c = await startScoped(app);
+    expect(() => c.resolve(app, Session)).toThrow(
+      'Session is request-scoped and can only be resolved while handling a request',
+    );
+    expect(() => c.get(Request)).toThrow('Request is not visible to the root modules');
+    expect(() => c.requestScope(new Map()).resolve(app, Session)).toThrow(
+      'This request scope has no value for Request',
+    );
+  });
+
+  it('requires request tokens to be declared', () => {
+    expect(
+      () =>
+        new Container([
+          mod('App', {
+            providers: [Db, { provide: Session, useClass: Session, scope: 'request' }],
+          }),
+        ]),
+    ).toThrow('Cannot resolve Session → Request in App');
+  });
+
+  it('disposes request instances in reverse order, keeping singletons', async () => {
+    const events: string[] = [];
+    const First = createToken<string>('First');
+    const Second = createToken<string>('Second');
+    const app = mod('App', {
+      providers: [
+        Db,
+        {
+          provide: First,
+          useFactory: () => 'first',
+          scope: 'request',
+          dispose: (value: string) => events.push(value),
+        },
+        {
+          provide: Second,
+          useFactory: (first: string) => `${first}+second`,
+          inject: [First],
+          scope: 'request',
+          dispose: (value: string) => events.push(value),
+        },
+      ],
+    });
+    const c = await startScoped(app);
+    const scope = c.requestScope(new Map());
+    scope.resolve(app, Second);
+    await scope.dispose();
+    await scope.dispose();
+    expect(events).toEqual(['first+second', 'first']);
+    expect(c.resolve(app, Db)).toBeInstanceOf(Db);
+  });
+
+  it('rejects async request-scoped factories', async () => {
+    const app = mod('App', {
+      providers: [{ provide: UserId, useFactory: () => Promise.resolve('x'), scope: 'request' }],
+    });
+    const c = await startScoped(app);
+    expect(() => c.requestScope(new Map()).resolve(app, UserId)).toThrow(
+      'Request-scoped provider UserId in App returned a Promise; only singletons may be async',
+    );
+  });
+
+  it('describes request scope', () => {
+    const c = new Container(
+      [mod('App', { providers: [Db, { provide: Session, useClass: Session, scope: 'request' }] })],
+      { requestTokens: [Request] },
+    );
+    expect(c.describe()[0]?.providers[1]).toEqual({
+      token: 'Session',
+      kind: 'class',
+      scope: 'request',
+      inject: ['Request', 'Db'],
+    });
   });
 });

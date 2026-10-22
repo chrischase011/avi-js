@@ -1,4 +1,4 @@
-import type { Token } from '@avi/di';
+import type { Token } from '@avijs/di';
 import type {
   Context,
   Guard,
@@ -7,8 +7,8 @@ import type {
   Next,
   NoInput,
   RouteDefinition,
-} from '@avi/http';
-import type { InputOf, PathParams, ResultOf, RouteSchema } from '@avi/validation';
+} from '@avijs/http';
+import type { InputOf, PathParams, ResultOf, RouteSchema } from '@avijs/validation';
 
 /** Middleware with dependencies. Built once per app with its `static inject`. */
 export interface MiddlewareClass {

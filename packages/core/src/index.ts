@@ -29,6 +29,7 @@ export type { CheckInject } from './decorators.js';
 export { defineModule } from './module.js';
 export type { AviModule, ModuleOptions, ModuleRef } from './module.js';
 export { route } from './pipeline.js';
+export { REQUEST } from './request.js';
 export type {
   GuardClass,
   GuardRef,
@@ -46,9 +47,9 @@ export type {
   RouteSchema,
   StandardSchemaV1,
   ValidationIssue,
-} from '@avi/validation';
+} from '@avijs/validation';
 
-export { HTTP_METHODS, HttpError, reply } from '@avi/http';
+export { HTTP_METHODS, HttpError, reply } from '@avijs/http';
 export type {
   AviState,
   Context,
@@ -64,10 +65,11 @@ export type {
   Params,
   Reply,
   ReplyInit,
+  RequestHook,
   ResponseInfo,
   RouteDefinition,
-} from '@avi/http';
-export { createToken } from '@avi/di';
+} from '@avijs/http';
+export { createToken } from '@avijs/di';
 export type {
   Class,
   ClassProvider,
@@ -80,4 +82,4 @@ export type {
   Token,
   TokenType,
   ValueProvider,
-} from '@avi/di';
+} from '@avijs/di';

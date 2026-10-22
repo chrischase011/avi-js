@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { checkInjectLists, main, serializeManifest, writeManifest } from '../src/index.js';
-import { describeApp } from '@avi/core';
+import { describeApp } from '@avijs/core';
 
 const fixtures = fileURLToPath(new URL('./fixtures/', import.meta.url));
 const project = path.join(fixtures, 'tsconfig.json');

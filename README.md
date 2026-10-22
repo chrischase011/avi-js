@@ -12,6 +12,7 @@ A lightweight, TypeScript-first backend framework for Node.js, featuring NestJS-
 [![CI](https://github.com/chrischase011/avi-js/actions/workflows/ci.yml/badge.svg)](https://github.com/chrischase011/avi-js/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%E2%89%A522.12-339933.svg)](package.json)
+[![npm](https://img.shields.io/npm/v/@avijs/core.svg)](https://www.npmjs.com/package/@avijs/core)
 [![Status](https://img.shields.io/badge/status-pre--alpha-orange.svg)](#try-it-now)
 
 [Tutorial](docs/tutorial/README.md) · [Project structure](#project-structure) · [Why Avi.js](#why-avijs) · [Try it](#try-it-now)
@@ -21,8 +22,8 @@ A lightweight, TypeScript-first backend framework for Node.js, featuring NestJS-
 ---
 
 > [!IMPORTANT]
-> Avi.js is in early development and not on npm yet. Everything shown below works today in the
-> workspace: both API styles, routing, modules and dependency injection, middleware and guards, safe
+> Avi.js is in early development (0.x), so the API may still change between minor versions before
+> 1.0. Everything shown below works today: both API styles, routing, modules and dependency injection, middleware and guards, safe
 > errors, schema validation with any Standard Schema library, and graceful shutdown. Follow along,
 > try it, and help shape it before 1.0.
 
@@ -34,7 +35,7 @@ and run on the same engine, so they behave identically.
 **Explicit**: plain objects and functions, no decorators.
 
 ```ts
-import { createAvi, defineController } from '@avi/core';
+import { createAvi, defineController } from '@avijs/core';
 
 const users = defineController({
   prefix: '/users',
@@ -53,7 +54,7 @@ await app.listen(3000);
 **Decorators**: familiar if you know NestJS, built on standard TC39 decorators.
 
 ```ts
-import { Controller, Get, Module, AviFactory, type Context } from '@avi/core';
+import { Controller, Get, Module, AviFactory, type Context } from '@avijs/core';
 
 @Controller('/users')
 class UsersController {
@@ -127,8 +128,8 @@ required. For small services and quick starts.</td>
 </table>
 
 ```sh
-avi new my-api                     # modular
-avi new my-api --template minimal  # minimal
+npx @avijs/cli new my-api                     # modular
+npx @avijs/cli new my-api --template minimal  # minimal
 ```
 
 Each generated project compiles, has passing tests and serves requests out of the box. The layouts
@@ -145,8 +146,9 @@ runs.
 **Types that follow your wiring.** List a service's dependencies once and TypeScript infers the
 rest. Swap two entries by mistake and the compiler tells you.
 
-**Errors at startup, not in production.** Missing providers, invalid exports, dependency cycles
-and conflicting routes stop the app before it listens, with a message that names the culprit.
+**Catch configuration errors early.** Missing providers, invalid exports, dependency cycles, and
+conflicting routes are detected during application initialization, before the server starts
+accepting requests.
 
 **Safe by default.** Bounded request bodies, sanitized error responses, abort-aware handlers and
 graceful shutdown are built in, not plugins.
@@ -160,39 +162,39 @@ all. The current local baselines and how to run them are in [benchmarks](benchma
 
 ## Try it now
 
-Avi.js is not on npm yet. Clone the workspace and run the full check suite:
+Create a project with the CLI (Node.js 22.12+):
 
 ```sh
-git clone https://github.com/chrischase011/avi-js.git
-cd avi-js
-pnpm install
-pnpm verify
+npx @avijs/cli new my-api                    # modular template
+npx @avijs/cli new my-api --template minimal
+cd my-api
+npm install
+npm run dev                                  # http://localhost:3000
 ```
 
-You need Node.js 22.12+ and pnpm 12. Then run the examples or generate a project:
+Or add it to an existing project:
 
 ```sh
-pnpm --filter @avi/example-modular-api start   # http://localhost:3000/users
-pnpm avi new my-api --dir ../                  # the avi CLI, from the workspace
+npm install @avijs/core
 ```
 
-[Chapter 0 of the tutorial](docs/tutorial/00-getting-started.md) walks through the workspace, and
-the [tutorial](docs/tutorial/README.md) covers everything from a first route to production.
+To work on Avi.js itself, see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+The [tutorial](docs/tutorial/README.md) covers everything from a first route to production.
 
 ## Packages
 
-| Package           | Purpose                                                      |
-| ----------------- | ------------------------------------------------------------ |
-| `@avi/core`       | The public API you import: app factory, modules, controllers |
-| `@avi/di`         | Explicit, reflection-free dependency injection               |
-| `@avi/http`       | Router, request pipeline and the native Node.js adapter      |
-| `@avi/validation` | Standard Schema validation for routes                        |
-| `@avi/compiler`   | Optional build-time checks and manifests (`avi-compile`)     |
-| `@avi/testing`    | A test client with provider overrides                        |
-| `@avi/openapi`    | OpenAPI 3.1 documents from routes and schemas                |
-| `@avi/cli`        | `avi new`, `avi dev`, `avi check`, `avi manifest`            |
-
-Package names are provisional until they are published.
+| Package             | Purpose                                                      |
+| ------------------- | ------------------------------------------------------------ |
+| `@avijs/core`       | The public API you import: app factory, modules, controllers |
+| `@avijs/di`         | Explicit, reflection-free dependency injection               |
+| `@avijs/http`       | Router, request pipeline and the native Node.js adapter      |
+| `@avijs/validation` | Standard Schema validation for routes                        |
+| `@avijs/compiler`   | Optional build-time checks and manifests (`avi-compile`)     |
+| `@avijs/testing`    | A test client with provider overrides                        |
+| `@avijs/openapi`    | OpenAPI 3.1 documents from routes and schemas                |
+| `@avijs/security`   | CORS and security headers                                    |
+| `@avijs/cli`        | `avi new`, `avi dev`, `avi check`, `avi manifest`            |
 
 ## Compatibility
 

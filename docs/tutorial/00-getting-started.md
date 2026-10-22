@@ -47,9 +47,9 @@ down, exactly as an app will use Avi.js after it is published.
 ```text
 avi-js/
 ├── packages/
-│   ├── core/      @avi/core: the public API you import
-│   ├── di/        @avi/di: dependency injection
-│   └── http/      @avi/http: router, pipeline, Node.js adapter
+│   ├── core/      @avijs/core: the public API you import
+│   ├── di/        @avijs/di: dependency injection
+│   └── http/      @avijs/http: router, pipeline, Node.js adapter
 ├── examples/
 │   └── basic-api/ an app that consumes the built packages
 ├── docs/          you are here
@@ -71,9 +71,9 @@ packages/di/
 
 Two things to know:
 
-- **You import only from `@avi/core`.** It re-exports what applications need from `di` and
+- **You import only from `@avijs/core`.** It re-exports what applications need from `di` and
   `http`. The other packages exist to keep the internals decoupled.
-- **Tests do not need a build.** Vitest maps `@avi/*` to each package's `src/`, so
+- **Tests do not need a build.** Vitest maps `@avijs/*` to each package's `src/`, so
   `pnpm test:watch` gives instant feedback while you edit.
 
 ## Exercise: put the DI types to work

@@ -1,7 +1,6 @@
 {
-  "name": "@avi/compiler",
-  "version": "0.0.0",
-  "private": true,
+  "name": "@avijs/compiler",
+  "version": "0.1.0",
   "description": "Optional build-time checks and manifests for Avi.js apps.",
   "keywords": [
     "avi",
@@ -31,7 +30,7 @@
   },
   "exports": {
     ".": {
-      "@avi/source": "./src/index.ts",
+      "@avijs/source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     }
@@ -43,14 +42,13 @@
     "LICENSE"
   ],
   "publishConfig": {
-    "access": "public",
-    "provenance": true
+    "access": "public"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@avi/core": "workspace:*"
+    "@avijs/core": "workspace:*"
   },
   "peerDependencies": {
     "typescript": ">=5.8"

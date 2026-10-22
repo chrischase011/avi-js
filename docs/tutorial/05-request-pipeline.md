@@ -38,7 +38,7 @@ Middleware wraps everything after it. `await next()` runs the rest of the pipeli
 handler's result:
 
 ```ts
-import type { Middleware } from '@avi/core';
+import type { Middleware } from '@avijs/core';
 
 const requestId: Middleware = async (ctx, next) => {
   ctx.setHeader('x-request-id', crypto.randomUUID());
@@ -70,7 +70,7 @@ error responses. If `reply()` or an `HttpError` sets the same header, theirs win
 once for your whole app:
 
 ```ts
-declare module '@avi/core' {
+declare module '@avijs/core' {
   interface AviState {
     user?: { id: string; role: 'admin' | 'member' };
   }
@@ -86,7 +86,7 @@ A guard decides whether a request may reach the handler. Return `true` to allow 
 answers **403 Forbidden**. Throw an `HttpError` for other answers, such as 401:
 
 ```ts
-import { HttpError, type Guard } from '@avi/core';
+import { HttpError, type Guard } from '@avijs/core';
 
 const signedIn: Guard = (ctx) => {
   if (!ctx.state.user) {

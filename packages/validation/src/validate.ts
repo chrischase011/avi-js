@@ -1,4 +1,4 @@
-import { HttpError, isReply, reply, type Context, type Handler } from '@avi/http';
+import { HttpError, isReply, reply, type Context, type Handler } from '@avijs/http';
 import type { StandardSchemaIssue, StandardSchemaV1 } from './standard-schema.js';
 import type { RouteSchema } from './types.js';
 

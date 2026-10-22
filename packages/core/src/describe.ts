@@ -1,6 +1,6 @@
-import { Container, type ModuleDescription } from '@avi/di';
+import { Container, type ModuleDescription } from '@avijs/di';
 import { checkConsumers } from './consumers.js';
-import type { HttpMethod } from '@avi/http';
+import type { HttpMethod } from '@avijs/http';
 import { joinPath, type StaticRoute } from './controller.js';
 import {
   defineModule,
@@ -9,6 +9,7 @@ import {
   type ModuleOptions,
   type ModuleRef,
 } from './module.js';
+import { REQUEST_TOKENS } from './request.js';
 
 export interface ControllerDescription {
   readonly name: string;
@@ -44,7 +45,7 @@ export interface AppDescription {
  */
 export function describeApp(...roots: (ModuleRef | ModuleOptions)[]): AppDescription {
   const modules = roots.map((root) => toModule(root) ?? defineModule(root as ModuleOptions));
-  const container = new Container(modules);
+  const container = new Container(modules, { requestTokens: REQUEST_TOKENS });
   checkConsumers(container);
   return describeModules(container);
 }

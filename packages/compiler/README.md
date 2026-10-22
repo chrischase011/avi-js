@@ -1,9 +1,9 @@
-# @avi/compiler
+# @avijs/compiler
 
 Optional build-time checks and manifests for Avi.js apps (avi-compile).
 
 ```sh
-npm install @avi/compiler
+npm install @avijs/compiler
 ```
 
 Part of [Avi.js](https://github.com/chrischase011/avi-js), a TypeScript framework for Node.js with

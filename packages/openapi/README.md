@@ -1,9 +1,9 @@
-# @avi/openapi
+# @avijs/openapi
 
 OpenAPI 3.1 documents generated from Avi.js routes and schemas.
 
 ```sh
-npm install @avi/openapi
+npm install @avijs/openapi
 ```
 
 Part of [Avi.js](https://github.com/chrischase011/avi-js), a TypeScript framework for Node.js with

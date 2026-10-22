@@ -1,4 +1,4 @@
-import type { Reply } from '@avi/http';
+import type { Reply } from '@avijs/http';
 import type { InferInput, InferOutput, StandardSchemaV1 } from './standard-schema.js';
 
 export interface RouteSchema {

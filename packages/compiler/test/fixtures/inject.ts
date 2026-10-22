@@ -1,4 +1,4 @@
-import { createToken } from '@avi/core';
+import { createToken } from '@avijs/core';
 
 class Db {
   query() {

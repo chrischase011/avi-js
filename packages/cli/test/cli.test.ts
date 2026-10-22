@@ -26,8 +26,8 @@ afterAll(async () => {
 
 async function linkPackages(project: string): Promise<void> {
   const links: [string, string][] = [
-    ['@avi/core', 'packages/core'],
-    ['@avi/testing', 'packages/testing'],
+    ['@avijs/core', 'packages/core'],
+    ['@avijs/testing', 'packages/testing'],
     ['@types/node', 'node_modules/@types/node'],
   ];
   for (const [name, target] of links) {
@@ -100,7 +100,10 @@ describe.each(['modular', 'minimal'] as const)('avi new --template %s', (templat
       dependencies: Record<string, string>;
     };
     expect(pkg.name).toBe(`demo-${template}`);
-    expect(pkg.dependencies['@avi/core']).toBe('latest');
+    const cli = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8')) as {
+      version: string;
+    };
+    expect(pkg.dependencies['@avijs/core']).toBe(`^${cli.version}`);
   });
 
   it('compiles', () => {

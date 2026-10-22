@@ -6,7 +6,7 @@ import {
   route,
   type AviApp,
   type StandardSchemaV1,
-} from '@avi/core';
+} from '@avijs/core';
 import * as v from 'valibot';
 import { afterEach, describe, expect, it } from 'vitest';
 import { generateOpenApi, openApiPath, type JsonSchema } from '../src/index.js';

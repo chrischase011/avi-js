@@ -1,4 +1,4 @@
-import { Controller, Get, defineController, defineModule } from '@avi/core';
+import { Controller, Get, defineController, defineModule } from '@avijs/core';
 
 @Controller('/items')
 class Items {

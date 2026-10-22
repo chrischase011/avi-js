@@ -1,4 +1,4 @@
-import { Module } from '@avi/core';
+import { Module } from '@avijs/core';
 import { HealthController } from './common/health.controller.js';
 import { UsersModule } from './modules/users/users.module.js';
 

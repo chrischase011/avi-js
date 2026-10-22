@@ -1,4 +1,4 @@
-import type { Class, ModuleDefinition, Provider, Token } from '@avi/di';
+import type { Class, ModuleDefinition, Provider, Token } from '@avijs/di';
 import type { ControllerDefinition } from './controller.js';
 import { checkRefs, type GuardRef, type MiddlewareRef } from './pipeline.js';
 import { controllerFromClass, injectableScopes, moduleClasses } from './registry.js';

@@ -50,14 +50,15 @@ Use Workspace Version_. Prettier and ESLint configs are at the repository root.
 
 ```text
 packages/
-  core/         @avi/core: public API (createAvi, modules, controllers, decorators)
-  di/           @avi/di: dependency injection container
-  http/         @avi/http: router, request context, pipeline, node:http server
-  validation/   @avi/validation: Standard Schema validation
-  compiler/     @avi/compiler: avi-compile check and manifest
-  testing/      @avi/testing: test client
-  openapi/      @avi/openapi: OpenAPI documents
-  cli/          @avi/cli: the avi command and project templates
+  core/         @avijs/core: public API (createAvi, modules, controllers, decorators)
+  di/           @avijs/di: dependency injection container
+  http/         @avijs/http: router, request context, pipeline, node:http server
+  validation/   @avijs/validation: Standard Schema validation
+  compiler/     @avijs/compiler: avi-compile check and manifest
+  testing/      @avijs/testing: test client
+  openapi/      @avijs/openapi: OpenAPI documents
+  security/     @avijs/security: CORS and security headers
+  cli/          @avijs/cli: the avi command and project templates
 examples/       apps built from the published entry points
 benchmarks/     router, HTTP and startup benchmarks
 docs/tutorial/  the tutorial
@@ -66,7 +67,7 @@ scripts/        release and artifact tooling
 
 Each package has `src/`, `test/`, a `tsconfig.json` (editor, lint, typecheck) and a
 `tsconfig.build.json` (build). Import other packages only through their entry point
-(`@avi/http`), never through deep paths. `di` and `http` must not depend on each other; only `core`
+(`@avijs/http`), never through deep paths. `di` and `http` must not depend on each other; only `core`
 connects them.
 
 ## Making a change

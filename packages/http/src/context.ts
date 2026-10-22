@@ -12,7 +12,7 @@ import type { Params } from './router.js';
 
 /**
  * Per-request data shared by middleware, guards and handlers. Apps add typed keys:
- * `declare module '@avi/core' { interface AviState { user?: User } }`.
+ * `declare module '@avijs/core' { interface AviState { user?: User } }`.
  */
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type -- extended by apps
 export interface AviState {}

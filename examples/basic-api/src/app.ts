@@ -1,4 +1,4 @@
-import { createAvi, defineController, HttpError, reply, type Middleware } from '@avi/core';
+import { createAvi, defineController, HttpError, reply, type Middleware } from '@avijs/core';
 
 interface User {
   id: number;

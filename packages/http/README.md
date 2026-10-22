@@ -1,9 +1,9 @@
-# @avi/http
+# @avijs/http
 
 The Avi.js HTTP engine: segment-trie router, request context, middleware composition and the native node:http adapter.
 
 ```sh
-npm install @avi/http
+npm install @avijs/http
 ```
 
 Part of [Avi.js](https://github.com/chrischase011/avi-js), a TypeScript framework for Node.js with

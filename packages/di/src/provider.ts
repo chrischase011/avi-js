@@ -1,6 +1,10 @@
 import { isToken, tokenName, type Constructor, type Token } from './token.js';
 
-export type Scope = 'singleton' | 'transient';
+/**
+ * `singleton`: one instance per app. `transient`: a new one per injection. `request`: one per
+ * request, created on first use and disposed after the handler.
+ */
+export type Scope = 'singleton' | 'transient' | 'request';
 
 export interface ClassProvider<T = unknown> {
   provide: Token<T>;
@@ -15,11 +19,14 @@ export interface ValueProvider<T = unknown> {
 
 export interface FactoryProvider<T = unknown> {
   provide: Token<T>;
-  /** Receives `inject` in order. Singleton factories may return a promise. */
+  /** Receives `inject` in order. Only singleton factories may return a promise. */
   useFactory: (...deps: never[]) => T | Promise<T>;
   inject?: readonly Token[];
   scope?: Scope;
-  /** Called on shutdown with the created value. A method, so typed callbacks fit `Provider[]`. */
+  /**
+   * Called with the created value on shutdown, or after the request for request scope. A method,
+   * so typed callbacks fit `Provider[]`.
+   */
   dispose?(value: T): unknown;
 }
 
@@ -72,7 +79,7 @@ export function normalizeProvider(provider: unknown, where: string): ProviderSpe
   }
 
   const scope = p['scope'] ?? 'singleton';
-  if (scope !== 'singleton' && scope !== 'transient') {
+  if (scope !== 'singleton' && scope !== 'transient' && scope !== 'request') {
     throw new TypeError(
       `Invalid scope ${typeof scope === 'string' ? `"${scope}"` : typeof scope} at ${label}`,
     );

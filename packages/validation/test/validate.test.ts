@@ -1,4 +1,4 @@
-import { HttpServer, Router, reply, type Handler } from '@avi/http';
+import { HttpServer, Router, reply, type Handler } from '@avijs/http';
 import * as v from 'valibot';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {

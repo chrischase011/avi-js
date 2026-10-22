@@ -1,4 +1,4 @@
-import { Module } from '@avi/core';
+import { Module } from '@avijs/core';
 import { UsersController } from './users.controller.js';
 import { UsersService } from './users.service.js';
 

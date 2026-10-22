@@ -1,9 +1,9 @@
-# @avi/validation
+# @avijs/validation
 
 Standard Schema validation for Avi.js routes: Zod, Valibot, ArkType and more, with no adapters.
 
 ```sh
-npm install @avi/validation
+npm install @avijs/validation
 ```
 
 Part of [Avi.js](https://github.com/chrischase011/avi-js), a TypeScript framework for Node.js with

@@ -1,9 +1,9 @@
-# @avi/core
+# @avijs/core
 
 The Avi.js public API: createAvi, AviFactory, modules, controllers, decorators, middleware, guards and validation.
 
 ```sh
-npm install @avi/core
+npm install @avijs/core
 ```
 
 Part of [Avi.js](https://github.com/chrischase011/avi-js), a TypeScript framework for Node.js with

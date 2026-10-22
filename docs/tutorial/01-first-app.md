@@ -9,7 +9,7 @@ From the repository root:
 
 ```sh
 pnpm build
-pnpm --filter @avi/example-basic-api start
+pnpm --filter @avijs/example-basic-api start
 ```
 
 ```text
@@ -36,7 +36,7 @@ Stop it with `Ctrl+C`. The app shuts down gracefully.
 ## The code
 
 ```ts
-import { createAvi, defineController } from '@avi/core';
+import { createAvi, defineController } from '@avijs/core';
 
 const hello = defineController({
   routes: [
@@ -72,7 +72,7 @@ Every response also carries `x-content-type-options: nosniff`.
 ## Status codes and headers: `reply()`
 
 ```ts
-import { reply } from '@avi/core';
+import { reply } from '@avijs/core';
 
 {
   method: 'POST',

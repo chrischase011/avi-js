@@ -1,4 +1,4 @@
-import { AviFactory } from '@avi/core';
+import { AviFactory } from '@avijs/core';
 import { AppModule } from './app.module.js';
 
 const app = await AviFactory.create(AppModule);

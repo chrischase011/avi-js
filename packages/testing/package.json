@@ -1,7 +1,6 @@
 {
-  "name": "@avi/testing",
-  "version": "0.0.0",
-  "private": true,
+  "name": "@avijs/testing",
+  "version": "0.1.0",
   "description": "Testing helpers for Avi.js apps.",
   "keywords": [
     "avi",
@@ -26,7 +25,7 @@
   "sideEffects": false,
   "exports": {
     ".": {
-      "@avi/source": "./src/index.ts",
+      "@avijs/source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     }
@@ -38,13 +37,12 @@
     "LICENSE"
   ],
   "publishConfig": {
-    "access": "public",
-    "provenance": true
+    "access": "public"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@avi/core": "workspace:*"
+    "@avijs/core": "workspace:*"
   }
 }

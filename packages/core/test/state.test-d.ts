@@ -1,11 +1,11 @@
 import { expectTypeOf, it } from 'vitest';
-import { defineController, type Context } from '@avi/core';
+import { defineController, type Context } from '@avijs/core';
 
 interface User {
   id: string;
 }
 
-declare module '@avi/core' {
+declare module '@avijs/core' {
   interface AviState {
     user?: User;
   }

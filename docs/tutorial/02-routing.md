@@ -101,8 +101,8 @@ route. To match a literal `%`, write it as `%25`.
 | `HEAD` on a `GET` route       | The `GET` handler runs; same status and headers, no body   |
 | `OPTIONS` on a known path     | `204` with an `Allow` header                               |
 
-An explicit `HEAD` or `OPTIONS` route always takes priority over the automatic behavior. CORS is
-not handled here; it comes with the security package later.
+An explicit `HEAD` or `OPTIONS` route always takes priority over the automatic behavior. For CORS
+preflights, use `cors()` from `@avijs/security` ([Chapter 12](12-security.md)).
 
 ## Conflicts fail at startup
 

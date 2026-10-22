@@ -50,7 +50,7 @@ export class UsersService {
 
 ```ts
 // src/routes/users.ts
-import { defineController } from '@avi/core';
+import { defineController } from '@avijs/core';
 import { UsersService } from '../services/users.js';
 
 export const usersRoutes = defineController({
@@ -62,7 +62,7 @@ export const usersRoutes = defineController({
 
 ```ts
 // src/main.ts
-import { createAvi } from '@avi/core';
+import { createAvi } from '@avijs/core';
 import { usersRoutes } from './routes/users.js';
 import { UsersService } from './services/users.js';
 
@@ -91,7 +91,7 @@ src/
 
 ```ts
 // src/modules/users/users.service.ts
-import { Injectable } from '@avi/core';
+import { Injectable } from '@avijs/core';
 
 @Injectable()
 export class UsersService {
@@ -105,7 +105,7 @@ export class UsersService {
 
 ```ts
 // src/modules/users/users.controller.ts
-import { Controller, Get } from '@avi/core';
+import { Controller, Get } from '@avijs/core';
 import { UsersService } from './users.service.js';
 
 @Controller('/users')
@@ -123,7 +123,7 @@ export class UsersController {
 
 ```ts
 // src/modules/users/users.module.ts
-import { Module } from '@avi/core';
+import { Module } from '@avijs/core';
 import { UsersController } from './users.controller.js';
 import { UsersService } from './users.service.js';
 
@@ -133,7 +133,7 @@ export class UsersModule {}
 
 ```ts
 // src/app.module.ts
-import { Module } from '@avi/core';
+import { Module } from '@avijs/core';
 import { UsersModule } from './modules/users/users.module.js';
 
 @Module({ imports: [UsersModule] })
@@ -142,7 +142,7 @@ export class AppModule {}
 
 ```ts
 // src/main.ts
-import { AviFactory } from '@avi/core';
+import { AviFactory } from '@avijs/core';
 import { AppModule } from './app.module.js';
 
 const app = await AviFactory.create(AppModule);

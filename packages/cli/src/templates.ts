@@ -3,11 +3,11 @@ export type TemplateName = 'modular' | 'minimal';
 export interface TemplateOptions {
   name: string;
   template: TemplateName;
-  /** Version range for the @avi packages. */
+  /** Version range for the @avijs packages. */
   aviVersion: string;
   /**
    * Local package files to use instead of the registry, keyed by package name, such as
-   * 'file:../artifacts/avi-core-0.1.0.tgz'. Also added as npm overrides so packages that depend on
+   * 'file:../artifacts/avijs-core-0.1.0.tgz'. Also added as npm overrides so packages that depend on
    * each other resolve locally too.
    */
   localPackages?: Readonly<Record<string, string>>;
@@ -40,10 +40,10 @@ function shared({
       check: 'avi check',
       test: 'tsc && node --test "dist/**/*.test.js"',
     },
-    dependencies: { '@avi/core': spec('@avi/core') },
+    dependencies: { '@avijs/core': spec('@avijs/core') },
     devDependencies: {
-      '@avi/cli': spec('@avi/cli'),
-      '@avi/testing': spec('@avi/testing'),
+      '@avijs/cli': spec('@avijs/cli'),
+      '@avijs/testing': spec('@avijs/testing'),
       '@types/node': '^22.0.0',
       typescript: '~6.0.3',
     },
@@ -97,19 +97,19 @@ process.once('SIGTERM', shutdown);
 
 function modular(): Record<string, string> {
   return {
-    'src/main.ts': `import { AviFactory } from '@avi/core';
+    'src/main.ts': `import { AviFactory } from '@avijs/core';
 import { AppModule } from './app.module.js';
 
 const app = await AviFactory.create(AppModule);
 ${MAIN_LISTEN}`,
-    'src/app.module.ts': `import { Module } from '@avi/core';
+    'src/app.module.ts': `import { Module } from '@avijs/core';
 import { HealthController } from './common/health.controller.js';
 import { UsersModule } from './modules/users/users.module.js';
 
 @Module({ imports: [UsersModule], controllers: [HealthController] })
 export class AppModule {}
 `,
-    'src/common/health.controller.ts': `import { Controller, Get } from '@avi/core';
+    'src/common/health.controller.ts': `import { Controller, Get } from '@avijs/core';
 
 @Controller()
 export class HealthController {
@@ -119,14 +119,14 @@ export class HealthController {
   }
 }
 `,
-    'src/modules/users/users.module.ts': `import { Module } from '@avi/core';
+    'src/modules/users/users.module.ts': `import { Module } from '@avijs/core';
 import { UsersController } from './users.controller.js';
 import { UsersService } from './users.service.js';
 
 @Module({ controllers: [UsersController], providers: [UsersService], exports: [UsersService] })
 export class UsersModule {}
 `,
-    'src/modules/users/users.service.ts': `import { Injectable } from '@avi/core';
+    'src/modules/users/users.service.ts': `import { Injectable } from '@avijs/core';
 import type { CreateUserDto } from './dto/create-user.dto.js';
 
 export interface User {
@@ -153,7 +153,7 @@ export class UsersService {
   }
 }
 `,
-    'src/modules/users/users.controller.ts': `import { Controller, Get, HttpError, Post, reply, type Context } from '@avi/core';
+    'src/modules/users/users.controller.ts': `import { Controller, Get, HttpError, Post, reply, type Context } from '@avijs/core';
 import { parseCreateUser } from './dto/create-user.dto.js';
 import { UsersService } from './users.service.js';
 
@@ -196,7 +196,7 @@ export function parseCreateUser(input: unknown): CreateUserDto | undefined {
 `,
     'src/modules/users/users.test.ts': `import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
-import { createTestClient, type TestClient } from '@avi/testing';
+import { createTestClient, type TestClient } from '@avijs/testing';
 import { AppModule } from '../../app.module.js';
 
 let client: TestClient;
@@ -230,7 +230,7 @@ function minimal(): Record<string, string> {
 
 const app = createApp();
 ${MAIN_LISTEN}`,
-    'src/app.ts': `import { createAvi } from '@avi/core';
+    'src/app.ts': `import { createAvi } from '@avijs/core';
 import { healthRoutes } from './routes/health.js';
 import { usersRoutes } from './routes/users.js';
 import { UsersService } from './services/users.js';
@@ -242,13 +242,13 @@ export function createApp() {
   });
 }
 `,
-    'src/routes/health.ts': `import { defineController, route } from '@avi/core';
+    'src/routes/health.ts': `import { defineController, route } from '@avijs/core';
 
 export const healthRoutes = defineController({
   routes: [route({ method: 'GET', path: '/health', handler: () => 'ok' })],
 });
 `,
-    'src/routes/users.ts': `import { HttpError, defineController, reply, route } from '@avi/core';
+    'src/routes/users.ts': `import { HttpError, defineController, reply, route } from '@avijs/core';
 import { UsersService } from '../services/users.js';
 
 export const usersRoutes = defineController({
@@ -304,7 +304,7 @@ export class UsersService {
 `,
     'src/app.test.ts': `import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
-import { createTestClient, type TestClient } from '@avi/testing';
+import { createTestClient, type TestClient } from '@avijs/testing';
 import { createApp } from './app.js';
 
 let client: TestClient;

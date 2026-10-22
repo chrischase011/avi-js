@@ -1,9 +1,9 @@
-# @avi/di
+# @avijs/di
 
 Explicit, reflection-free dependency injection for Avi.js: tokens, providers, scopes, module visibility and disposal.
 
 ```sh
-npm install @avi/di
+npm install @avijs/di
 ```
 
 Part of [Avi.js](https://github.com/chrischase011/avi-js), a TypeScript framework for Node.js with

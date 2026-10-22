@@ -3,7 +3,7 @@
 > **Status: Runnable.** Everything on this page works today. The compiler is optional: apps run
 > the same without it.
 
-`@avi/compiler` adds two checks you can run in CI or before a deploy. It ships an `avi-compile`
+`@avijs/compiler` adds two checks you can run in CI or before a deploy. It ships an `avi-compile`
 command.
 
 ## Checking `static inject` lists
@@ -47,7 +47,7 @@ The command checks the module graph the same way `init()` does, so a missing pro
 fails the build instead of the deploy. In code, the same description comes from `describeApp`:
 
 ```ts
-import { describeApp } from '@avi/core';
+import { describeApp } from '@avijs/core';
 
 const manifest = describeApp(AppModule);
 // manifest.routes → [{ method: 'GET', path: '/users/:id', module: 'UsersModule', controller: 'UsersController' }, ...]

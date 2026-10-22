@@ -1,8 +1,6 @@
-import { createAvi, defineController, route } from '@avi/core';
+import { createAvi, defineController, route } from '@avijs/core';
 import * as v from 'valibot';
-import { ROUTES } from '../routes.js';
-
-const filler = ROUTES.filter(([, path]) => path !== '/' && path !== '/users/:id');
+import { FILLER } from '../routes.js';
 
 const CreateUser = v.object({
   name: v.pipe(v.string(), v.minLength(1)),
@@ -23,7 +21,7 @@ const app = createAvi().register({
           schema: { body: CreateUser },
           handler: (ctx) => ctx.input.body,
         }),
-        ...filler.map(([method, path]) => ({ method, path, handler: () => null })),
+        ...FILLER.map(([method, path]) => ({ method, path, handler: () => null })),
       ],
     }),
   ],

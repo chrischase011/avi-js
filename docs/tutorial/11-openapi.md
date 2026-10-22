@@ -2,12 +2,12 @@
 
 > **Status: Runnable.** Everything on this page works today.
 
-`@avi/openapi` builds an OpenAPI 3.1 document from an initialized app: every route, including
+`@avijs/openapi` builds an OpenAPI 3.1 document from an initialized app: every route, including
 routes created at runtime, with parameters, request bodies and responses taken from route schemas.
 
 ```ts
-import { createAvi } from '@avi/core';
-import { generateOpenApi } from '@avi/openapi';
+import { createAvi } from '@avijs/core';
+import { generateOpenApi } from '@avijs/openapi';
 
 const app = createAvi().register(AppModule);
 await app.init();
@@ -75,4 +75,4 @@ Without a converter, the route is still documented, with an empty schema where t
 
 ## Next
 
-[Chapter 12: Avi.js for NestJS developers](12-from-nestjs.md).
+[Chapter 12: Security headers and CORS](12-security.md).

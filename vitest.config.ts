@@ -29,14 +29,15 @@ export default defineConfig({
   plugins: [typescript],
   resolve: {
     alias: {
-      '@avi/cli': src('cli'),
-      '@avi/compiler': src('compiler'),
-      '@avi/core': src('core'),
-      '@avi/di': src('di'),
-      '@avi/http': src('http'),
-      '@avi/openapi': src('openapi'),
-      '@avi/testing': src('testing'),
-      '@avi/validation': src('validation'),
+      '@avijs/cli': src('cli'),
+      '@avijs/compiler': src('compiler'),
+      '@avijs/core': src('core'),
+      '@avijs/di': src('di'),
+      '@avijs/http': src('http'),
+      '@avijs/openapi': src('openapi'),
+      '@avijs/security': src('security'),
+      '@avijs/testing': src('testing'),
+      '@avijs/validation': src('validation'),
     },
   },
   test: {

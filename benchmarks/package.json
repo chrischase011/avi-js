@@ -1,5 +1,5 @@
 {
-  "name": "@avi/benchmarks",
+  "name": "@avijs/benchmarks",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -10,14 +10,23 @@
     "startup": "node dist/startup.js"
   },
   "dependencies": {
-    "@avi/core": "workspace:*",
-    "@avi/http": "workspace:*",
-    "@avi/validation": "workspace:*"
+    "@avijs/core": "workspace:*",
+    "@avijs/http": "workspace:*",
+    "@avijs/validation": "workspace:*"
   },
   "devDependencies": {
+    "@hono/node-server": "2.1.5",
+    "@nestjs/common": "12.2.0",
+    "@nestjs/core": "12.2.0",
+    "@nestjs/platform-express": "12.2.0",
+    "@nestjs/platform-fastify": "12.2.0",
     "@types/autocannon": "7.12.7",
     "autocannon": "8.0.0",
+    "fastify": "5.12.7",
+    "hono": "4.13.13",
     "mitata": "1.0.34",
+    "reflect-metadata": "0.2.2",
+    "rxjs": "7.8.2",
     "valibot": "1.5.0"
   }
 }

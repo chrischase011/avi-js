@@ -1,7 +1,6 @@
 {
-  "name": "@avi/core",
-  "version": "0.0.0",
-  "private": true,
+  "name": "@avijs/core",
+  "version": "0.1.0",
   "description": "Avi.js public API: application factory, modules and controllers.",
   "keywords": [
     "avi",
@@ -29,7 +28,7 @@
   },
   "exports": {
     ".": {
-      "@avi/source": "./src/index.ts",
+      "@avijs/source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     }
@@ -41,16 +40,15 @@
     "LICENSE"
   ],
   "publishConfig": {
-    "access": "public",
-    "provenance": true
+    "access": "public"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@avi/di": "workspace:*",
-    "@avi/http": "workspace:*",
-    "@avi/validation": "workspace:*"
+    "@avijs/di": "workspace:*",
+    "@avijs/http": "workspace:*",
+    "@avijs/validation": "workspace:*"
   },
   "devDependencies": {
     "valibot": "1.5.0"

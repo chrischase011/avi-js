@@ -1,4 +1,4 @@
-import { describeApp, type AppDescription, type ModuleRef } from '@avi/core';
+import { describeApp, type AppDescription, type ModuleRef } from '@avijs/core';
 import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
