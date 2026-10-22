@@ -20,6 +20,7 @@ export default defineConfig(
     rules: {
       // Conflicts with no-non-null-assertion under noUncheckedIndexedAccess.
       '@typescript-eslint/non-nullable-type-assertion-style': 'off',
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
     },
   },
   {
