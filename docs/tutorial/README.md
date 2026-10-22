@@ -18,7 +18,7 @@ status line:
 | [2](02-routing.md)           | Routing: params, query, precedence         | Runnable          |
 | [3](03-modules-and-di.md)    | Modules and dependency injection           | Runnable          |
 | [4](04-controllers.md)       | Controllers: explicit and decorator styles | Runnable          |
-| [5](05-request-pipeline.md)  | Middleware, guards and errors              | Planned (Phase 5) |
+| [5](05-request-pipeline.md)  | Middleware, guards and errors              | Runnable          |
 | [6](06-validation.md)        | Validation and typed input                 | Planned (Phase 6) |
 | [7](07-production.md)        | Running in production                      | Partly runnable   |
 | [8](08-testing.md)           | Testing your app                           | Partly runnable   |

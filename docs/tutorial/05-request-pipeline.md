@@ -1,31 +1,197 @@
 # 5. Middleware, guards and errors
 
-> **Status: Planned (Phase 5).** The API for this chapter is designed in Phase 5. This page
-> describes the agreed behavior only.
+> **Status: Runnable.** Everything on this page works today. Validation joins the pipeline in
+> [Chapter 6](06-validation.md).
 
 ## The request pipeline
 
-Every request passes through the same steps, in this order:
+Every request passes through the same stages, in this order:
 
 ```text
-route match → middleware → guards → validation → handler → serialization → response
+route match → middleware → guards → handler → serialization → response
+              └──────── any error → errorHandler → safe error response ─┘
 ```
 
-- **Middleware** runs code around a request: logging, timing, headers.
-- **Guards** decide whether the request may continue: authentication, roles.
-- **Validation** checks params, query and body before your handler sees them (Chapter 6).
+Middleware and guards can be attached at four levels. They always run in this order:
+**app → module → controller → route**.
 
-Each route's chain is assembled once at startup, not on every request.
+```ts
+const app = createAvi({ middleware: [requestId], guards: [] }); // app
 
-## One place for errors
+defineModule({ middleware: [audit], controllers: [users] }); // module: its own controllers
 
-An error thrown anywhere in the pipeline, sync or async, goes to a single error boundary. It turns
-the error into a safe HTTP response and logs the details. Errors are never silently swallowed.
+defineController({
+  prefix: '/users',
+  middleware: [timing], // controller
+  routes: [
+    { method: 'DELETE', path: '/:id', guards: [isAdmin], handler: remove }, // route
+  ],
+});
+```
 
-## Request isolation
+Each route's chain is assembled once at startup. Routes without middleware or guards call the
+handler directly.
 
-Each request gets its own `ctx`. State you attach to it cannot leak into another request, even
-under heavy concurrency.
+## Middleware
+
+Middleware wraps everything after it. `await next()` runs the rest of the pipeline and returns the
+handler's result:
+
+```ts
+import type { Middleware } from '@avi/core';
+
+const requestId: Middleware = async (ctx, next) => {
+  ctx.setHeader('x-request-id', crypto.randomUUID());
+  return next();
+};
+
+const envelope: Middleware = async (_ctx, next) => ({ data: await next() });
+```
+
+- **Return without calling `next()`** to answer early. Guards and the handler never run.
+- **Calling `next()` twice** is a bug and fails the request with a 500.
+- **Throwing** works like throwing in a handler.
+
+```ts
+const cache: Middleware = (ctx, next) => {
+  const hit = store.get(ctx.path);
+  return hit ? reply(hit, { headers: { 'x-cache': 'hit' } }) : next();
+};
+```
+
+### Response headers
+
+`ctx.setHeader(name, value)` adds a header to whatever response the request ends with, including
+error responses. If `reply()` or an `HttpError` sets the same header, theirs wins.
+
+### Request state
+
+`ctx.state` is a fresh object for every request, for passing data along the pipeline. Give it types
+once for your whole app:
+
+```ts
+declare module '@avi/core' {
+  interface AviState {
+    user?: { id: string; role: 'admin' | 'member' };
+  }
+}
+
+// later, in a handler
+ctx.state.user?.id; // typed
+```
+
+## Guards
+
+A guard decides whether a request may reach the handler. Return `true` to allow it; anything else
+answers **403 Forbidden**. Throw an `HttpError` for other answers, such as 401:
+
+```ts
+import { HttpError, type Guard } from '@avi/core';
+
+const signedIn: Guard = (ctx) => {
+  if (!ctx.state.user) {
+    throw new HttpError(401, 'Sign in first', { headers: { 'www-authenticate': 'Bearer' } });
+  }
+  return true;
+};
+
+const isAdmin: Guard = (ctx) => ctx.state.user?.role === 'admin';
+```
+
+Guards run after all middleware, so authentication middleware can set `ctx.state.user` first.
+
+## Classes with dependencies
+
+Middleware and guards can be classes with `use(ctx, next)` or `canActivate(ctx)`. Avi.js builds
+each class once per app with its `static inject`, resolved from the module where it is attached.
+You do not list them in `providers`.
+
+```ts
+class AuthMiddleware {
+  static inject = [SessionStore] as const;
+  constructor(private readonly sessions: SessionStore) {}
+
+  async use(ctx: Context, next: Next) {
+    const token = ctx.headers.authorization?.replace('Bearer ', '');
+    if (token) ctx.state.user = await this.sessions.find(token);
+    return next();
+  }
+}
+
+defineModule({
+  providers: [SessionStore],
+  middleware: [AuthMiddleware],
+  controllers: [users],
+});
+```
+
+## With decorators
+
+`@UseMiddleware(...)` and `@UseGuards(...)` work on a controller class or on one method:
+
+```ts
+@Controller('/admin')
+@UseMiddleware(AuthMiddleware)
+@UseGuards(signedIn)
+class AdminController {
+  @Get('/stats')
+  stats() {
+    return { users: 42 };
+  }
+
+  @Delete('/users/:id')
+  @UseGuards(isAdmin)
+  remove(ctx: Context) {
+    return undefined;
+  }
+}
+```
+
+## Custom error responses
+
+By default, errors become `{ statusCode, error, message? }` and 5xx details never reach the client.
+To use another format, such as `application/problem+json`, pass an `errorHandler`. It receives
+every error, including 404 and 405, and returns a response value like a handler:
+
+```ts
+const app = createAvi({
+  errorHandler: (error, ctx) =>
+    reply(
+      {
+        type: 'about:blank',
+        title: error instanceof HttpError && error.status < 500 ? error.message : 'Server error',
+        instance: ctx.path,
+      },
+      { headers: { 'content-type': 'application/problem+json' } },
+    ),
+});
+```
+
+- Without its own status, the response uses the error's: `HttpError.status`, otherwise 500.
+- Headers from the error (such as `allow` on a 405) are kept.
+- 5xx errors are still logged before your handler runs.
+- If `errorHandler` itself throws, Avi.js logs that too and sends its built-in safe response.
+
+## Watching responses
+
+Middleware cannot see the final status, because serialization happens after it. For logs and
+metrics, use `onResponse`. It runs after every response:
+
+```ts
+createAvi({
+  onResponse: ({ method, path, route, status, duration, aborted }) => {
+    logger.info({ method, path, route, status, ms: duration.toFixed(1), aborted });
+  },
+});
+```
+
+`route` is the matched pattern, such as `/users/:id`, so you can group metrics by route. Errors
+thrown in `onResponse` are logged and never affect the response.
+
+## Requests never share state
+
+Each request gets its own `ctx`, `ctx.state` and headers. The test suite runs 150 overlapping
+requests through the same middleware and checks that none sees another's data.
 
 ## Next
 
