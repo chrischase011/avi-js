@@ -19,11 +19,10 @@ dependency injection, without `reflect-metadata` and without the weight.
 ---
 
 > [!IMPORTANT]
-> Avi.js is in early development. The HTTP foundation and router work today: apps, controllers,
-> route parameters, JSON and text responses, safe errors, body limits and graceful shutdown.
-> Dependency injection and decorators are being built next, so the code below shows the **target
-> API**.
-> Follow along, try the workspace, and help shape it before 1.0.
+> Avi.js is in early development. Apps, routing, modules and dependency injection work today,
+> along with safe errors, body limits and graceful shutdown. Decorators are being built next, so
+> the decorator example below shows the **target API**. Follow along, try the workspace, and help
+> shape it before 1.0.
 
 ## Two styles, one engine
 
@@ -198,4 +197,4 @@ Commits follow [Conventional Commits](https://www.conventionalcommits.org/), for
 
 ## License
 
-[MIT](LICENSE) © Christopher Robin Chase
+[MIT](LICENSE) © [Christopher Robin Chase](https://github.com/chrischase011)
