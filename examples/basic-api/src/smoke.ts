@@ -26,6 +26,13 @@ try {
   });
   assert.equal(invalid.status, 400);
 
+  assert.deepEqual(await (await fetch(`${url}/users/2`)).json(), { id: 2, name: 'Grace' });
+  assert.equal((await fetch(`${url}/users/99`)).status, 404);
+
+  const wrongMethod = await fetch(`${url}/users`, { method: 'DELETE' });
+  assert.equal(wrongMethod.status, 405);
+  assert.equal(wrongMethod.headers.get('allow'), 'GET, HEAD, POST, OPTIONS');
+
   assert.equal((await fetch(`${url}/nope`)).status, 404);
 } finally {
   await app.close();
