@@ -3,6 +3,17 @@
 All notable changes are listed here. Avi.js follows [Semantic Versioning](https://semver.org); all
 packages share one version.
 
+## Unreleased
+
+### Added
+
+- `avi generate resource` (`avi g res`) creates a module, service and controller with CRUD routes
+  in one step, or a service and routes in minimal projects.
+
+### Changed
+
+- Each package's npm `homepage` now points to the website.
+
 ## 0.1.1 - 2026-10-22
 
 ### Added

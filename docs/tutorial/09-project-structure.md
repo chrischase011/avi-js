@@ -162,7 +162,17 @@ npx avi g controller posts         # posts.controller.ts, added to PostsModule c
 npx avi g controller admin/reports # src/modules/admin/reports/reports.controller.ts
 ```
 
-The short kinds `mo`, `co` and `s` work too. A path like `admin/reports` creates folders; the
+For a whole feature at once, generate a resource. It creates the module, service and controller
+with working CRUD routes (`GET`, `POST`, `PATCH`, `DELETE`) backed by an in-memory store:
+
+```sh
+npx avi g resource posts           # or: npx avi g res posts
+```
+
+Replace the store in the service with your database; the routes stay the same. In a minimal
+project, a resource is a service in `src/services/` and routes in `src/routes/`.
+
+The short kinds `mo`, `co`, `s` and `res` work too. A path like `admin/reports` creates folders; the
 last part is the name. A controller generated next to an existing service injects it.
 
 Each new file is registered in the nearest module, walking up from its folder to

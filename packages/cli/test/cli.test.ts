@@ -41,10 +41,8 @@ function run(args: string[], cwd: string) {
   return spawnSync(process.execPath, args, { cwd, encoding: 'utf8' });
 }
 
-async function startAndGet(
-  project: string,
-  urlPath: string,
-): Promise<{ status: number; body: string }> {
+/** Starts the compiled app, runs `use` against its URL, then stops it. */
+async function withApp<T>(project: string, use: (base: string) => Promise<T>): Promise<T> {
   const child = spawn(process.execPath, ['dist/main.js'], {
     cwd: project,
     env: { ...process.env, PORT: '0' },
@@ -62,11 +60,17 @@ async function startAndGet(
         reject(new Error(`App exited with ${String(code)}: ${output}`));
       });
     });
-    const res = await fetch(`${base}${urlPath}`);
-    return { status: res.status, body: await res.text() };
+    return await use(base);
   } finally {
     child.kill();
   }
+}
+
+function startAndGet(project: string, urlPath: string): Promise<{ status: number; body: string }> {
+  return withApp(project, async (base) => {
+    const res = await fetch(`${base}${urlPath}`);
+    return { status: res.status, body: await res.text() };
+  });
 }
 
 describe.each(['modular', 'minimal'] as const)('avi new --template %s', (template) => {
@@ -296,4 +300,78 @@ export class PostsModule {}
     expect((await generate(dir, 'widget', 'x')).code).toBe(2);
     expect((await generate(path.join(workdir, 'nowhere'), 'service', 'x')).code).toBe(1);
   }, 60_000);
+
+  /** Runs create, read, update and delete against a running app. */
+  async function crud(dir: string, prefix: string) {
+    return withApp(dir, async (base) => {
+      const send = async (method: string, urlPath: string, body?: unknown) => {
+        const res = await fetch(`${base}${prefix}${urlPath}`, {
+          method,
+          headers: body === undefined ? {} : { 'content-type': 'application/json' },
+          body: body === undefined ? null : JSON.stringify(body),
+        });
+        return { status: res.status, body: res.status === 204 ? undefined : await res.json() };
+      };
+      return [
+        await send('POST', '', { title: 'Hello' }),
+        await send('GET', ''),
+        await send('PATCH', '/1', { title: 'Hi', id: 99 }),
+        await send('GET', '/1'),
+        await send('POST', '', [1, 2]),
+        await send('GET', '/abc'),
+        await send('DELETE', '/1'),
+        await send('GET', '/1'),
+      ].map((r) => [r.status, r.body] as const);
+    });
+  }
+
+  const EXPECTED_CRUD = [
+    [201, { title: 'Hello', id: 1 }],
+    [200, [{ title: 'Hello', id: 1 }]],
+    [200, { title: 'Hi', id: 1 }],
+    [200, { title: 'Hi', id: 1 }],
+    [400, expect.objectContaining({ message: 'Expected a JSON object' })],
+    [400, expect.objectContaining({ message: 'id must be an integer' })],
+    [204, undefined],
+    [404, expect.objectContaining({ message: 'Category 1 not found' })],
+  ];
+
+  it('creates a CRUD resource in a modular project', async () => {
+    const dir = await project('modular', 'res-modular');
+
+    expect((await generate(dir, 'res', 'shop/categories')).out).toEqual([
+      'CREATE src/modules/shop/categories/categories.module.ts',
+      'CREATE src/modules/shop/categories/categories.service.ts',
+      'CREATE src/modules/shop/categories/categories.controller.ts',
+      'UPDATE src/app.module.ts',
+    ]);
+    expect(await read(dir, 'src/app.module.ts')).toContain(
+      "import { CategoriesModule } from './modules/shop/categories/categories.module.js';",
+    );
+
+    const result = run([tsc, '-p', 'tsconfig.json'], dir);
+    expect(result.stdout + result.stderr).toBe('');
+    expect(await crud(dir, '/categories')).toEqual(EXPECTED_CRUD);
+
+    const again = await generate(dir, 'resource', 'shop/categories');
+    expect(again.code).toBe(1);
+    expect(again.err[0]).toContain('already exists');
+  }, 120_000);
+
+  it('creates a CRUD resource in a minimal project', async () => {
+    const dir = await project('minimal', 'res-minimal');
+
+    expect((await generate(dir, 'resource', 'categories')).out).toEqual([
+      'CREATE src/services/categories.ts',
+      'CREATE src/routes/categories.ts',
+      'UPDATE src/app.ts',
+    ]);
+    const app = await read(dir, 'src/app.ts');
+    expect(app).toContain('providers: [UsersService, CategoriesService]');
+    expect(app).toContain('controllers: [healthRoutes, usersRoutes, categoriesRoutes]');
+
+    const result = run([tsc, '-p', 'tsconfig.json'], dir);
+    expect(result.stdout + result.stderr).toBe('');
+    expect(await crud(dir, '/categories')).toEqual(EXPECTED_CRUD);
+  }, 120_000);
 });

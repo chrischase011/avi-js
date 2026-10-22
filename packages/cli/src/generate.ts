@@ -4,7 +4,7 @@ import path from 'node:path';
 import { parseArgs } from 'node:util';
 import ts from 'typescript';
 
-type Kind = 'module' | 'controller' | 'service';
+type Kind = 'module' | 'controller' | 'service' | 'resource';
 type Layout = 'modular' | 'minimal';
 
 const KINDS: Record<string, Kind> = {
@@ -14,14 +14,16 @@ const KINDS: Record<string, Kind> = {
   co: 'controller',
   service: 'service',
   s: 'service',
+  resource: 'resource',
+  res: 'resource',
 };
 const SEGMENT = /^[a-z][a-z0-9-]*$/;
 
-export const GENERATE_USAGE = `  avi generate <module|controller|service> <path> [--root .] [--dry-run]
+export const GENERATE_USAGE = `  avi generate <module|controller|service|resource> <path> [--root .] [--dry-run]
       Create a module, controller or service and register it. Short: avi g co admin/posts.
       Modular projects get src/modules/<path>/<name>.<kind>.ts, registered in the nearest
       module; minimal projects get src/routes/<path>.ts or src/services/<path>.ts, registered
-      in src/app.ts.`;
+      in src/app.ts. A resource (avi g res posts) creates all of them with CRUD routes.`;
 
 interface Names {
   /** kebab-case file name, e.g. `user-profile`. */
@@ -131,6 +133,17 @@ async function modular(
   names: Names,
 ): Promise<void> {
   const folder = path.join(src, 'modules', ...dirs, names.file);
+
+  if (kind === 'resource') {
+    const module = path.join(folder, `${names.file}.module.ts`);
+    plan.create(module, resourceModule(names));
+    plan.create(path.join(folder, `${names.file}.service.ts`), crudService(names, true));
+    plan.create(path.join(folder, `${names.file}.controller.ts`), crudController(names));
+    const parent = nearestModule(plan, src, path.dirname(folder));
+    await register(plan, parent, 'imports', `${names.pascal}Module`, module);
+    return;
+  }
+
   const file = path.join(folder, `${names.file}.${kind}.ts`);
   const className = `${names.pascal}${capitalize(kind)}`;
 
@@ -215,6 +228,15 @@ async function minimal(
   const app = path.join(src, 'app.ts');
   const service = path.join(src, 'services', ...dirs, `${names.file}.ts`);
   const serviceClass = `${names.pascal}Service`;
+
+  if (kind === 'resource') {
+    const routes = path.join(src, 'routes', ...dirs, `${names.file}.ts`);
+    plan.create(service, crudService(names, false));
+    plan.create(routes, crudRoutes(names, importPath(routes, service)));
+    await register(plan, app, 'providers', serviceClass, service);
+    await register(plan, app, 'controllers', `${names.camel}Routes`, routes);
+    return;
+  }
 
   if (kind === 'service') {
     plan.create(
@@ -391,4 +413,159 @@ function toNames(file: string): Names {
 
 function capitalize(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+/** `posts` → `Post`, `categories` → `Category`; names without a plural `s` stay as they are. */
+function singular(pascal: string): string {
+  if (pascal.endsWith('ies')) return `${pascal.slice(0, -3)}y`;
+  if (pascal.endsWith('s') && !pascal.endsWith('ss')) return pascal.slice(0, -1);
+  return pascal;
+}
+
+function resourceModule(names: Names): string {
+  return `import { Module } from '@avijs/core';
+import { ${names.pascal}Controller } from './${names.file}.controller.js';
+import { ${names.pascal}Service } from './${names.file}.service.js';
+
+@Module({ controllers: [${names.pascal}Controller], providers: [${names.pascal}Service] })
+export class ${names.pascal}Module {}
+`;
+}
+
+function crudService(names: Names, decorated: boolean): string {
+  const item = singular(names.pascal);
+  const imports = decorated ? 'HttpError, Injectable' : 'HttpError';
+  return `import { ${imports} } from '@avijs/core';
+
+export interface ${item} {
+  id: number;
+  [field: string]: unknown;
+}
+
+/** Keeps ${names.file} in memory. Swap the Map for your database; the routes stay the same. */
+${decorated ? '@Injectable()\n' : ''}export class ${names.pascal}Service {
+  readonly #items = new Map<number, ${item}>();
+  #nextId = 1;
+
+  findAll(): ${item}[] {
+    return [...this.#items.values()];
+  }
+
+  findOne(id: number): ${item} {
+    const item = this.#items.get(id);
+    if (!item) throw new HttpError(404, \`${item} \${String(id)} not found\`);
+    return item;
+  }
+
+  create(data: Record<string, unknown>): ${item} {
+    const item = { ...data, id: this.#nextId++ };
+    this.#items.set(item.id, item);
+    return item;
+  }
+
+  update(id: number, data: Record<string, unknown>): ${item} {
+    const item = { ...this.findOne(id), ...data, id };
+    this.#items.set(id, item);
+    return item;
+  }
+
+  remove(id: number): void {
+    this.findOne(id);
+    this.#items.delete(id);
+  }
+}
+`;
+}
+
+// Shared by the generated controller and routes. Replace them with route schemas
+// (see the validation chapter) once the shape of the data is known.
+const INPUT_HELPERS = `function idOf(value: string | undefined): number {
+  const id = Number(value);
+  if (!Number.isInteger(id)) throw new HttpError(400, 'id must be an integer');
+  return id;
+}
+
+function bodyOf(value: unknown): Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new HttpError(400, 'Expected a JSON object');
+  }
+  return value as Record<string, unknown>;
+}`;
+
+function crudController(names: Names): string {
+  const service = `${names.pascal}Service`;
+  const field = names.camel;
+  return `import { Controller, Delete, Get, HttpError, Patch, Post, reply, type Context } from '@avijs/core';
+import { ${service} } from './${names.file}.service.js';
+
+${INPUT_HELPERS}
+
+@Controller('/${names.file}')
+export class ${names.pascal}Controller {
+  static inject = [${service}] as const;
+
+  constructor(private readonly ${field}: ${service}) {}
+
+  @Get()
+  findAll() {
+    return this.${field}.findAll();
+  }
+
+  @Get('/:id')
+  findOne(ctx: Context) {
+    return this.${field}.findOne(idOf(ctx.params['id']));
+  }
+
+  @Post()
+  async create(ctx: Context) {
+    return reply(this.${field}.create(bodyOf(await ctx.json())), { status: 201 });
+  }
+
+  @Patch('/:id')
+  async update(ctx: Context) {
+    return this.${field}.update(idOf(ctx.params['id']), bodyOf(await ctx.json()));
+  }
+
+  @Delete('/:id')
+  remove(ctx: Context) {
+    this.${field}.remove(idOf(ctx.params['id']));
+  }
+}
+`;
+}
+
+function crudRoutes(names: Names, serviceImport: string): string {
+  const service = `${names.pascal}Service`;
+  const field = names.camel;
+  return `import { HttpError, defineController, reply, route } from '@avijs/core';
+import { ${service} } from '${serviceImport}';
+
+${INPUT_HELPERS}
+
+export const ${field}Routes = defineController({
+  prefix: '/${names.file}',
+  inject: [${service}],
+  routes: (${field}) => [
+    route({ method: 'GET', path: '/', handler: () => ${field}.findAll() }),
+    route({ method: 'GET', path: '/:id', handler: (ctx) => ${field}.findOne(idOf(ctx.params.id)) }),
+    route({
+      method: 'POST',
+      path: '/',
+      handler: async (ctx) => reply(${field}.create(bodyOf(await ctx.json())), { status: 201 }),
+    }),
+    route({
+      method: 'PATCH',
+      path: '/:id',
+      handler: async (ctx) => ${field}.update(idOf(ctx.params.id), bodyOf(await ctx.json())),
+    }),
+    route({
+      method: 'DELETE',
+      path: '/:id',
+      handler: (ctx) => {
+        ${field}.remove(idOf(ctx.params.id));
+      },
+    }),
+  ],
+});
+`;
 }

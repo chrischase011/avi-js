@@ -62,7 +62,17 @@ my-api/
 
 ## Add a feature
 
-The CLI creates files and registers them for you:
+The CLI creates files and registers them for you. One command gives you a module, a service and a
+controller with working CRUD routes:
+
+```sh
+npx avi g resource posts
+```
+
+http://localhost:3000/posts now lists, creates, updates and deletes posts, kept in memory until you
+connect a database.
+
+Instead of a resource, you can create the pieces one at a time and write the routes yourself:
 
 ```sh
 npx avi g module posts
