@@ -1,0 +1,20 @@
+{
+  "name": "@avi/benchmarks",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "router": "node dist/router.js",
+    "http": "node dist/http.js",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@avi/core": "workspace:*",
+    "@avi/http": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/autocannon": "7.12.7",
+    "autocannon": "8.0.0",
+    "mitata": "1.0.34"
+  }
+}
