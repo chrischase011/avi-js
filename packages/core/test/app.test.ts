@@ -66,27 +66,22 @@ describe('createAvi', () => {
     expect(await (await fetch(`${url}/b`)).text()).toBe('b');
   });
 
-  it('rejects the same route from two controllers', () => {
+  it('rejects the same route from two controllers at init', async () => {
     const one = defineController({
       prefix: '/x',
       routes: [{ method: 'GET', path: '/', handler: () => 1 }],
     });
     const two = defineController({ routes: [{ method: 'GET', path: '/x', handler: () => 2 }] });
-    expect(() => createAvi().register({ controllers: [one, two] })).toThrow(
-      'Duplicate route: GET /x',
-    );
+    const instance = createAvi().register({ controllers: [one, two] });
+    await expect(instance.init()).rejects.toThrow('Duplicate route: GET /x');
   });
 
-  it('keeps nothing from a register call that fails', async () => {
-    const good = defineController({
-      routes: [{ method: 'GET', path: '/good', handler: () => 'ok' }],
-    });
+  it('refuses to listen when init fails, and keeps failing the same way', async () => {
     const bad = defineController({ routes: [{ method: 'GET', path: '/:1x', handler: () => 'x' }] });
-    const instance = createAvi(silent);
-    expect(() => instance.register({ controllers: [good, bad] })).toThrow('Invalid parameter name');
-
-    const url = await serve(instance);
-    expect((await fetch(`${url}/good`)).status).toBe(404);
+    const instance = createAvi(silent).register({ controllers: [bad] });
+    await expect(instance.listen(0, '127.0.0.1')).rejects.toThrow('Invalid parameter name');
+    await expect(instance.init()).rejects.toThrow('Invalid parameter name');
+    await instance.close();
   });
 
   it('routes parameters through controller prefixes', async () => {
@@ -129,10 +124,10 @@ describe('createAvi', () => {
     );
   });
 
-  it('refuses to register after listen()', async () => {
+  it('refuses to register after init()', async () => {
     const instance = createAvi();
-    await serve(instance);
-    expect(() => instance.register({ controllers: [] })).toThrow('after listen()');
+    await instance.init();
+    expect(() => instance.register({ controllers: [] })).toThrow('after init() or listen()');
   });
 
   it('passes server options through', async () => {
