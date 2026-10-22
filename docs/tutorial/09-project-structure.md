@@ -151,6 +151,28 @@ await app.listen(3000);
 
 `common/` holds code shared across features, such as guards, middleware and helpers.
 
+## Generating code
+
+`avi generate` (short: `avi g`) adds a module, controller or service and registers it for you:
+
+```sh
+npx avi g module posts             # src/modules/posts/posts.module.ts, imported by AppModule
+npx avi g service posts            # posts.service.ts, added to PostsModule providers
+npx avi g controller posts         # posts.controller.ts, added to PostsModule controllers
+npx avi g controller admin/reports # src/modules/admin/reports/reports.controller.ts
+```
+
+The short kinds `mo`, `co` and `s` work too. A path like `admin/reports` creates folders; the
+last part is the name. A controller generated next to an existing service injects it.
+
+Each new file is registered in the nearest module, walking up from its folder to
+`src/app.module.ts`. In a minimal project (`src/app.ts`), controllers go to `src/routes/`,
+services to `src/services/`, and both are added to the `register()` call in `src/app.ts`.
+
+The CLI edits your files through the TypeScript parser and only adds an import and an array entry.
+When it cannot find where to register something, it changes nothing and prints what to add. It
+never overwrites an existing file, and `--dry-run` lists the changes without writing them.
+
 ## Growing from minimal to modular
 
 You do not have to rewrite the app. Move one feature at a time:

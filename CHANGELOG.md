@@ -3,6 +3,18 @@
 All notable changes are listed here. Avi.js follows [Semantic Versioning](https://semver.org); all
 packages share one version.
 
+## Unreleased
+
+### Added
+
+- `avi generate` (`avi g`) creates a module, controller or service and registers it in the nearest
+  module, or in `src/app.ts` for minimal projects.
+
+### Fixed
+
+- `avi check` no longer reports a mismatch for generic classes used as tokens, such as Prisma's
+  `PrismaClient`.
+
 ## 0.1.0 - 2026-10-22
 
 The first release. Everything below is new.

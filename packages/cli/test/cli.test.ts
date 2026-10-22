@@ -177,3 +177,123 @@ describe('avi', () => {
     error.mockRestore();
   });
 });
+
+describe('avi generate', () => {
+  async function project(template: 'modular' | 'minimal', name: string): Promise<string> {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    await main(['new', name, '--template', template, '--dir', workdir]);
+    log.mockRestore();
+    const dir = path.join(workdir, name);
+    await linkPackages(dir);
+    return dir;
+  }
+
+  async function generate(dir: string, ...args: string[]) {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      const code = await main(['g', ...args, '--root', dir]);
+      return {
+        code,
+        out: log.mock.calls.map((call) => String(call[0])),
+        err: error.mock.calls.map((call) => String(call[0])),
+      };
+    } finally {
+      log.mockRestore();
+      error.mockRestore();
+    }
+  }
+
+  const read = (dir: string, file: string) => readFile(path.join(dir, file), 'utf8');
+
+  it('adds a module, service and controller to a modular project', async () => {
+    const dir = await project('modular', 'gen-modular');
+
+    expect((await generate(dir, 'module', 'posts')).out).toEqual([
+      'CREATE src/modules/posts/posts.module.ts',
+      'UPDATE src/app.module.ts',
+    ]);
+    expect((await generate(dir, 's', 'posts')).out).toEqual([
+      'CREATE src/modules/posts/posts.service.ts',
+      'UPDATE src/modules/posts/posts.module.ts',
+    ]);
+    expect((await generate(dir, 'co', 'posts')).out).toEqual([
+      'CREATE src/modules/posts/posts.controller.ts',
+      'UPDATE src/modules/posts/posts.module.ts',
+    ]);
+    expect((await generate(dir, 'controller', 'admin/reports')).out).toEqual([
+      'CREATE src/modules/admin/reports/reports.controller.ts',
+      'UPDATE src/app.module.ts',
+    ]);
+
+    expect(await read(dir, 'src/modules/posts/posts.module.ts')).toBe(
+      `import { Module } from '@avijs/core';
+import { PostsService } from './posts.service.js';
+import { PostsController } from './posts.controller.js';
+
+@Module({ providers: [PostsService], controllers: [PostsController] })
+export class PostsModule {}
+`,
+    );
+    const app = await read(dir, 'src/app.module.ts');
+    expect(app).toContain("import { PostsModule } from './modules/posts/posts.module.js';");
+    expect(app).toContain(
+      "import { ReportsController } from './modules/admin/reports/reports.controller.js';",
+    );
+    expect(app).toContain(
+      '@Module({ imports: [UsersModule, PostsModule], controllers: [HealthController, ReportsController] })',
+    );
+    expect(await read(dir, 'src/modules/posts/posts.controller.ts')).toContain(
+      'static inject = [PostsService] as const;',
+    );
+
+    const result = run([tsc, '-p', 'tsconfig.json'], dir);
+    expect(result.stdout + result.stderr).toBe('');
+    expect(await startAndGet(dir, '/posts')).toEqual({ status: 200, body: '[]' });
+    expect(await startAndGet(dir, '/reports')).toEqual({ status: 200, body: '[]' });
+  }, 120_000);
+
+  it('adds a service and routes to a minimal project', async () => {
+    const dir = await project('minimal', 'gen-minimal');
+
+    expect((await generate(dir, 'service', 'posts')).out).toEqual([
+      'CREATE src/services/posts.ts',
+      'UPDATE src/app.ts',
+    ]);
+    expect((await generate(dir, 'controller', 'posts')).out).toEqual([
+      'CREATE src/routes/posts.ts',
+      'UPDATE src/app.ts',
+    ]);
+    const app = await read(dir, 'src/app.ts');
+    expect(app).toContain('providers: [UsersService, PostsService]');
+    expect(app).toContain('controllers: [healthRoutes, usersRoutes, postsRoutes]');
+    expect(await read(dir, 'src/routes/posts.ts')).toContain('inject: [PostsService]');
+
+    const module = await generate(dir, 'module', 'posts');
+    expect(module.code).toBe(1);
+    expect(module.err[0]).toContain('does not use modules');
+
+    const result = run([tsc, '-p', 'tsconfig.json'], dir);
+    expect(result.stdout + result.stderr).toBe('');
+    expect(await startAndGet(dir, '/posts')).toEqual({ status: 200, body: '[]' });
+  }, 120_000);
+
+  it('previews with --dry-run, refuses to overwrite and validates input', async () => {
+    const dir = await project('modular', 'gen-checks');
+
+    const dry = await generate(dir, 'service', 'billing', '--dry-run');
+    expect(dry.out).toEqual([
+      'CREATE src/modules/billing/billing.service.ts',
+      'UPDATE src/app.module.ts',
+    ]);
+    expect(await read(dir, 'src/app.module.ts')).not.toContain('BillingService');
+
+    const twice = await generate(dir, 'service', 'users');
+    expect(twice.code).toBe(1);
+    expect(twice.err[0]).toContain('already exists');
+
+    expect((await generate(dir, 'controller', 'Bad/Name')).code).toBe(2);
+    expect((await generate(dir, 'widget', 'x')).code).toBe(2);
+    expect((await generate(path.join(workdir, 'nowhere'), 'service', 'x')).code).toBe(1);
+  }, 60_000);
+});

@@ -5,6 +5,7 @@ import { mkdir, readdir, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
+import { GENERATE_USAGE, generate } from './generate.js';
 import { templateFiles } from './templates.js';
 
 const { version } = createRequire(import.meta.url)('../package.json') as { version: string };
@@ -15,6 +16,7 @@ const USAGE = `Usage:
       minimal uses plain routes and services. --from points at a folder of packed
       @avijs tarballs (pnpm pack) to install instead of the registry. --avi-version
       defaults to this CLI's version.
+${GENERATE_USAGE}
   avi dev [--project tsconfig.json] [--entry dist/main.js]
       Compile, then recompile and restart on every change.
   avi check [--project tsconfig.json]
@@ -27,6 +29,9 @@ export async function main(argv: readonly string[]): Promise<number> {
   switch (command) {
     case 'new':
       return create(rest);
+    case 'generate':
+    case 'g':
+      return generate(rest);
     case 'dev':
       return dev(rest);
     case 'check':
