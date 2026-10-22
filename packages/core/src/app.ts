@@ -2,13 +2,19 @@ import { Container, type Token, type TokenType } from '@avi/di';
 import { HttpServer, Router, type RouteDefinition, type ServerOptions } from '@avi/http';
 import type { AddressInfo } from 'node:net';
 import { joinPath } from './controller.js';
-import { defineModule, isModule, type AviModule, type ModuleOptions } from './module.js';
+import {
+  defineModule,
+  toModule,
+  type AviModule,
+  type ModuleOptions,
+  type ModuleRef,
+} from './module.js';
 
 export type AviOptions = ServerOptions;
 
 export interface AviApp {
-  /** Adds a root module. Checks run in `init()`. */
-  register(module: AviModule | ModuleOptions): this;
+  /** Adds a root module: `defineModule`, an `@Module` class or inline options. Checks run in `init()`. */
+  register(module: ModuleRef | ModuleOptions): this;
   /** Validates the module graph and routes, then creates all singletons. `listen()` calls it. */
   init(): Promise<void>;
   /** Starts the server. Use port `0` for a random free port. */
@@ -23,6 +29,15 @@ export function createAvi(options: AviOptions = {}): AviApp {
   return new Application(options);
 }
 
+export const AviFactory = {
+  /** Registers `module` and runs `init()`. The returned app is ready to `listen()`. */
+  async create(module: ModuleRef | ModuleOptions, options?: AviOptions): Promise<AviApp> {
+    const app = createAvi(options).register(module);
+    await app.init();
+    return app;
+  },
+};
+
 class Application implements AviApp {
   readonly #router = new Router();
   readonly #server: HttpServer;
@@ -34,9 +49,12 @@ class Application implements AviApp {
     this.#server = new HttpServer(this.#router, options);
   }
 
-  register(module: AviModule | ModuleOptions): this {
+  register(module: ModuleRef | ModuleOptions): this {
     if (this.#init) throw new Error('Cannot register modules after init() or listen()');
-    this.#roots.push(isModule(module) ? module : defineModule(module));
+    if (typeof module === 'function' && !toModule(module)) {
+      throw new TypeError(`${module.name || 'This class'} is not a module: add @Module()`);
+    }
+    this.#roots.push(toModule(module) ?? defineModule(module as ModuleOptions));
     return this;
   }
 

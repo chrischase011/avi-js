@@ -13,8 +13,19 @@ describe('@avi/core', () => {
 
   it('exposes only the documented runtime exports', () => {
     expect(Object.keys(core).sort()).toEqual([
+      'AviFactory',
+      'Controller',
+      'Delete',
+      'Get',
       'HTTP_METHODS',
+      'Head',
       'HttpError',
+      'Injectable',
+      'Module',
+      'Options',
+      'Patch',
+      'Post',
+      'Put',
       'createAvi',
       'createToken',
       'defineController',

@@ -1,9 +1,24 @@
-export { createAvi } from './app.js';
+import './decorators.js';
+
+export { AviFactory, createAvi } from './app.js';
 export type { AviApp, AviOptions } from './app.js';
 export { defineController } from './controller.js';
 export type { ControllerDefinition, ControllerOptions } from './controller.js';
+export {
+  Controller,
+  Delete,
+  Get,
+  Head,
+  Injectable,
+  Module,
+  Options,
+  Patch,
+  Post,
+  Put,
+} from './decorators.js';
+export type { CheckInject } from './decorators.js';
 export { defineModule } from './module.js';
-export type { AviModule, ModuleOptions } from './module.js';
+export type { AviModule, ModuleOptions, ModuleRef } from './module.js';
 
 export { HTTP_METHODS, HttpError, reply } from '@avi/http';
 export type {

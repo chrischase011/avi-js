@@ -179,10 +179,10 @@ describe('modules and DI over HTTP', () => {
 describe('defineModule', () => {
   it('rejects imports that are not modules', () => {
     expect(() => defineModule({ name: 'App', imports: [undefined as never] })).toThrow(
-      'App.imports[0] is not a module created with defineModule (is there a circular import?)',
+      'App.imports[0] is not a module: use defineModule or @Module (is there a circular import?)',
     );
     expect(() => defineModule({ imports: [{ providers: [] } as never] })).toThrow(
-      'not a module created with defineModule',
+      'is not a module',
     );
   });
 
