@@ -8,9 +8,10 @@ import { parseArgs } from 'node:util';
 import { templateFiles } from './templates.js';
 
 const USAGE = `Usage:
-  avi new <name> [--template modular|minimal] [--dir .] [--avi-version latest]
+  avi new <name> [--template modular|minimal] [--dir .] [--avi-version latest] [--from <dir>]
       Create a project. The modular template (default) uses modules and decorators;
-      minimal uses plain routes and services.
+      minimal uses plain routes and services. --from points at a folder of packed
+      @avi tarballs (pnpm pack) to install instead of the registry.
   avi dev [--project tsconfig.json] [--entry dist/main.js]
       Compile, then recompile and restart on every change.
   avi check [--project tsconfig.json]
@@ -42,6 +43,7 @@ async function create(args: readonly string[]): Promise<number> {
       template: { type: 'string', default: 'modular' },
       dir: { type: 'string', default: '.' },
       'avi-version': { type: 'string', default: 'latest' },
+      from: { type: 'string' },
     },
   });
   const name = positionals[0];
@@ -65,6 +67,7 @@ async function create(args: readonly string[]): Promise<number> {
     name,
     template,
     aviVersion: values['avi-version'],
+    ...(values.from ? { localPackages: await localPackages(values.from, target) } : {}),
   });
   for (const [file, content] of Object.entries(files)) {
     const destination = path.join(target, file);
@@ -132,4 +135,18 @@ async function dev(args: readonly string[]): Promise<number> {
       });
     }
   });
+}
+
+/** Maps each packed @avi tarball in `dir` to a `file:` spec relative to the new project. */
+async function localPackages(dir: string, project: string): Promise<Record<string, string>> {
+  const folder = path.resolve(dir);
+  const specs: Record<string, string> = {};
+  for (const file of await readdir(folder)) {
+    const match = /^avi-([a-z-]+?)-\d+\.\d+\.\d+.*\.tgz$/.exec(file);
+    if (!match?.[1]) continue;
+    const relative = path.relative(project, path.join(folder, file)).replaceAll(path.sep, '/');
+    specs[`@avi/${match[1]}`] = `file:${relative}`;
+  }
+  if (!specs['@avi/core']) throw new Error(`No @avi package tarballs found in ${folder}`);
+  return specs;
 }

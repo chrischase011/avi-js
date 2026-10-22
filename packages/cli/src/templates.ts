@@ -5,6 +5,12 @@ export interface TemplateOptions {
   template: TemplateName;
   /** Version range for the @avi packages. */
   aviVersion: string;
+  /**
+   * Local package files to use instead of the registry, keyed by package name, such as
+   * 'file:../artifacts/avi-core-0.1.0.tgz'. Also added as npm overrides so packages that depend on
+   * each other resolve locally too.
+   */
+  localPackages?: Readonly<Record<string, string>>;
 }
 
 /** Every file of a new project, keyed by its path relative to the project folder. */
@@ -15,7 +21,13 @@ export function templateFiles(options: TemplateOptions): Record<string, string> 
   };
 }
 
-function shared({ name, template, aviVersion }: TemplateOptions): Record<string, string> {
+function shared({
+  name,
+  template,
+  aviVersion,
+  localPackages,
+}: TemplateOptions): Record<string, string> {
+  const spec = (pkg: string) => localPackages?.[pkg] ?? aviVersion;
   const pkg = {
     name,
     version: '0.1.0',
@@ -28,14 +40,15 @@ function shared({ name, template, aviVersion }: TemplateOptions): Record<string,
       check: 'avi check',
       test: 'tsc && node --test "dist/**/*.test.js"',
     },
-    dependencies: { '@avi/core': aviVersion },
+    dependencies: { '@avi/core': spec('@avi/core') },
     devDependencies: {
-      '@avi/cli': aviVersion,
-      '@avi/testing': aviVersion,
+      '@avi/cli': spec('@avi/cli'),
+      '@avi/testing': spec('@avi/testing'),
       '@types/node': '^22.0.0',
       typescript: '~6.0.3',
     },
     engines: { node: '>=22.12' },
+    ...(localPackages ? { overrides: localPackages } : {}),
   };
   const tsconfig = {
     compilerOptions: {
