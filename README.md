@@ -182,7 +182,8 @@ npm install @avijs/core
 
 To work on Avi.js itself, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
-The [tutorial](docs/tutorial/README.md) covers everything from a first route to production.
+The [tutorial](docs/tutorial/README.md) covers everything from a first route to production. For complete apps, see the [examples](examples/README.md): CRUD with validation,
+authentication with guards and roles, and Prisma with SQLite.
 
 ## Packages
 

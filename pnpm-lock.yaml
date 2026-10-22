@@ -249,11 +249,40 @@ importers:
         specifier: 1.5.0
         version: 1.5.0(typescript@6.0.3)
 
+  examples/auth-api:
+    dependencies:
+      '@avijs/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@avijs/security':
+        specifier: workspace:*
+        version: link:../../packages/security
+      valibot:
+        specifier: 1.5.0
+        version: 1.5.0(typescript@6.0.3)
+    devDependencies:
+      '@avijs/testing':
+        specifier: workspace:*
+        version: link:../../packages/testing
+
   examples/basic-api:
     dependencies:
       '@avijs/core':
         specifier: workspace:*
         version: link:../../packages/core
+
+  examples/crud-api:
+    dependencies:
+      '@avijs/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      valibot:
+        specifier: 1.5.0
+        version: 1.5.0(typescript@6.0.3)
+    devDependencies:
+      '@avijs/testing':
+        specifier: workspace:*
+        version: link:../../packages/testing
 
   examples/modular-api:
     dependencies:

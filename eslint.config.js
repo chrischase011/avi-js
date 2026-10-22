@@ -4,7 +4,14 @@ import { defineConfig, globalIgnores } from 'eslint/config';
 import tseslint from 'typescript-eslint';
 
 export default defineConfig(
-  globalIgnores(['**/dist/', '**/coverage/', 'docs/', 'packages/compiler/test/fixtures/']),
+  globalIgnores([
+    '**/dist/',
+    '**/coverage/',
+    'docs/',
+    'packages/compiler/test/fixtures/',
+    // Standalone app with its own npm install; CI does not install its dependencies.
+    'examples/prisma-api/',
+  ]),
   js.configs.recommended,
   tseslint.configs.strictTypeChecked,
   tseslint.configs.stylisticTypeChecked,

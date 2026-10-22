@@ -3,3 +3,4 @@ PROMPT.md
 pnpm-lock.yaml
 dist/
 coverage/
+examples/prisma-api/src/generated/

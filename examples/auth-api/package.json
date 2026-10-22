@@ -1,0 +1,19 @@
+{
+  "name": "@avijs/example-auth-api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node dist/main.js",
+    "smoke": "node dist/smoke.js",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@avijs/core": "workspace:*",
+    "@avijs/security": "workspace:*",
+    "valibot": "1.5.0"
+  },
+  "devDependencies": {
+    "@avijs/testing": "workspace:*"
+  }
+}
