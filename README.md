@@ -12,16 +12,17 @@ dependency injection, without `reflect-metadata` and without the weight.
 [![Node.js](https://img.shields.io/badge/node-%E2%89%A522.12-339933.svg)](package.json)
 [![Status](https://img.shields.io/badge/status-pre--alpha-orange.svg)](#try-it-now)
 
-[Tutorial](docs/tutorial/README.md) · [Why Avi.js](#why-avijs) · [Try it](#try-it-now)
+[Tutorial](docs/tutorial/README.md) · [Project structure](#project-structure) · [Why Avi.js](#why-avijs) · [Try it](#try-it-now)
 
 </div>
 
 ---
 
 > [!IMPORTANT]
-> Avi.js is in early development. The repository foundation is in place, and the HTTP server,
-> router and DI container are being built phase by phase. The code below shows the **target
-> API**. Follow along, try the workspace, and help shape it before 1.0.
+> Avi.js is in early development. The HTTP foundation works today: apps, controllers, JSON and
+> text responses, safe errors, body limits and graceful shutdown. Routing parameters, dependency
+> injection and decorators are being built next, so the code below shows the **target API**.
+> Follow along, try the workspace, and help shape it before 1.0.
 
 ## Two styles, one engine
 
@@ -74,6 +75,64 @@ class AppModule {}
 const app = await AviFactory.create(AppModule);
 await app.listen(3000);
 ```
+
+## Project structure
+
+Avi.js ships two official templates. Start small and grow into modules when the app needs them:
+both run on the same router, DI container and request pipeline.
+
+<table>
+<tr>
+<th>Modular (default)</th>
+<th>Minimal</th>
+</tr>
+<tr>
+<td>
+
+```text
+src/
+├── main.ts
+├── app.module.ts
+├── modules/
+│   └── users/
+│       ├── users.module.ts
+│       ├── users.controller.ts
+│       ├── users.service.ts
+│       └── dto/
+└── common/
+```
+
+</td>
+<td>
+
+```text
+src/
+├── main.ts
+├── routes/
+│   └── users.ts
+└── services/
+    └── users.ts
+```
+
+</td>
+</tr>
+<tr>
+<td>Feature-first. Each feature owns its module, controller and service, written with
+decorators. For larger APIs and teams.</td>
+<td>Functional. Routes and services written with the explicit API, no modules or decorators
+required. For small services and quick starts.</td>
+</tr>
+</table>
+
+```sh
+avi new my-api                     # modular
+avi new my-api --template minimal  # minimal
+```
+
+The `avi` CLI is planned and not available yet. The layouts are conventions, never runtime
+requirements: Avi.js does not scan folders or care where files live, so you can move from minimal
+to modular one feature at a time. The tutorial's
+[project structure chapter](docs/tutorial/09-project-structure.md) walks through both.
 
 ## Why Avi.js
 

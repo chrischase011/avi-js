@@ -1,17 +1,45 @@
 # 7. Running in production
 
-> **Status: Planned (Phases 1, 7 and 10).** This page describes the agreed behavior only.
+> **Status: Partly runnable.** Rows marked _Available_ work today. The rest are planned for
+> Phases 2, 3, 7 and 10.
 
 These defaults are part of Avi.js from the start, not add-ons:
 
-| Concern            | Default behavior                                                                 |
-| ------------------ | -------------------------------------------------------------------------------- |
-| Request bodies     | Size-limited. Oversized bodies are rejected before being fully read.             |
-| Error responses    | Generic messages. No stack traces or internal details sent to clients.           |
-| Malformed input    | Bad URL encodings and invalid requests are rejected safely.                      |
-| Client disconnects | Detected. Handlers get an `AbortSignal` to stop work early.                      |
-| Streaming          | Supported, with backpressure respected.                                          |
-| Shutdown           | `app.close()` drains in-flight requests and disposes providers in reverse order. |
+| Concern            | Default behavior                                                                | Status    |
+| ------------------ | ------------------------------------------------------------------------------- | --------- |
+| Request bodies     | Limited to 1 MiB (`bodyLimit`). Oversized bodies get `413`, never read past it. | Available |
+| Error responses    | Generic 5xx bodies in every environment. Details go to your logger.             | Available |
+| Client disconnects | `ctx.signal` aborts so handlers can stop work early.                            | Available |
+| Shutdown           | `app.close()` drains in-flight requests, then forces after `shutdownTimeout`.   | Available |
+| Timeouts           | `requestTimeout` and `headersTimeout` are passed to `node:http`.                | Available |
+| Malformed paths    | Bad URL encodings are rejected with `400`.                                      | Phase 2   |
+| Provider cleanup   | Providers are disposed in reverse dependency order on `close()`.                | Phase 3   |
+| Streaming          | Streamed responses with backpressure.                                           | Phase 7   |
+
+## A production entry point
+
+```ts
+import { createAvi } from '@avi/core';
+
+const app = createAvi({
+  bodyLimit: 256 * 1024,
+  shutdownTimeout: 15_000,
+  logger: { error: (message, error) => console.error(message, error) },
+});
+
+// app.register(...)
+
+await app.listen(Number(process.env['PORT'] ?? 3000), '0.0.0.0');
+
+const shutdown = () => {
+  void app.close().then(() => process.exit(0));
+};
+process.once('SIGINT', shutdown);
+process.once('SIGTERM', shutdown);
+```
+
+Set `shutdownTimeout` below your platform's kill grace period (Kubernetes defaults to 30 seconds)
+so in-flight requests finish before the process is killed.
 
 ## Performance
 

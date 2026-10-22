@@ -36,11 +36,11 @@ pnpm verify
 When it finishes, the last line comes from the example:
 
 ```text
-@avi/core loaded: GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS
+basic-api smoke check passed
 ```
 
-That line proves a consumer can import `@avi/core` from its build output, exactly as an app will
-after Avi.js is published.
+That check starts the example app from its build output, sends real HTTP requests and shuts it
+down, exactly as an app will use Avi.js after it is published.
 
 ## A tour of the workspace
 

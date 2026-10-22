@@ -8,7 +8,7 @@
 const users = defineController({
   prefix: '/users',
   routes: [
-    { method: 'GET', path: '/', handler: (ctx) => ({ page: ctx.query.page ?? '1' }) },
+    { method: 'GET', path: '/', handler: (ctx) => ({ page: ctx.query.get('page') ?? '1' }) },
     { method: 'GET', path: '/:id', handler: (ctx) => ({ id: ctx.params.id }) },
   ],
 });
