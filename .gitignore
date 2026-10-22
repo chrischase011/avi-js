@@ -2,6 +2,8 @@ PROMPT.md
 CLAUDE.md
 docs/*
 !docs/tutorial/
+brand/source/
+brand/README.md
 
 node_modules/
 dist/

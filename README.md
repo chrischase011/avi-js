@@ -1,6 +1,9 @@
 <div align="center">
 
-# Avi.js
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="brand/logo/avi-horizontal-dark.svg">
+  <img alt="Avi.js" src="brand/logo/avi-horizontal.svg" width="320">
+</picture>
 
 **Structure without the overhead.**
 
