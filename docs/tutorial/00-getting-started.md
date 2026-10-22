@@ -1,122 +1,124 @@
-# 0. Getting started with the workspace
+# 0. Getting started
 
-> **Status: Runnable.** Everything on this page works today.
+> **Status: Runnable.** Everything on this page works with the packages on npm.
 
-Avi.js is not published to npm yet. To try it, you work inside the repository. This chapter gets
-the workspace running, shows you around, and ends with a small exercise against the type
-contracts that already exist.
+You need **Node.js 22.12 or newer**. Check with `node --version`.
 
-## Prerequisites
-
-- **Node.js 22.12 or newer.** Check with `node --version`.
-- **pnpm 12.** See [pnpm.io/installation](https://pnpm.io/installation). The exact version is
-  pinned in `package.json` under `packageManager`.
-- Git.
-
-## Install and verify
+## Create a project
 
 ```sh
-git clone https://github.com/chrischase011/avi-js.git
-cd avi-js
-pnpm install
-pnpm verify
+npm create avi@latest my-api
+cd my-api
+npm install
+npm run dev
 ```
-
-`pnpm verify` runs the same checks as CI, in order:
-
-| Command             | What it does                                                       |
-| ------------------- | ------------------------------------------------------------------ |
-| `pnpm format:check` | Prettier, without writing changes (`pnpm format` fixes formatting) |
-| `pnpm lint`         | ESLint with type-aware `typescript-eslint` rules                   |
-| `pnpm typecheck`    | `tsc` on every package, including tests                            |
-| `pnpm build`        | `tsc -b`: emits `dist/` with `.d.ts` files for each package        |
-| `pnpm test`         | Vitest: runtime tests (`*.test.ts`) and type tests (`*.test-d.ts`) |
-| `pnpm examples`     | Runs each example against the built packages                       |
-
-When it finishes, the last line comes from the example:
 
 ```text
-basic-api smoke check passed
+Listening on http://localhost:3000
 ```
 
-That check starts the example app from its build output, sends real HTTP requests and shuts it
-down, exactly as an app will use Avi.js after it is published.
+Open http://localhost:3000/users. `npm run dev` recompiles and restarts on every change.
 
-## A tour of the workspace
+Without a name, `npm create avi@latest` asks for the name and the template. There are two:
+
+| Template          | Command                                              | For                         |
+| ----------------- | ---------------------------------------------------- | --------------------------- |
+| modular (default) | `npm create avi@latest my-api`                       | Feature modules, decorators |
+| minimal           | `npm create avi@latest my-api -- --template minimal` | Plain routes and services   |
+
+Both run on the same engine; [chapter 9](09-project-structure.md) compares them.
+
+## What you get
+
+The modular template:
 
 ```text
-avi-js/
-├── packages/
-│   ├── core/      @avijs/core: the public API you import
-│   ├── di/        @avijs/di: dependency injection
-│   └── http/      @avijs/http: router, pipeline, Node.js adapter
-├── examples/
-│   └── basic-api/ an app that consumes the built packages
-├── docs/          you are here
-├── tsconfig.base.json
-├── vitest.config.ts
-└── eslint.config.js
+my-api/
+├── src/
+│   ├── main.ts                    starts the app
+│   ├── app.module.ts              the root module
+│   ├── common/
+│   │   └── health.controller.ts   GET /health
+│   └── modules/users/
+│       ├── users.module.ts
+│       ├── users.controller.ts    GET /users, GET /users/:id, POST /users
+│       ├── users.service.ts
+│       ├── users.test.ts
+│       └── dto/
+├── package.json
+└── tsconfig.json
 ```
 
-Each package has the same shape:
+| Script          | What it does                                        |
+| --------------- | --------------------------------------------------- |
+| `npm run dev`   | Compile, then recompile and restart on every change |
+| `npm test`      | Compile and run the tests with `node --test`        |
+| `npm run build` | Compile to `dist/`                                  |
+| `npm start`     | Run the compiled app                                |
+| `npm run check` | Check every `static inject` list against its class  |
+
+## Add a feature
+
+The CLI creates files and registers them for you:
+
+```sh
+npx avi g module posts
+npx avi g service posts
+npx avi g controller posts
+```
 
 ```text
-packages/di/
-├── src/index.ts          the public entry point; anything not exported here is internal
-├── test/                 *.test.ts and *.test-d.ts
-├── tsconfig.json         editor, lint and typecheck (includes tests, no output)
-├── tsconfig.build.json   build only (src → dist)
-└── package.json
+CREATE src/modules/posts/posts.module.ts
+UPDATE src/app.module.ts
+CREATE src/modules/posts/posts.service.ts
+UPDATE src/modules/posts/posts.module.ts
+CREATE src/modules/posts/posts.controller.ts
+UPDATE src/modules/posts/posts.module.ts
 ```
 
-Two things to know:
-
-- **You import only from `@avijs/core`.** It re-exports what applications need from `di` and
-  `http`. The other packages exist to keep the internals decoupled.
-- **Tests do not need a build.** Vitest maps `@avijs/*` to each package's `src/`, so
-  `pnpm test:watch` gives instant feedback while you edit.
-
-## Exercise: put the DI types to work
-
-Dependency injection is not implemented yet, but its type contract is. In Avi.js you list a
-class's dependencies explicitly, and TypeScript infers what each one resolves to. Try it.
-
-Create `packages/di/test/playground.test-d.ts`:
+`npm run dev` picks the change up, and http://localhost:3000/posts answers `[]`. The controller
+injects the service it found next to it:
 
 ```ts
-import { expectTypeOf, it } from 'vitest';
-import type { InjectionToken, ResolveTokens } from '../src/index.js';
+@Controller('/posts')
+export class PostsController {
+  static inject = [PostsService] as const;
 
-class UsersRepository {
+  constructor(private readonly posts: PostsService) {}
+
+  @Get()
   findAll() {
-    return [{ id: 1, name: 'Ada' }];
+    return this.posts.findAll();
   }
 }
-
-interface AppConfig {
-  greeting: string;
-}
-
-declare const Config: InjectionToken<AppConfig>;
-
-it('resolves an inject list in order', () => {
-  type Deps = ResolveTokens<[typeof UsersRepository, typeof Config]>;
-  expectTypeOf<Deps>().toEqualTypeOf<[UsersRepository, AppConfig]>();
-});
 ```
 
-Run it:
+`static inject` lists the constructor's dependencies in order. That list is how Avi.js wires
+classes together without `reflect-metadata`, and TypeScript checks it against the constructor.
+
+## Add Avi.js to an existing project
 
 ```sh
-pnpm test
+npm install @avijs/core
 ```
 
-Now swap the order in the expected tuple to `[AppConfig, UsersRepository]` and run again. The
-type test fails. This is how Avi.js will catch a mismatch between what a service declares in
-`inject` and what its constructor expects.
+```ts
+import { createAvi, defineController } from '@avijs/core';
 
-Delete the playground file when you are done.
+const app = createAvi().register({
+  controllers: [
+    defineController({
+      routes: [{ method: 'GET', path: '/', handler: () => ({ hello: 'world' }) }],
+    }),
+  ],
+});
+await app.listen(3000);
+```
+
+Avi.js is ESM. Use `"type": "module"` and `"module": "NodeNext"` in `tsconfig.json`, and leave
+`experimentalDecorators` off: Avi.js uses standard decorators.
 
 ## Next
 
-[Chapter 1: Your first app](01-first-app.md) shows the HTTP API that Phase 1 delivers.
+[Chapter 1: Your first app](01-first-app.md) walks through a small app line by line. To work on
+Avi.js itself, see [CONTRIBUTING.md](https://github.com/chrischase011/avi-js/blob/main/CONTRIBUTING.md).
