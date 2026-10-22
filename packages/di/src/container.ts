@@ -9,6 +9,20 @@ export interface ModuleDefinition {
   readonly exports?: readonly (Token | ModuleDefinition)[];
 }
 
+export interface ProviderDescription {
+  readonly token: string;
+  readonly kind: 'class' | 'value' | 'factory';
+  readonly scope: 'singleton' | 'transient';
+  readonly inject: readonly string[];
+}
+
+export interface ModuleDescription {
+  readonly name: string;
+  readonly imports: readonly string[];
+  readonly providers: readonly ProviderDescription[];
+  readonly exports: readonly string[];
+}
+
 interface ProviderRecord extends ProviderSpec {
   readonly module: ModuleRecord;
   links: ProviderRecord[];
@@ -47,6 +61,21 @@ export class Container {
   /** Module definitions in dependency order: imports before importers. */
   get modules(): ModuleDefinition[] {
     return [...this.#modules.keys()];
+  }
+
+  /** A plain description of the validated graph, without creating any provider. */
+  describe(): ModuleDescription[] {
+    return [...this.#modules.values()].map((module) => ({
+      name: module.name,
+      imports: module.imports.map((imported) => imported.name),
+      providers: [...module.own.values()].map((record) => ({
+        token: tokenName(record.token),
+        kind: record.kind,
+        scope: record.scope,
+        inject: record.deps.map(tokenName),
+      })),
+      exports: [...module.exported.keys()].map(tokenName),
+    }));
   }
 
   /** Throws if `tokens` cannot all be resolved from `module`. `label` starts the error path. */
