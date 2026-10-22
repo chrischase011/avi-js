@@ -1,5 +1,14 @@
 import type { Token } from '@avi/di';
-import type { Context, Guard, Middleware, Next, RouteDefinition } from '@avi/http';
+import type {
+  Context,
+  Guard,
+  HttpMethod,
+  Middleware,
+  Next,
+  NoInput,
+  RouteDefinition,
+} from '@avi/http';
+import type { InputOf, PathParams, ResultOf, RouteSchema } from '@avi/validation';
 
 /** Middleware with dependencies. Built once per app with its `static inject`. */
 export interface MiddlewareClass {
@@ -16,10 +25,31 @@ export interface GuardClass {
 export type MiddlewareRef = Middleware | MiddlewareClass;
 export type GuardRef = Guard | GuardClass;
 
-/** A route as written in a controller, with optional route-level middleware and guards. */
+/** A route as written in a controller, with optional middleware, guards and schemas. */
 export interface Route extends RouteDefinition {
   readonly middleware?: readonly MiddlewareRef[];
   readonly guards?: readonly GuardRef[];
+  readonly schema?: RouteSchema;
+}
+
+/** A route whose handler is typed from its path and schema. Created with `route()`. */
+export interface TypedRoute<P extends string, S extends RouteSchema> {
+  readonly method: HttpMethod;
+  readonly path: P;
+  readonly schema?: S;
+  readonly middleware?: readonly MiddlewareRef[];
+  readonly guards?: readonly GuardRef[];
+  readonly handler: (ctx: Context<InputOf<S>, PathParams<P>>) => ResultOf<S>;
+}
+
+/**
+ * Declares a route with typed `ctx.params` (from the path) and `ctx.input` (from the schema).
+ * At runtime it returns the definition unchanged.
+ */
+export function route<const P extends string, S extends RouteSchema = NoInput>(
+  definition: TypedRoute<P, S>,
+): Route {
+  return definition as unknown as Route;
 }
 
 export function isClass(value: unknown): boolean {

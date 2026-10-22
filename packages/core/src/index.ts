@@ -21,7 +21,24 @@ export {
 export type { CheckInject } from './decorators.js';
 export { defineModule } from './module.js';
 export type { AviModule, ModuleOptions, ModuleRef } from './module.js';
-export type { GuardClass, GuardRef, MiddlewareClass, MiddlewareRef, Route } from './pipeline.js';
+export { route } from './pipeline.js';
+export type {
+  GuardClass,
+  GuardRef,
+  MiddlewareClass,
+  MiddlewareRef,
+  Route,
+  TypedRoute,
+} from './pipeline.js';
+export type {
+  InferInput,
+  InferOutput,
+  InputOf,
+  PathParams,
+  RouteSchema,
+  StandardSchemaV1,
+  ValidationIssue,
+} from '@avi/validation';
 
 export { HTTP_METHODS, HttpError, reply } from '@avi/http';
 export type {
@@ -35,6 +52,7 @@ export type {
   Logger,
   Middleware,
   Next,
+  NoInput,
   Params,
   Reply,
   ReplyInit,

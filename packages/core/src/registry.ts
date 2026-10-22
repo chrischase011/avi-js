@@ -1,6 +1,7 @@
 // Decorated classes map to the same definitions the explicit API produces.
 import type { Class, Scope, Token } from '@avi/di';
 import type { HttpMethod } from '@avi/http';
+import type { RouteSchema } from '@avi/validation';
 import type { ControllerDefinition } from './controller.js';
 import type { AviModule } from './module.js';
 import { checkRefs, type GuardRef, type MiddlewareRef, type Route } from './pipeline.js';
@@ -9,6 +10,7 @@ export interface RouteEntry {
   readonly method: HttpMethod;
   readonly path: string;
   readonly name: string;
+  readonly schema: RouteSchema | undefined;
   readonly get: (instance: object) => unknown;
 }
 
@@ -119,6 +121,7 @@ export function controllerFromClass(cls: Class): ControllerDefinition {
             handler: (method as (...args: unknown[]) => unknown).bind(instance),
             middleware,
             guards,
+            schema: entry.schema,
           };
         }),
       );

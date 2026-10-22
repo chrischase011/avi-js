@@ -1,4 +1,5 @@
 import type { ResolveTokens, Token } from '@avi/di';
+import { checkRouteSchema } from '@avi/validation';
 import { checkRefs, type GuardRef, type MiddlewareRef, type Route } from './pipeline.js';
 
 export interface ControllerOptions<K extends readonly Token[] = []> {
@@ -66,6 +67,7 @@ export function checkRoutes(value: unknown): readonly Route[] {
         ...route,
         middleware: checkRefs(route.middleware, 'use', `${where} middleware`),
         guards: checkRefs(route.guards, 'canActivate', `${where} guards`),
+        schema: checkRouteSchema(route.schema, where),
       });
     }),
   );

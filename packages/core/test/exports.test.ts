@@ -33,6 +33,7 @@ describe('@avi/core', () => {
       'defineController',
       'defineModule',
       'reply',
+      'route',
     ]);
   });
 });

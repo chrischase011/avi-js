@@ -1,5 +1,6 @@
 import type { Class, ResolveTokens, Scope, Token } from '@avi/di';
-import type { Context, HttpMethod } from '@avi/http';
+import type { Context, HttpMethod, NoInput } from '@avi/http';
+import { checkRouteSchema, type InputOf, type PathParams, type RouteSchema } from '@avi/validation';
 import { defineModule, type ModuleOptions } from './module.js';
 import { checkRefs, type GuardRef, type MiddlewareRef } from './pipeline.js';
 import {
@@ -29,8 +30,6 @@ interface InjectMismatch {
 /** Resolves to `unknown` when `static inject` fits the constructor, else to an error type. */
 export type CheckInject<C extends Class> =
   ResolveTokens<InjectOf<C>> extends ConstructorParameters<C> ? unknown : InjectMismatch;
-
-type Method = (ctx: Context) => unknown;
 
 export function Controller(prefix = '/') {
   if (typeof prefix !== 'string') throw usage('@Controller');
@@ -98,12 +97,17 @@ export function Module(options: ModuleOptions = {}) {
 
 function routeDecorator(method: HttpMethod) {
   const label = `@${method.charAt(0)}${method.slice(1).toLowerCase()}`;
-  return (path = '') => {
-    if (typeof path !== 'string') throw usage(label);
-    if (path !== '' && !path.startsWith('/')) {
-      throw new TypeError(`${label} path must be empty or start with "/": ${path}`);
+  return <const P extends string = '', S extends RouteSchema = NoInput>(
+    path?: P,
+    options: { schema?: S } = {},
+  ) => {
+    const routePath: string = path ?? '';
+    if (typeof routePath !== 'string') throw usage(label);
+    if (routePath !== '' && !routePath.startsWith('/')) {
+      throw new TypeError(`${label} path must be empty or start with "/": ${routePath}`);
     }
-    return <This, F extends Method>(
+    const schema = checkRouteSchema(options.schema, `${label}('${routePath}')`);
+    return <This, F extends (this: This, ctx: Context<InputOf<S>, PathParams<P>>) => unknown>(
       _value: F,
       context: ClassMethodDecoratorContext<This, F>,
     ): void => {
@@ -112,8 +116,9 @@ function routeDecorator(method: HttpMethod) {
       if (context.static) throw new TypeError(`${label} cannot decorate static method ${name}`);
       ownList<RouteEntry>(context.metadata, ROUTES).push({
         method,
-        path,
+        path: routePath,
         name,
+        schema,
         get: (instance) => context.access.get(instance as This),
       });
     };

@@ -8,6 +8,7 @@ import {
   type RouteDefinition,
   type ServerOptions,
 } from '@avi/http';
+import { withValidation } from '@avi/validation';
 import type { AddressInfo } from 'node:net';
 import { joinPath } from './controller.js';
 import {
@@ -147,7 +148,7 @@ class Application implements AviApp {
               handler: compose(
                 [...middleware, ...scope.middleware(route.middleware ?? [])],
                 [...guards, ...scope.guards(route.guards ?? [])],
-                route.handler,
+                route.schema ? withValidation(route.schema, route.handler) : route.handler,
               ),
             });
           }

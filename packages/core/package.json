@@ -28,6 +28,10 @@
   },
   "dependencies": {
     "@avi/di": "workspace:*",
-    "@avi/http": "workspace:*"
+    "@avi/http": "workspace:*",
+    "@avi/validation": "workspace:*"
+  },
+  "devDependencies": {
+    "valibot": "1.5.0"
   }
 }
