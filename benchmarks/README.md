@@ -9,6 +9,7 @@ with a dedicated setup.
 ```sh
 pnpm bench:router   # Router.find micro-benchmarks (mitata)
 pnpm bench:http     # HTTP load test (autocannon), Avi vs node:http
+pnpm bench:startup  # init() time for 100 modules, 1,000 providers, 1,000 routes
 ```
 
 `bench:http` options, as environment variables:
@@ -96,6 +97,34 @@ A run just before this one was discarded: `node:http` fell to 19,680 req/s on th
 the validated route came out faster than the unvalidated one, which only happens when something
 else is competing for the CPU.
 
+### Static-route fast path (Phase 7)
+
+Phase 7 added a direct lookup for routes without parameters, checked before the trie. It was
+measured as an A/B: the old and new `Router` builds were loaded into one process and benchmarked
+in pairs on the same probes.
+
+| Probe              | Before | After |
+| ------------------ | -----: | ----: |
+| static root        |  53 ns | 11 ns |
+| static deep        | 440 ns | 12 ns |
+| static beats param | 197 ns | 12 ns |
+
+Parameter routes first looked 20–50% slower with the fast path. Swapping which router ran first
+reversed that: whichever ran second was slower. That difference is a benchmark-order effect, not
+the change; the static-route gain held in both orders.
+
+### Startup (Phase 7)
+
+`pnpm bench:startup` defines and initializes an app with 100 modules, 1,000 factory providers in
+dependency chains and 1,000 routes, 20 times in one process.
+
+| Run                   |    Time |
+| --------------------- | ------: |
+| First (cold JIT)      |  ~11 ms |
+| Median of the next 19 | ~3.7 ms |
+
+Two runs gave 10.2 / 3.6 ms and 11.6 / 3.8 ms.
+
 ## Reading these numbers
 
 - Run-to-run noise on this machine is large. Between two router runs, the encoded-param probe
@@ -106,12 +135,11 @@ else is competing for the CPU.
   autocannon as much as by the server.
 - The gap between Avi.js and `node:http` here (about 1–3%) is within that noise. Do not quote it.
 - autocannon reports latency in whole milliseconds, which hides sub-millisecond differences.
-- Hello-world workloads say little about real applications. Phase 7 adds realistic workloads,
-  allocation profiling and repeated runs on a quiet machine.
+- Hello-world workloads say little about real applications. Treat every number here as a
+  local measurement until it is repeated on dedicated hardware.
 
 ## Known costs to revisit in the future
 
-- `find` allocates per request: the split segment array, the params object and the match result.
-- Static routes walk the trie segment by segment; a direct lookup for fully static paths could skip
-  that.
+- For parameter routes, `find` still allocates per request: the split segment array, the params
+  object and the match result. Fully static routes allocate nothing since Phase 7.
 - Percent-decoding uses `decodeURIComponent` per encoded segment.

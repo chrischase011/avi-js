@@ -6,7 +6,8 @@
   "scripts": {
     "router": "node dist/router.js",
     "http": "node dist/http.js",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "startup": "node dist/startup.js"
   },
   "dependencies": {
     "@avi/core": "workspace:*",
