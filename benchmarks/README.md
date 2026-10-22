@@ -125,6 +125,19 @@ dependency chains and 1,000 routes, 20 times in one process.
 
 Two runs gave 10.2 / 3.6 ms and 11.6 / 3.8 ms.
 
+### Manifest verification (Phase 8)
+
+`BENCH_MANIFEST=1 pnpm bench:startup` builds a manifest with `describeApp()` and passes it to
+`createAvi({ manifest })`, inside the timed section.
+
+| Mode             | First (cold) | Median of next 19 |
+| ---------------- | -----------: | ----------------: |
+| No manifest      | 10.4–11.9 ms |        3.9–4.1 ms |
+| Manifest checked | 14.8–15.5 ms |        6.0–7.5 ms |
+
+The timing includes building the manifest, which a real deployment does at build time, so it
+overstates the cost. Either way, verifying a manifest adds work and does not speed startup up.
+
 ## Reading these numbers
 
 - Run-to-run noise on this machine is large. Between two router runs, the encoded-param probe

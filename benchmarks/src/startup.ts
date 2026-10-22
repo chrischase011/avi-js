@@ -1,5 +1,12 @@
 // Times init() for a large app: module graph checks, singleton creation and route composition.
-import { createAvi, createToken, defineController, defineModule, type AviModule } from '@avi/core';
+import {
+  createAvi,
+  createToken,
+  defineController,
+  defineModule,
+  describeApp,
+  type AviModule,
+} from '@avi/core';
 import { performance } from 'node:perf_hooks';
 
 const MODULES = Number(process.env['BENCH_MODULES'] ?? 100);
@@ -54,7 +61,10 @@ function buildApp() {
       }),
     );
   }
-  return createAvi().register({ name: 'App', imports: modules });
+  const root = defineModule({ name: 'App', imports: modules });
+  // With BENCH_MANIFEST=1, init() also verifies a manifest made beforehand.
+  const manifest = process.env['BENCH_MANIFEST'] === '1' ? describeApp(root) : undefined;
+  return createAvi(manifest ? { manifest } : {}).register(root);
 }
 
 const timings: number[] = [];
