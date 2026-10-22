@@ -1,4 +1,4 @@
-import { createAvi, defineController, HttpError, reply } from '@avi/core';
+import { createAvi, defineController, HttpError, reply, type Middleware } from '@avi/core';
 
 interface User {
   id: number;
@@ -43,6 +43,13 @@ const usersController = defineController({
   ],
 });
 
+let nextRequest = 0;
+
+const requestId: Middleware = (ctx, next) => {
+  ctx.setHeader('x-request-id', String(++nextRequest));
+  return next();
+};
+
 export function createApp() {
-  return createAvi().register({ controllers: [hello, usersController] });
+  return createAvi({ middleware: [requestId] }).register({ controllers: [hello, usersController] });
 }

@@ -9,6 +9,7 @@ const url = `http://127.0.0.1:${String(port)}`;
 try {
   const hello = await fetch(url);
   assert.equal(hello.status, 200);
+  assert.ok(hello.headers.get('x-request-id'));
   assert.deepEqual(await hello.json(), { message: 'Hello, Avi' });
 
   const created = await fetch(`${url}/users`, {
