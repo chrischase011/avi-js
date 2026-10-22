@@ -38,4 +38,10 @@ const assetDir = path.join(site, 'public');
 mkdirSync(assetDir, { recursive: true });
 for (const [from, to] of assets) copyFileSync(path.join(root, from), path.join(assetDir, to));
 
+// Files served unchanged at the site root, such as search engine verification files.
+const staticDir = path.join(root, 'web/static');
+for (const file of readdirSync(staticDir)) {
+  copyFileSync(path.join(staticDir, file), path.join(assetDir, file));
+}
+
 console.log('Synced the tutorial, examples and brand assets into web/src');
