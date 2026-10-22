@@ -172,11 +172,13 @@ already work.
 
 ## Packages
 
-| Package     | Purpose                                                      |
-| ----------- | ------------------------------------------------------------ |
-| `@avi/core` | The public API you import: app factory, modules, controllers |
-| `@avi/di`   | Explicit, reflection-free dependency injection               |
-| `@avi/http` | Router, request pipeline and the native Node.js adapter      |
+| Package           | Purpose                                                      |
+| ----------------- | ------------------------------------------------------------ |
+| `@avi/core`       | The public API you import: app factory, modules, controllers |
+| `@avi/di`         | Explicit, reflection-free dependency injection               |
+| `@avi/http`       | Router, request pipeline and the native Node.js adapter      |
+| `@avi/validation` | Standard Schema validation for routes                        |
+| `@avi/compiler`   | Optional build-time checks and manifests (`avi-compile`)     |
 
 Package names are provisional until they are published.
 

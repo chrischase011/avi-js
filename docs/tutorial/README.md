@@ -23,6 +23,7 @@ status line:
 | [7](07-production.md)        | Running in production                      | Runnable        |
 | [8](08-testing.md)           | Testing your app                           | Partly runnable |
 | [9](09-project-structure.md) | Project structure: modular and minimal     | Partly runnable |
+| [10](10-build-checks.md)     | Build-time checks and manifests            | Runnable        |
 
 Throughout the tutorial you build **Greeter**, a small API with a users resource and a greeting
 service, so each chapter adds to the previous one.

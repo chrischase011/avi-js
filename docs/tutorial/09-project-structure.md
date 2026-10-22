@@ -154,4 +154,4 @@ same definitions.
 
 ## Next
 
-Back to the [tutorial index](README.md).
+[Chapter 10: Build-time checks and manifests](10-build-checks.md).
