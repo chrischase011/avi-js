@@ -1,7 +1,7 @@
 # 7. Running in production
 
 > **Status: Partly runnable.** Rows marked _Available_ work today. The rest are planned for
-> Phases 3, 7 and 10.
+> Phases 7 and 10.
 
 These defaults are part of Avi.js from the start, not add-ons:
 
@@ -13,7 +13,7 @@ These defaults are part of Avi.js from the start, not add-ons:
 | Shutdown           | `app.close()` drains in-flight requests, then forces after `shutdownTimeout`.   | Available |
 | Timeouts           | `requestTimeout` and `headersTimeout` are passed to `node:http`.                | Available |
 | Malformed paths    | Bad URL encodings are rejected with `400`.                                      | Available |
-| Provider cleanup   | Providers are disposed in reverse dependency order on `close()`.                | Phase 3   |
+| Provider cleanup   | Providers are disposed in reverse dependency order on `close()`.                | Available |
 | Streaming          | Streamed responses with backpressure.                                           | Phase 7   |
 
 ## A production entry point

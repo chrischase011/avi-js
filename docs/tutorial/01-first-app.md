@@ -51,7 +51,8 @@ await app.listen(3000);
 ```
 
 - `defineController` groups routes under an optional `prefix` (default `/`).
-- `register` adds controllers. Call it as often as you like before `listen`.
+- `register` adds controllers. Call it as often as you like before `listen`. Routes and
+  dependencies are checked when the app starts, and `listen` rejects if something is wrong.
 - `listen` resolves to the bound address. Pass port `0` to get a random free port.
 
 ## Return values become responses

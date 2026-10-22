@@ -105,7 +105,7 @@ not handled here; it comes with the security package later.
 
 ## Conflicts fail at startup
 
-`register()` throws, and adds none of that call's routes, when:
+The app refuses to start (`init()` and `listen()` reject) when:
 
 - the same method and path are registered twice, including `/a` and `/a/`
 - two routes use different parameter names at the same position, such as `/users/:id` and
