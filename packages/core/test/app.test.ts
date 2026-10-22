@@ -81,12 +81,52 @@ describe('createAvi', () => {
     const good = defineController({
       routes: [{ method: 'GET', path: '/good', handler: () => 'ok' }],
     });
-    const bad = defineController({ routes: [{ method: 'GET', path: '/:id', handler: () => 'x' }] });
+    const bad = defineController({ routes: [{ method: 'GET', path: '/:1x', handler: () => 'x' }] });
     const instance = createAvi(silent);
-    expect(() => instance.register({ controllers: [good, bad] })).toThrow('not supported yet');
+    expect(() => instance.register({ controllers: [good, bad] })).toThrow('Invalid parameter name');
 
     const url = await serve(instance);
     expect((await fetch(`${url}/good`)).status).toBe(404);
+  });
+
+  it('routes parameters through controller prefixes', async () => {
+    const users = defineController({
+      prefix: '/users',
+      routes: [
+        { method: 'GET', path: '/me', handler: () => ({ id: 'me' }) },
+        { method: 'GET', path: '/:id', handler: (ctx) => ({ id: ctx.params['id'] }) },
+      ],
+    });
+    const url = await serve(createAvi().register({ controllers: [users] }));
+
+    expect(await (await fetch(`${url}/users/me`)).json()).toEqual({ id: 'me' });
+    expect(await (await fetch(`${url}/users/42`)).json()).toEqual({ id: '42' });
+    expect(await (await fetch(`${url}/users/42/`)).json()).toEqual({ id: '42' });
+  });
+
+  it('applies a register prefix to every controller', async () => {
+    const users = defineController({
+      prefix: '/users',
+      routes: [{ method: 'GET', path: '/', handler: () => 'users' }],
+    });
+    const health = defineController({
+      routes: [{ method: 'GET', path: '/health', handler: () => 'ok' }],
+    });
+    const url = await serve(
+      createAvi()
+        .register({ prefix: '/api/v1', controllers: [users] })
+        .register({ controllers: [health] }),
+    );
+
+    expect(await (await fetch(`${url}/api/v1/users`)).text()).toBe('users');
+    expect(await (await fetch(`${url}/health`)).text()).toBe('ok');
+    expect((await fetch(`${url}/users`)).status).toBe(404);
+  });
+
+  it('rejects a register prefix without a leading slash', () => {
+    expect(() => createAvi().register({ prefix: 'api', controllers: [] })).toThrow(
+      'Prefix must start with "/"',
+    );
   });
 
   it('refuses to register after listen()', async () => {

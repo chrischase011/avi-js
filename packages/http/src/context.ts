@@ -1,11 +1,14 @@
 import type { IncomingHttpHeaders, IncomingMessage, ServerResponse } from 'node:http';
 import { HttpError, RequestAbortedError } from './errors.js';
 import type { HttpMethod } from './methods.js';
+import type { Params } from './router.js';
 
 export interface Context {
   readonly method: HttpMethod;
   /** Raw path without the query string. */
   readonly path: string;
+  /** Decoded route parameters. A trailing `*` is available as `params['*']`. */
+  readonly params: Params;
   readonly query: URLSearchParams;
   readonly headers: IncomingHttpHeaders;
   /** Aborts when the client disconnects before the response is sent. */
@@ -30,6 +33,7 @@ export class RequestContext implements Context {
     res: ServerResponse,
     readonly method: HttpMethod,
     readonly path: string,
+    readonly params: Params,
     rawQuery: string,
     bodyLimit: number,
   ) {

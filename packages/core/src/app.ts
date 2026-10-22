@@ -5,6 +5,8 @@ import { joinPath, type ControllerDefinition } from './controller.js';
 export type AviOptions = ServerOptions;
 
 export interface ModuleDefinition {
+  /** Prepended to every controller prefix in this call, e.g. `/api/v1`. */
+  prefix?: string;
   controllers?: readonly ControllerDefinition[];
 }
 
@@ -32,12 +34,13 @@ class Application implements AviApp {
 
   register(definition: ModuleDefinition): this {
     if (this.#started) throw new Error('Cannot register controllers after listen()');
-    const routes = (definition.controllers ?? []).flatMap((controller) =>
-      controller.routes.map((route) => ({
-        ...route,
-        path: joinPath(controller.prefix, route.path),
-      })),
-    );
+    const prefix = definition.prefix ?? '/';
+    if (!prefix.startsWith('/')) throw new TypeError(`Prefix must start with "/": ${prefix}`);
+
+    const routes = (definition.controllers ?? []).flatMap((controller) => {
+      const base = joinPath(prefix, controller.prefix);
+      return controller.routes.map((route) => ({ ...route, path: joinPath(base, route.path) }));
+    });
     this.#router.add(routes);
     return this;
   }

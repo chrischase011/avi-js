@@ -17,6 +17,10 @@ export default defineConfig(
         tsconfigRootDir: import.meta.dirname,
       },
     },
+    rules: {
+      // Conflicts with no-non-null-assertion under noUncheckedIndexedAccess.
+      '@typescript-eslint/non-nullable-type-assertion-style': 'off',
+    },
   },
   {
     files: ['**/*.js'],

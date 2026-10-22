@@ -15,6 +15,8 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
+    "bench:router": "pnpm build && pnpm --filter @avi/benchmarks router",
+    "bench:http": "pnpm build && pnpm --filter @avi/benchmarks http",
     "examples": "pnpm --filter \"./examples/*\" smoke",
     "verify": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm build && pnpm test && pnpm examples"
   },
@@ -23,6 +25,7 @@
     "@types/node": "22.20.5",
     "eslint": "10.13.0",
     "eslint-config-prettier": "10.1.8",
+    "fast-check": "4.10.2",
     "prettier": "3.9.10",
     "typescript": "6.0.3",
     "typescript-eslint": "8.72.0",

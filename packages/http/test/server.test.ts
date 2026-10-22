@@ -102,21 +102,108 @@ describe('responses', () => {
     expect(html.headers.get('content-type')).toBe('text/html');
   });
 
-  it('returns 404 JSON for unknown paths and methods', async () => {
+  it('returns 404 JSON for unknown paths', async () => {
     const { url, logger } = await start([get('/known', () => 'ok')]);
-
-    for (const res of [
-      await fetch(`${url}/missing`),
-      await fetch(`${url}/known`, { method: 'DELETE' }),
-    ]) {
-      expect(res.status).toBe(404);
-      expect(await res.json()).toEqual({
-        statusCode: 404,
-        error: 'Not Found',
-        message: 'Not Found',
-      });
-    }
+    const res = await fetch(`${url}/missing`);
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ statusCode: 404, error: 'Not Found', message: 'Not Found' });
     expect(logger.error).not.toHaveBeenCalled();
+  });
+});
+
+describe('routing', () => {
+  it('passes decoded params to the handler', async () => {
+    const { url } = await start([
+      get('/users/:id/files/*', (ctx) => ({ path: ctx.path, params: { ...ctx.params } })),
+    ]);
+    const res = await fetch(`${url}/users/caf%C3%A9/files/a/b%20c.txt?x=1`);
+    expect(await res.json()).toEqual({
+      path: '/users/caf%C3%A9/files/a/b%20c.txt',
+      params: { id: 'café', '*': 'a/b c.txt' },
+    });
+  });
+
+  it('answers 405 with an Allow header', async () => {
+    const { url, logger } = await start([get('/items', () => []), post('/items', () => ({}))]);
+    const res = await fetch(`${url}/items`, { method: 'DELETE' });
+    expect(res.status).toBe(405);
+    expect(res.headers.get('allow')).toBe('GET, HEAD, POST, OPTIONS');
+    expect(await res.json()).toEqual({
+      statusCode: 405,
+      error: 'Method Not Allowed',
+      message: 'Method Not Allowed',
+    });
+    expect(logger.error).not.toHaveBeenCalled();
+  });
+
+  it('serves HEAD from GET with headers and no body', async () => {
+    let calls = 0;
+    const { url } = await start([
+      get('/items', () => {
+        calls++;
+        return { items: [1, 2, 3] };
+      }),
+    ]);
+    const res = await fetch(`${url}/items`, { method: 'HEAD' });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('application/json; charset=utf-8');
+    expect(res.headers.get('content-length')).toBe(String('{"items":[1,2,3]}'.length));
+    expect(await res.text()).toBe('');
+    expect(calls).toBe(1);
+  });
+
+  it('answers OPTIONS with 204 and Allow', async () => {
+    const { url } = await start([get('/items/:id', () => 'x')]);
+    const res = await fetch(`${url}/items/1`, { method: 'OPTIONS' });
+    expect(res.status).toBe(204);
+    expect(res.headers.get('allow')).toBe('GET, HEAD, OPTIONS');
+    expect(await res.text()).toBe('');
+  });
+
+  it('rejects malformed percent-encoding with 400 before any handler', async () => {
+    let called = false;
+    const { port } = await start([
+      get('/*', () => {
+        called = true;
+        return 'x';
+      }),
+    ]);
+    const { status, body } = await new Promise<{ status?: number; body: string }>(
+      (resolve, reject) => {
+        const req = httpRequest({ port, host: '127.0.0.1', path: '/files/%E0%A4' }, (res) => {
+          let body = '';
+          res.setEncoding('utf8');
+          res.on('data', (chunk: string) => (body += chunk));
+          res.on('end', () => {
+            resolve({ status: res.statusCode, body });
+          });
+        });
+        req.on('error', reject);
+        req.end();
+      },
+    );
+    expect(status).toBe(400);
+    expect(JSON.parse(body)).toMatchObject({ message: 'Malformed URL encoding' });
+    expect(called).toBe(false);
+  });
+
+  it('sends headers attached to an HttpError', async () => {
+    const { url } = await start([
+      get('/limited', () => {
+        throw new HttpError(429, 'Slow down', { headers: { 'retry-after': '30' } });
+      }),
+      get('/bad-headers', () => {
+        throw new HttpError(400, 'Bad', { headers: { 'x-ok': '1', 'x-bad': 'a\nb' } });
+      }),
+    ]);
+
+    const limited = await fetch(`${url}/limited`);
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get('retry-after')).toBe('30');
+
+    const bad = await fetch(`${url}/bad-headers`);
+    expect(bad.status).toBe(400);
+    expect(bad.headers.get('x-ok')).toBeNull();
   });
 
   it('exposes path and query separately', async () => {

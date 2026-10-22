@@ -52,13 +52,31 @@ export function sendError(res: ServerResponse, error: unknown, closeConnection: 
     res.destroy();
     return;
   }
-  for (const name of res.getHeaderNames()) res.removeHeader(name);
+  clearHeaders(res);
 
   const status = error instanceof HttpError ? error.status : 500;
   const body: ErrorBody = { statusCode: status, error: STATUS_CODES[status] ?? 'Error' };
   if (status < 500 && error instanceof HttpError) body.message = error.message;
 
+  if (error instanceof HttpError && error.headers) {
+    try {
+      setHeaders(res, error.headers);
+    } catch {
+      clearHeaders(res);
+    }
+  }
+
   finish(res, status, JSON.stringify(body), JSON_TYPE, closeConnection || status === 413);
+}
+
+/** `204` with an `Allow` header, for `OPTIONS` requests without their own route. */
+export function sendOptions(res: ServerResponse, allow: string, closeConnection: boolean): void {
+  res.setHeader('allow', allow);
+  finish(res, 204, undefined, undefined, closeConnection);
+}
+
+function clearHeaders(res: ServerResponse): void {
+  for (const name of res.getHeaderNames()) res.removeHeader(name);
 }
 
 function setHeaders(res: ServerResponse, headers: OutgoingHttpHeaders): void {

@@ -19,6 +19,15 @@ const usersController = defineController({
   routes: [
     { method: 'GET', path: '/', handler: () => users },
     {
+      method: 'GET',
+      path: '/:id',
+      handler: (ctx) => {
+        const user = users.find((u) => String(u.id) === ctx.params['id']);
+        if (!user) throw new HttpError(404, 'User not found');
+        return user;
+      },
+    },
+    {
       method: 'POST',
       path: '/',
       handler: async (ctx) => {
