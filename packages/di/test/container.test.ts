@@ -449,3 +449,39 @@ describe('createToken', () => {
     expect(() => createToken('')).toThrow('non-empty description');
   });
 });
+
+describe('overrides', () => {
+  it('replaces a provider wherever it is declared', async () => {
+    class FakeDb extends Db {
+      override query() {
+        return 'fake rows';
+      }
+    }
+    const Data = mod('DataModule', { providers: [Db], exports: [Db] });
+    const app = mod('App', { imports: [Data], providers: [Repo] });
+    const c = new Container([app], { overrides: [{ provide: Db, useClass: FakeDb }] });
+    await c.init();
+    expect((c.resolve(app, Repo) as Repo).db.query()).toBe('fake rows');
+  });
+
+  it('rejects an override that matches nothing', () => {
+    expect(
+      () =>
+        new Container([mod('App', { providers: [Db] })], {
+          overrides: [{ provide: Config, useValue: { url: '' } }],
+        }),
+    ).toThrow('The override for Config matches no provider in the app');
+  });
+
+  it('rejects two overrides for one token', () => {
+    expect(
+      () =>
+        new Container([mod('App', { providers: [Db] })], {
+          overrides: [
+            { provide: Db, useValue: {} },
+            { provide: Db, useValue: {} },
+          ],
+        }),
+    ).toThrow('Db is overridden twice');
+  });
+});

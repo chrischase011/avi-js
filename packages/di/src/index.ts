@@ -1,5 +1,10 @@
 export { Container } from './container.js';
-export type { ModuleDefinition, ModuleDescription, ProviderDescription } from './container.js';
+export type {
+  ContainerOptions,
+  ModuleDefinition,
+  ModuleDescription,
+  ProviderDescription,
+} from './container.js';
 export type { ClassProvider, FactoryProvider, Provider, Scope, ValueProvider } from './provider.js';
 export { createToken } from './token.js';
 export type {

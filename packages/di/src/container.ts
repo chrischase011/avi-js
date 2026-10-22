@@ -9,6 +9,14 @@ export interface ModuleDefinition {
   readonly exports?: readonly (Token | ModuleDefinition)[];
 }
 
+export interface ContainerOptions {
+  /**
+   * Providers that replace the provider for the same token wherever it is declared. Meant for
+   * tests. An override that matches nothing is an error.
+   */
+  readonly overrides?: readonly Provider[];
+}
+
 export interface ProviderDescription {
   readonly token: string;
   readonly kind: 'class' | 'value' | 'factory';
@@ -49,10 +57,25 @@ export class Container {
   readonly #modules = new Map<ModuleDefinition, ModuleRecord>();
   readonly #roots: ModuleRecord[];
   readonly #created: ProviderRecord[] = [];
+  readonly #overrides = new Map<Token, ProviderSpec>();
+  readonly #overridden = new Set<Token>();
   #state: 'new' | 'initializing' | 'ready' | 'disposed' = 'new';
 
-  constructor(roots: readonly ModuleDefinition[]) {
+  constructor(roots: readonly ModuleDefinition[], options: ContainerOptions = {}) {
+    (options.overrides ?? []).forEach((provider, i) => {
+      const spec = normalizeProvider(provider, `overrides[${String(i)}]`);
+      if (this.#overrides.has(spec.token)) {
+        throw new Error(`${tokenName(spec.token)} is overridden twice`);
+      }
+      this.#overrides.set(spec.token, spec);
+    });
+
     this.#roots = roots.map((root, i) => this.#collect(root, [], `root module ${String(i)}`));
+    for (const token of this.#overrides.keys()) {
+      if (!this.#overridden.has(token)) {
+        throw new Error(`The override for ${tokenName(token)} matches no provider in the app`);
+      }
+    }
     for (const module of this.#modules.values()) {
       for (const record of module.own.values()) this.#check(record, [tokenName(record.token)]);
     }
@@ -165,10 +188,12 @@ export class Container {
     const record: ModuleRecord = { definition, name, imports, own: new Map(), exported: new Map() };
 
     (definition.providers ?? []).forEach((provider, i) => {
-      const spec = normalizeProvider(provider, `${name}.providers[${String(i)}]`);
-      if (record.own.has(spec.token)) {
-        throw new Error(`${tokenName(spec.token)} is provided twice in ${name}`);
+      const declared = normalizeProvider(provider, `${name}.providers[${String(i)}]`);
+      if (record.own.has(declared.token)) {
+        throw new Error(`${tokenName(declared.token)} is provided twice in ${name}`);
       }
+      const spec = this.#overrides.get(declared.token) ?? declared;
+      if (spec !== declared) this.#overridden.add(declared.token);
       record.own.set(spec.token, {
         ...spec,
         module: record,
