@@ -2,6 +2,9 @@
 
 > **Status: Runnable.** Everything on this page works today.
 
+What Avi.js does for you in production, and the settings that control it: body limits, safe
+errors, client disconnects, graceful shutdown, timeouts and streaming.
+
 These defaults are part of Avi.js from the start, not add-ons:
 
 | Concern            | Default behavior                                                                                                   |

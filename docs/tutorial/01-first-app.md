@@ -3,6 +3,9 @@
 > **Status: Runnable.** Everything on this page works today. The code lives in
 > `examples/basic-api`.
 
+A small users API built with the explicit API: routes, a service, middleware and errors, run from
+the repository and explained line by line.
+
 ## Run it
 
 From the repository root:

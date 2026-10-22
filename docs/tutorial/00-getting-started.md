@@ -2,6 +2,9 @@
 
 > **Status: Runnable.** Everything on this page works with the packages on npm.
 
+This chapter creates an Avi.js project with `npm create avi`, tours the generated files and adds
+a feature with the CLI.
+
 You need **Node.js 22.12 or newer**. Check with `node --version`.
 
 ## Create a project

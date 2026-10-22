@@ -2,6 +2,9 @@
 
 > **Status: Runnable.** Everything on this page works today.
 
+How Avi.js matches requests to routes: path parameters, wildcards, precedence between static and
+dynamic segments, method handling, and conflicts caught at startup.
+
 ## Parameters
 
 A segment starting with `:` captures one path segment:
