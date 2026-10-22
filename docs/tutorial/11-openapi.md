@@ -75,4 +75,4 @@ Without a converter, the route is still documented, with an empty schema where t
 
 ## Next
 
-[Chapter 12: Coming from NestJS](12-from-nestjs.md).
+[Chapter 12: Avi.js for NestJS developers](12-from-nestjs.md).

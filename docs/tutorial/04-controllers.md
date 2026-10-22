@@ -141,19 +141,21 @@ class BillingController extends HealthBase {} // serves GET /billing/health
 `register()` accept `@Module` classes and `defineModule` modules. A decorated module can import an
 explicit one and the other way round.
 
-## Coming from NestJS
+## If you know NestJS
 
-| NestJS                                       | Avi.js                                     |
-| -------------------------------------------- | ------------------------------------------ |
-| `reflect-metadata` + `emitDecoratorMetadata` | Not needed                                 |
-| `experimentalDecorators: true`               | Leave it off: Avi uses standard decorators |
-| Constructor types discovered by reflection   | `static inject = [...] as const`           |
-| `@Param('id') id: string`                    | `ctx.params['id']`                         |
-| `@Query()`, `@Body()`                        | `ctx.query`, `await ctx.json()`            |
-| `@Global()` modules                          | Not supported: import what you use         |
-| `forwardRef()`                               | Not supported: cycles are startup errors   |
+Avi.js is inspired by NestJS, so the decorators will look familiar. A few work differently:
+
+| In NestJS                                    | In Avi.js                              |
+| -------------------------------------------- | -------------------------------------- |
+| `reflect-metadata` + `emitDecoratorMetadata` | Dependencies listed in `static inject` |
+| `experimentalDecorators: true`               | Standard decorators; leave it off      |
+| `@Param('id') id: string`                    | `ctx.params['id']`                     |
+| `@Query()`, `@Body()`                        | `ctx.query`, `await ctx.json()`        |
+| `@Global()` modules                          | Imports are always explicit            |
+| `forwardRef()`                               | Cycles are reported at startup instead |
 
 Standard decorators have no parameter decorators, so handlers read everything from `ctx`.
+[Chapter 12](12-from-nestjs.md) has the full concept map.
 
 ## Tooling setup
 

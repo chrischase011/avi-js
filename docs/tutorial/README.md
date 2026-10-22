@@ -25,7 +25,7 @@ status line:
 | [9](09-project-structure.md) | Project structure: modular and minimal     | Runnable |
 | [10](10-build-checks.md)     | Build-time checks and manifests            | Runnable |
 | [11](11-openapi.md)          | OpenAPI documents                          | Runnable |
-| [12](12-from-nestjs.md)      | Coming from NestJS                         | Runnable |
+| [12](12-from-nestjs.md)      | Avi.js for NestJS developers               | Runnable |
 
 Throughout the tutorial you build **Greeter**, a small API with a users resource and a greeting
 service, so each chapter adds to the previous one.

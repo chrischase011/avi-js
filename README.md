@@ -135,9 +135,9 @@ so you can move from minimal to modular one feature at a time. The tutorial's
 
 ## Why Avi.js
 
-**No reflection, no magic.** Dependencies are declared, not guessed. There is no
-`reflect-metadata`, no `emitDecoratorMetadata` and no `experimentalDecorators`. What you read is
-what runs.
+**Explicit by design.** Each class lists its dependencies in code, so there is no need for
+`reflect-metadata`, `emitDecoratorMetadata` or `experimentalDecorators`. What you read is what
+runs.
 
 **Types that follow your wiring.** List a service's dependencies once and TypeScript infers the
 rest. Swap two entries by mistake and the compiler tells you.
