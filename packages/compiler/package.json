@@ -3,17 +3,32 @@
   "version": "0.0.0",
   "private": true,
   "description": "Optional build-time checks and manifests for Avi.js apps.",
+  "keywords": [
+    "avi",
+    "avi.js",
+    "compiler",
+    "typescript",
+    "manifest"
+  ],
   "license": "MIT",
-  "type": "module",
+  "author": "Christopher Robin Chase",
+  "homepage": "https://github.com/chrischase011/avi-js#readme",
+  "bugs": {
+    "url": "https://github.com/chrischase011/avi-js/issues"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/chrischase011/avi-js.git",
     "directory": "packages/compiler"
   },
+  "type": "module",
   "engines": {
     "node": ">=22.12"
   },
   "sideEffects": false,
+  "bin": {
+    "avi-compile": "./dist/bin.js"
+  },
   "exports": {
     ".": {
       "@avi/source": "./src/index.ts",
@@ -22,13 +37,17 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "src",
+    "README.md",
+    "LICENSE"
   ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"
-  },
-  "bin": {
-    "avi-compile": "./dist/bin.js"
   },
   "dependencies": {
     "@avi/core": "workspace:*"

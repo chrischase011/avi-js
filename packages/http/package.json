@@ -3,13 +3,25 @@
   "version": "0.0.0",
   "private": true,
   "description": "Router, request pipeline and Node.js HTTP adapter for Avi.js.",
+  "keywords": [
+    "avi",
+    "avi.js",
+    "http",
+    "router",
+    "node"
+  ],
   "license": "MIT",
-  "type": "module",
+  "author": "Christopher Robin Chase",
+  "homepage": "https://github.com/chrischase011/avi-js#readme",
+  "bugs": {
+    "url": "https://github.com/chrischase011/avi-js/issues"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/chrischase011/avi-js.git",
     "directory": "packages/http"
   },
+  "type": "module",
   "engines": {
     "node": ">=22.12"
   },
@@ -22,8 +34,15 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "src",
+    "README.md",
+    "LICENSE"
   ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"
   }

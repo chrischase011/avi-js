@@ -3,13 +3,24 @@
   "version": "0.0.0",
   "private": true,
   "description": "Standard Schema validation for Avi.js routes.",
+  "keywords": [
+    "avi",
+    "avi.js",
+    "validation",
+    "standard-schema"
+  ],
   "license": "MIT",
-  "type": "module",
+  "author": "Christopher Robin Chase",
+  "homepage": "https://github.com/chrischase011/avi-js#readme",
+  "bugs": {
+    "url": "https://github.com/chrischase011/avi-js/issues"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/chrischase011/avi-js.git",
     "directory": "packages/validation"
   },
+  "type": "module",
   "engines": {
     "node": ">=22.12"
   },
@@ -22,8 +33,15 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "src",
+    "README.md",
+    "LICENSE"
   ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"
   },
