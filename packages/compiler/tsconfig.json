@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "customConditions": ["@avi/source"]
+  },
+  "include": ["src", "test"],
+  "exclude": ["test/fixtures"]
+}

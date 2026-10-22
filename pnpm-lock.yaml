@@ -234,6 +234,15 @@ importers:
         specifier: workspace:*
         version: link:../../packages/core
 
+  packages/compiler:
+    dependencies:
+      '@avi/core':
+        specifier: workspace:*
+        version: link:../core
+      typescript:
+        specifier: '>=5.8'
+        version: 6.0.3
+
   packages/core:
     dependencies:
       '@avi/di':

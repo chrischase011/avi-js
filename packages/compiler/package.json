@@ -1,0 +1,39 @@
+{
+  "name": "@avi/compiler",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Optional build-time checks and manifests for Avi.js apps.",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chrischase011/avi-js.git",
+    "directory": "packages/compiler"
+  },
+  "engines": {
+    "node": ">=22.12"
+  },
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "@avi/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "bin": {
+    "avi-compile": "./dist/bin.js"
+  },
+  "dependencies": {
+    "@avi/core": "workspace:*"
+  },
+  "peerDependencies": {
+    "typescript": ">=5.8"
+  }
+}

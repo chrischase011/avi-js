@@ -29,6 +29,7 @@ export default defineConfig({
   plugins: [typescript],
   resolve: {
     alias: {
+      '@avi/compiler': src('compiler'),
       '@avi/core': src('core'),
       '@avi/di': src('di'),
       '@avi/http': src('http'),
