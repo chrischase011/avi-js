@@ -9,7 +9,7 @@ import type { AddressInfo } from 'node:net';
 import { RequestContext } from './context.js';
 import { HttpError, RequestAbortedError } from './errors.js';
 import type { HttpMethod } from './methods.js';
-import { sendError, sendValue } from './respond.js';
+import { sendError, sendOptions, sendValue } from './respond.js';
 import type { Router } from './router.js';
 
 export interface Logger {
@@ -115,17 +115,32 @@ export class HttpServer {
     const path = queryStart === -1 ? url : url.slice(0, queryStart);
     const method = req.method ?? 'GET';
 
-    const handler = this.#router.find(method, path);
-    if (!handler) {
-      sendError(res, new HttpError(404), this.#closing !== undefined);
-      return;
+    const closing = this.#closing !== undefined;
+    const match = this.#router.find(method, path);
+    switch (match.kind) {
+      case 'found':
+        break;
+      case 'not-found':
+        sendError(res, new HttpError(404), closing);
+        return;
+      case 'malformed':
+        sendError(res, new HttpError(400, 'Malformed URL encoding'), closing);
+        return;
+      case 'method-not-allowed':
+        sendError(res, new HttpError(405, undefined, { headers: { allow: match.allow } }), closing);
+        return;
+      case 'options':
+        sendOptions(res, match.allow, closing);
+        return;
     }
 
+    const handler = match.handler;
     const ctx = new RequestContext(
       req,
       res,
       method as HttpMethod,
       path,
+      match.params,
       queryStart === -1 ? '' : url.slice(queryStart + 1),
       this.#bodyLimit,
     );

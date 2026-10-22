@@ -6,6 +6,6 @@ export type { HttpMethod } from './methods.js';
 export { reply } from './reply.js';
 export type { Reply, ReplyInit } from './reply.js';
 export { Router } from './router.js';
-export type { Handler, RouteDefinition } from './router.js';
+export type { Handler, Params, RouteDefinition, RouteMatch } from './router.js';
 export { HttpServer } from './server.js';
 export type { Logger, ServerOptions } from './server.js';
