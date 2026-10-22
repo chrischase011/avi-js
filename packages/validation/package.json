@@ -1,0 +1,36 @@
+{
+  "name": "@avi/validation",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Standard Schema validation for Avi.js routes.",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chrischase011/avi-js.git",
+    "directory": "packages/validation"
+  },
+  "engines": {
+    "node": ">=22.12"
+  },
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "@avi/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@avi/http": "workspace:*"
+  },
+  "devDependencies": {
+    "valibot": "1.5.0"
+  }
+}

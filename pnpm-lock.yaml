@@ -205,6 +205,9 @@ importers:
       '@avi/http':
         specifier: workspace:*
         version: link:../packages/http
+      '@avi/validation':
+        specifier: workspace:*
+        version: link:../packages/validation
     devDependencies:
       '@types/autocannon':
         specifier: 7.12.7
@@ -215,6 +218,9 @@ importers:
       mitata:
         specifier: 1.0.34
         version: 1.0.34
+      valibot:
+        specifier: 1.5.0
+        version: 1.5.0(typescript@6.0.3)
 
   examples/basic-api:
     dependencies:
@@ -236,10 +242,27 @@ importers:
       '@avi/http':
         specifier: workspace:*
         version: link:../http
+      '@avi/validation':
+        specifier: workspace:*
+        version: link:../validation
+    devDependencies:
+      valibot:
+        specifier: 1.5.0
+        version: 1.5.0(typescript@6.0.3)
 
   packages/di: {}
 
   packages/http: {}
+
+  packages/validation:
+    dependencies:
+      '@avi/http':
+        specifier: workspace:*
+        version: link:../http
+    devDependencies:
+      valibot:
+        specifier: 1.5.0
+        version: 1.5.0(typescript@6.0.3)
 
 packages:
 
@@ -1166,6 +1189,14 @@ packages:
     resolution: {integrity: sha512-+NYs2QeMWy+GWFOEm9xnn6HCDp0l7QBD7ml8zLUmJ+93Q5NF0NocErnwkTkXVFNiX3/fpC6afS8Dhb/gz7R7eg==}
     deprecated: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
     hasBin: true
+
+  valibot@1.5.0:
+    resolution: {integrity: sha512-nil6AkP2TChWL43Z5uJ6GTxX01CUA+g8LWUM+N/rB9NBbkUMaUsi9PUNzlUPgoKASgmx9f7eGOYpJ04/fSa6FQ==}
+    peerDependencies:
+      typescript: '>=5'
+    peerDependenciesMeta:
+      typescript:
+        optional: true
 
   vite@8.3.4:
     resolution: {integrity: sha512-IftLE8phJhdNRIGNEV4JCCvfNScoZQVfcXaN8TQropWGJtOHcu+iAB9pHcuGvmEb/kddw0LBe/jS8ztdC6xdiQ==}
@@ -2123,6 +2154,10 @@ snapshots:
   uuid-parse@1.1.0: {}
 
   uuid@8.3.2: {}
+
+  valibot@1.5.0(typescript@6.0.3):
+    optionalDependencies:
+      typescript: 6.0.3
 
   vite@8.3.4(@types/node@22.20.5):
     dependencies:

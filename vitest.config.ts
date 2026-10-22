@@ -32,6 +32,7 @@ export default defineConfig({
       '@avi/core': src('core'),
       '@avi/di': src('di'),
       '@avi/http': src('http'),
+      '@avi/validation': src('validation'),
     },
   },
   test: {
