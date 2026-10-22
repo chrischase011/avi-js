@@ -1,7 +1,7 @@
 # 9. Project structure
 
-> **Status: Planned (Phase 9).** The `avi` CLI and the decorator API do not exist yet. This
-> chapter shows the target layouts.
+> **Status: Partly runnable.** Both layouts work today; `examples/modular-api` follows the modular
+> one. The `avi new` CLI that generates them is planned for Phase 9.
 
 Avi.js has two official templates. They differ only in how you organize code: both use the same
 router, DI container and request pipeline, so an app behaves the same either way.

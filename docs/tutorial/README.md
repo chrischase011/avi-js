@@ -17,12 +17,12 @@ status line:
 | [1](01-first-app.md)         | Your first app                             | Runnable          |
 | [2](02-routing.md)           | Routing: params, query, precedence         | Runnable          |
 | [3](03-modules-and-di.md)    | Modules and dependency injection           | Runnable          |
-| [4](04-controllers.md)       | Controllers: explicit and decorator styles | Planned (Phase 4) |
+| [4](04-controllers.md)       | Controllers: explicit and decorator styles | Runnable          |
 | [5](05-request-pipeline.md)  | Middleware, guards and errors              | Planned (Phase 5) |
 | [6](06-validation.md)        | Validation and typed input                 | Planned (Phase 6) |
 | [7](07-production.md)        | Running in production                      | Partly runnable   |
 | [8](08-testing.md)           | Testing your app                           | Partly runnable   |
-| [9](09-project-structure.md) | Project structure: modular and minimal     | Planned (Phase 9) |
+| [9](09-project-structure.md) | Project structure: modular and minimal     | Partly runnable   |
 
 Throughout the tutorial you build **Greeter**, a small API with a users resource and a greeting
 service, so each chapter adds to the previous one.

@@ -19,10 +19,10 @@ dependency injection, without `reflect-metadata` and without the weight.
 ---
 
 > [!IMPORTANT]
-> Avi.js is in early development. Apps, routing, modules and dependency injection work today,
-> along with safe errors, body limits and graceful shutdown. Decorators are being built next, so
-> the decorator example below shows the **target API**. Follow along, try the workspace, and help
-> shape it before 1.0.
+> Avi.js is in early development and not on npm yet. Everything shown below works today in the
+> workspace: both API styles, routing, modules and dependency injection, safe errors and graceful
+> shutdown. Middleware, guards and validation come next. Follow along, try it, and help shape it
+> before 1.0.
 
 ## Two styles, one engine
 
