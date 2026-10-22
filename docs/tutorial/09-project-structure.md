@@ -7,8 +7,8 @@ Avi.js has two official templates. They differ only in how you organize code: bo
 router, DI container and request pipeline, so an app behaves the same either way.
 
 ```sh
-avi new my-api                      # modular (default)
-avi new my-api --template minimal
+npm create avi@latest my-api                          # modular (default)
+npm create avi@latest my-api -- --template minimal
 ```
 
 Each generated project compiles, has a passing test suite and serves `/health` and `/users` out of

@@ -51,3 +51,4 @@ The first release. Everything below is new.
 - `@avijs/testing`: a test client.
 - `@avijs/openapi`: OpenAPI 3.1 documents from routes and schemas.
 - `@avijs/cli`: `avi new` (modular and minimal templates), `avi dev`, `avi check`, `avi manifest`.
+- `create-avi`: `npm create avi@latest my-app`, asking for the name and template when missing.

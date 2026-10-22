@@ -128,8 +128,8 @@ required. For small services and quick starts.</td>
 </table>
 
 ```sh
-npx @avijs/cli new my-api                     # modular
-npx @avijs/cli new my-api --template minimal  # minimal
+npm create avi@latest my-api                          # modular
+npm create avi@latest my-api -- --template minimal    # minimal
 ```
 
 Each generated project compiles, has passing tests and serves requests out of the box. The layouts
@@ -162,15 +162,17 @@ all. The current local baselines and how to run them are in [benchmarks](benchma
 
 ## Try it now
 
-Create a project with the CLI (Node.js 22.12+):
+Create a project (Node.js 22.12+):
 
 ```sh
-npx @avijs/cli new my-api                    # modular template
-npx @avijs/cli new my-api --template minimal
+npm create avi@latest my-api
 cd my-api
 npm install
-npm run dev                                  # http://localhost:3000
+npm run dev    # http://localhost:3000
 ```
+
+Run `npm create avi@latest` without a name to be asked for the name and the template, or pass
+`-- --template minimal` for the minimal one. `npx @avijs/cli new my-api` does the same.
 
 Or add it to an existing project:
 
