@@ -21,6 +21,8 @@ export default defineConfig(
       // Conflicts with no-non-null-assertion under noUncheckedIndexedAccess.
       '@typescript-eslint/non-nullable-type-assertion-style': 'off',
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      // Decorated module classes such as `@Module({...}) class AppModule {}` are meant to be empty.
+      '@typescript-eslint/no-extraneous-class': ['error', { allowWithDecorator: true }],
     },
   },
   {
