@@ -191,6 +191,23 @@ the [tutorial](docs/tutorial/README.md) covers everything from a first route to 
 
 Package names are provisional until they are published.
 
+## Compatibility
+
+Checked in CI on every push:
+
+| Area       | Supported                                                           |
+| ---------- | ------------------------------------------------------------------- |
+| Node.js    | 22.12+, 24, 26                                                      |
+| Platforms  | Linux (Node 22, 24, 26), Windows and macOS (Node 24)                |
+| TypeScript | 6.0 to compile apps; published types also checked against 7.0       |
+| Modules    | ESM, and CommonJS through `require(esm)` (Node 22.12+)              |
+| Decorators | TC39 standard decorators; `experimentalDecorators` is not supported |
+
+The **Package artifacts** job packs every package, installs the tarballs into fresh npm projects
+and checks ESM, CommonJS, TypeScript 6 and 7, and both `avi new` templates end to end. See
+[SECURITY.md](SECURITY.md) for the security policy, [CHANGELOG.md](CHANGELOG.md) for changes and
+[RELEASING.md](RELEASING.md) for how releases are made.
+
 ## Contributing
 
 Ideas, questions and feedback on the API are welcome, especially now, while it is still easy to

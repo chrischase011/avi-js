@@ -1,0 +1,46 @@
+# Changelog
+
+All notable changes are listed here. Avi.js follows [Semantic Versioning](https://semver.org); all
+packages share one version.
+
+## Unreleased
+
+The first release. Everything below is new.
+
+### Core and HTTP
+
+- `createAvi`, `AviFactory`, `register`, `init`, `listen`, `close` with graceful shutdown.
+- Return-value responses: JSON, text, bytes, `204`, `reply()` for status and headers, streams
+  (Node `Readable`, web `ReadableStream`) and web `Response`, with backpressure.
+- Safe errors: `HttpError` with `headers` and `details`; 5xx details never sent.
+- Request bodies read on demand with a size limit; `ctx.text()`, `ctx.json()`.
+- Segment-trie router: `:params`, trailing `*`, deterministic precedence with backtracking, `405`
+  with `Allow`, automatic `HEAD` and `OPTIONS`, a direct lookup for static routes.
+
+### Modules and dependency injection
+
+- `defineModule` / `@Module` with imports, exports, re-exports and prefixes.
+- Class, value and factory providers; singleton and transient scopes; async factories; reverse-order
+  disposal. Explicit `static inject`, no `reflect-metadata`.
+- Startup checks with full dependency chains: missing or hidden providers, cycles, duplicates.
+- `overrides` to replace providers in tests.
+
+### Controllers and pipeline
+
+- Explicit (`defineController`, `route()`) and decorator (`@Controller`, `@Get`, ...) APIs on one
+  engine, proven equivalent by tests.
+- Middleware and guards at app, module, controller and route level, as functions or classes with
+  dependencies; `ctx.state`, `ctx.setHeader`, `errorHandler`, `onResponse`.
+
+### Validation and typing
+
+- Route schemas with any Standard Schema library; typed `ctx.input` and path params; response
+  schemas that drop undeclared fields.
+
+### Tooling
+
+- `@avi/compiler`: `avi-compile check` for `static inject` lists and `manifest` for app manifests;
+  `createAvi({ manifest })` refuses to start on a stale one.
+- `@avi/testing`: a test client.
+- `@avi/openapi`: OpenAPI 3.1 documents from routes and schemas.
+- `@avi/cli`: `avi new` (modular and minimal templates), `avi dev`, `avi check`, `avi manifest`.
