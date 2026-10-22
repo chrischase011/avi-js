@@ -11,19 +11,21 @@ status line:
 - **Planned (Phase N)**: the chapter shows the target API. The code does not run yet. It is
   rewritten into tested, runnable form when that phase ships.
 
-| #                            | Chapter                                    | Status          |
-| ---------------------------- | ------------------------------------------ | --------------- |
-| [0](00-getting-started.md)   | Getting started with the workspace         | Runnable        |
-| [1](01-first-app.md)         | Your first app                             | Runnable        |
-| [2](02-routing.md)           | Routing: params, query, precedence         | Runnable        |
-| [3](03-modules-and-di.md)    | Modules and dependency injection           | Runnable        |
-| [4](04-controllers.md)       | Controllers: explicit and decorator styles | Runnable        |
-| [5](05-request-pipeline.md)  | Middleware, guards and errors              | Runnable        |
-| [6](06-validation.md)        | Validation and typed input                 | Runnable        |
-| [7](07-production.md)        | Running in production                      | Runnable        |
-| [8](08-testing.md)           | Testing your app                           | Partly runnable |
-| [9](09-project-structure.md) | Project structure: modular and minimal     | Partly runnable |
-| [10](10-build-checks.md)     | Build-time checks and manifests            | Runnable        |
+| #                            | Chapter                                    | Status   |
+| ---------------------------- | ------------------------------------------ | -------- |
+| [0](00-getting-started.md)   | Getting started with the workspace         | Runnable |
+| [1](01-first-app.md)         | Your first app                             | Runnable |
+| [2](02-routing.md)           | Routing: params, query, precedence         | Runnable |
+| [3](03-modules-and-di.md)    | Modules and dependency injection           | Runnable |
+| [4](04-controllers.md)       | Controllers: explicit and decorator styles | Runnable |
+| [5](05-request-pipeline.md)  | Middleware, guards and errors              | Runnable |
+| [6](06-validation.md)        | Validation and typed input                 | Runnable |
+| [7](07-production.md)        | Running in production                      | Runnable |
+| [8](08-testing.md)           | Testing your app                           | Runnable |
+| [9](09-project-structure.md) | Project structure: modular and minimal     | Runnable |
+| [10](10-build-checks.md)     | Build-time checks and manifests            | Runnable |
+| [11](11-openapi.md)          | OpenAPI documents                          | Runnable |
+| [12](12-from-nestjs.md)      | Coming from NestJS                         | Runnable |
 
 Throughout the tutorial you build **Greeter**, a small API with a users resource and a greeting
 service, so each chapter adds to the previous one.

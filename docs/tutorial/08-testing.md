@@ -1,46 +1,81 @@
 # 8. Testing your app
 
-> **Status: Partly runnable.** Testing over HTTP works today. Dedicated testing helpers are
-> planned for Phase 9.
+> **Status: Runnable.** Everything on this page works today.
 
-## Today: a real server on a random port
+`@avi/testing` starts your app on a random local port and gives you a small client for it. Tests
+talk to the app over real HTTP, so they exercise routing, middleware, guards, validation and
+serialization exactly as production does.
 
-Each `createAvi()` app is self-contained, so every test can start its own on port `0` and talk to
-it with `fetch`:
+## A first test
+
+This uses Node's built-in test runner on the compiled output, which is what `avi new` sets up. Any
+runner works the same way.
 
 ```ts
-import { afterEach, expect, it } from 'vitest';
-import { createAvi, defineController, type AviApp } from '@avi/core';
+import assert from 'node:assert/strict';
+import { after, before, test } from 'node:test';
+import { createTestClient, type TestClient } from '@avi/testing';
+import { AppModule } from '../app.module.js';
 
-let app: AviApp;
+let client: TestClient;
+before(async () => {
+  client = await createTestClient(AppModule);
+});
+after(() => client.close());
 
-afterEach(() => app.close());
-
-it('says hello', async () => {
-  app = createAvi().register({
-    controllers: [
-      defineController({
-        routes: [{ method: 'GET', path: '/', handler: () => ({ message: 'Hello, Avi' }) }],
-      }),
-    ],
-  });
-  const { port } = await app.listen(0, '127.0.0.1');
-
-  const res = await fetch(`http://127.0.0.1:${port}/`);
-  expect(res.status).toBe(200);
-  expect(await res.json()).toEqual({ message: 'Hello, Avi' });
+test('creates a user', async () => {
+  const res = await client.post('/users', { name: 'Grace' });
+  assert.equal(res.status, 201);
+  assert.deepEqual(res.body, { id: 2, name: 'Grace' });
 });
 ```
 
-`close()` also closes the keep-alive connections `fetch` leaves open, so tests do not hang.
+The client has `get`, `post`, `put`, `patch`, `delete` and a general `request(method, path, init)`:
 
-The workspace's own tests in `packages/*/test` use the same approach.
+| Option    | Meaning                                                 |
+| --------- | ------------------------------------------------------- |
+| `body`    | Objects are sent as JSON; strings and bytes as they are |
+| `headers` | Request headers                                         |
+| `query`   | `{ tag: ['a', 'b'] }` becomes `?tag=a&tag=b`            |
 
-## Planned
+Each response has `status`, `headers`, `text`, and `body`: parsed JSON for JSON responses, the text
+otherwise. `client.close()` stops the app and disposes its providers.
 
-- Testing helpers that send requests to an app without opening a port.
-- Replacing any provider with a test double by registering a different provider for the same
-  token (once DI lands in Phase 3).
+## Replacing providers
+
+Pass `overrides` to swap a provider anywhere in the module graph, however deeply it is imported:
+
+```ts
+const sent: string[] = [];
+client = await createTestClient(AppModule, {
+  overrides: [{ provide: Mailer, useValue: { send: (to: string) => sent.push(to) } }],
+});
+```
+
+An override that matches no provider is an error, so a renamed token cannot silently stop a test
+from working. Overrides use the normal provider forms, so `useClass` and `useFactory` work too.
+
+`createTestClient` also accepts any `createAvi` option, or an app you built yourself:
+
+```ts
+client = await createTestClient(createAvi({ middleware: [requestId] }).register(AppModule));
+```
+
+## Testing providers directly
+
+For unit tests of a single service, skip HTTP:
+
+```ts
+const app = createAvi({ overrides: [{ provide: Db, useValue: fakeDb }] }).register(UsersModule);
+await app.init();
+const users = app.get(UsersService);
+```
+
+## With Vitest
+
+Vitest's built-in transform does not compile standard decorators yet. If your app uses
+decorators, add the small `tsc` plugin from [Chapter 4](04-controllers.md#tooling-setup), or run
+your tests on the compiled output as above.
 
 ## Next
 

@@ -1,7 +1,7 @@
 # 9. Project structure
 
-> **Status: Partly runnable.** Both layouts work today; `examples/modular-api` follows the modular
-> one. The `avi new` CLI that generates them is planned for Phase 9.
+> **Status: Runnable.** Everything on this page works today. `avi new` generates both layouts;
+> `examples/modular-api` follows the modular one.
 
 Avi.js has two official templates. They differ only in how you organize code: both use the same
 router, DI container and request pipeline, so an app behaves the same either way.
@@ -10,6 +10,16 @@ router, DI container and request pipeline, so an app behaves the same either way
 avi new my-api                      # modular (default)
 avi new my-api --template minimal
 ```
+
+Each generated project compiles, has a passing test suite and serves `/health` and `/users` out of
+the box:
+
+| Script          | Does                                                        |
+| --------------- | ----------------------------------------------------------- |
+| `npm run dev`   | `avi dev`: compiles, then recompiles and restarts on change |
+| `npm test`      | compiles and runs the tests with Node's test runner         |
+| `npm run check` | `avi check`: type-checks every `static inject` list         |
+| `npm start`     | runs the compiled app                                       |
 
 The layouts are conventions. Avi.js never scans folders or depends on file names. You register
 what you use, wherever it lives.

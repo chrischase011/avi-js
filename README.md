@@ -128,9 +128,9 @@ avi new my-api                     # modular
 avi new my-api --template minimal  # minimal
 ```
 
-The `avi` CLI is planned and not available yet. The layouts are conventions, never runtime
-requirements: Avi.js does not scan folders or care where files live, so you can move from minimal
-to modular one feature at a time. The tutorial's
+Each generated project compiles, has passing tests and serves requests out of the box. The layouts
+are conventions, never runtime requirements: Avi.js does not scan folders or care where files live,
+so you can move from minimal to modular one feature at a time. The tutorial's
 [project structure chapter](docs/tutorial/09-project-structure.md) walks through both.
 
 ## Why Avi.js
@@ -166,9 +166,15 @@ pnpm install
 pnpm verify
 ```
 
-You need Node.js 22.12+ and pnpm 12. [Chapter 0 of the tutorial](docs/tutorial/00-getting-started.md)
-walks through the workspace and includes a hands-on exercise with the DI type contracts that
-already work.
+You need Node.js 22.12+ and pnpm 12. Then run the examples or generate a project:
+
+```sh
+pnpm --filter @avi/example-modular-api start   # http://localhost:3000/users
+pnpm avi new my-api --dir ../                  # the avi CLI, from the workspace
+```
+
+[Chapter 0 of the tutorial](docs/tutorial/00-getting-started.md) walks through the workspace, and
+the [tutorial](docs/tutorial/README.md) covers everything from a first route to production.
 
 ## Packages
 
@@ -179,6 +185,9 @@ already work.
 | `@avi/http`       | Router, request pipeline and the native Node.js adapter      |
 | `@avi/validation` | Standard Schema validation for routes                        |
 | `@avi/compiler`   | Optional build-time checks and manifests (`avi-compile`)     |
+| `@avi/testing`    | A test client with provider overrides                        |
+| `@avi/openapi`    | OpenAPI 3.1 documents from routes and schemas                |
+| `@avi/cli`        | `avi new`, `avi dev`, `avi check`, `avi manifest`            |
 
 Package names are provisional until they are published.
 
