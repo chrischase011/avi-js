@@ -37,6 +37,8 @@ export default defineConfig({
   },
   test: {
     include: ['packages/*/test/**/*.test.ts'],
+    // The memory-stability test forces garbage collection.
+    execArgv: ['--expose-gc'],
     typecheck: {
       enabled: true,
       include: ['packages/*/test/**/*.test-d.ts'],
