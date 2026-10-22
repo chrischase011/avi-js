@@ -10,9 +10,9 @@ dependency injection, without `reflect-metadata` and without the weight.
 [![CI](https://github.com/chrischase011/avi-js/actions/workflows/ci.yml/badge.svg)](https://github.com/chrischase011/avi-js/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%E2%89%A522.12-339933.svg)](package.json)
-[![Status](https://img.shields.io/badge/status-pre--alpha-orange.svg)](#roadmap)
+[![Status](https://img.shields.io/badge/status-pre--alpha-orange.svg)](#try-it-now)
 
-[Tutorial](docs/tutorial/README.md) · [Why Avi.js](#why-avijs) · [Roadmap](#roadmap) · [Try it](#try-it-now)
+[Tutorial](docs/tutorial/README.md) · [Why Avi.js](#why-avijs) · [Try it](#try-it-now)
 
 </div>
 
@@ -96,22 +96,6 @@ DI, HTTP and the public API are separate packages with one-way dependencies.
 **Measured, not claimed.** Performance work is driven by reproducible benchmarks against
 `node:http`, Fastify, Hono and NestJS. Numbers get published with their methodology, or not at
 all.
-
-## Roadmap
-
-| Phase | Milestone                                                   | Status  |
-| :---: | ----------------------------------------------------------- | ------- |
-|   0   | Repository foundation: workspace, tooling, CI, contracts    | ✅ Done |
-|   1   | HTTP foundation: app factory, JSON/text, errors, shutdown   | 🔜 Next |
-|   2   | Routing: segment trie, params, precedence, 404/405          | Planned |
-|   3   | Modules and DI: providers, scopes, visibility, cycle checks | Planned |
-|   4   | Controllers: explicit and decorator APIs on one engine      | Planned |
-|   5   | Request pipeline: middleware, guards, error boundary        | Planned |
-|   6   | Validation: schema adapters, typed params/query/body        | Planned |
-|   7   | Performance: profiling, precomposition, benchmarks          | Planned |
-|   8   | Optional compiler: static manifests, generated DI factories | Planned |
-|   9   | Developer experience: CLI, testing helpers, OpenAPI         | Planned |
-|  10   | Release readiness: security review, fuzzing, publishing     | Planned |
 
 ## Try it now
 
