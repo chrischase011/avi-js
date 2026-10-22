@@ -29,10 +29,13 @@ export default defineConfig({
   plugins: [typescript],
   resolve: {
     alias: {
+      '@avi/cli': src('cli'),
       '@avi/compiler': src('compiler'),
       '@avi/core': src('core'),
       '@avi/di': src('di'),
       '@avi/http': src('http'),
+      '@avi/openapi': src('openapi'),
+      '@avi/testing': src('testing'),
       '@avi/validation': src('validation'),
     },
   },

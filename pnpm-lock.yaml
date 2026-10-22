@@ -234,6 +234,15 @@ importers:
         specifier: workspace:*
         version: link:../../packages/core
 
+  packages/cli:
+    dependencies:
+      '@avi/compiler':
+        specifier: workspace:*
+        version: link:../compiler
+      typescript:
+        specifier: '>=5.8'
+        version: 6.0.3
+
   packages/compiler:
     dependencies:
       '@avi/core':
@@ -262,6 +271,22 @@ importers:
   packages/di: {}
 
   packages/http: {}
+
+  packages/openapi:
+    dependencies:
+      '@avi/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      valibot:
+        specifier: 1.5.0
+        version: 1.5.0(typescript@6.0.3)
+
+  packages/testing:
+    dependencies:
+      '@avi/core':
+        specifier: workspace:*
+        version: link:../core
 
   packages/validation:
     dependencies:

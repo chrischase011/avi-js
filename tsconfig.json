@@ -6,6 +6,9 @@
     { "path": "./packages/validation/tsconfig.build.json" },
     { "path": "./packages/core/tsconfig.build.json" },
     { "path": "./packages/compiler/tsconfig.build.json" },
+    { "path": "./packages/testing/tsconfig.build.json" },
+    { "path": "./packages/openapi/tsconfig.build.json" },
+    { "path": "./packages/cli/tsconfig.build.json" },
     { "path": "./examples/basic-api/tsconfig.build.json" },
     { "path": "./examples/modular-api/tsconfig.build.json" },
     { "path": "./benchmarks/tsconfig.build.json" }

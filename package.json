@@ -18,6 +18,7 @@
     "bench:router": "pnpm build && pnpm --filter @avi/benchmarks router",
     "bench:http": "pnpm build && pnpm --filter @avi/benchmarks http",
     "bench:startup": "pnpm build && pnpm --filter @avi/benchmarks startup",
+    "avi": "node packages/cli/dist/bin.js",
     "examples": "pnpm --filter \"./examples/*\" smoke",
     "verify": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm build && pnpm test && pnpm examples"
   },
