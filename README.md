@@ -220,7 +220,8 @@ pnpm verify
 ```
 
 Commits follow [Conventional Commits](https://www.conventionalcommits.org/), for example
-`feat(http): add HEAD fallback`.
+`feat(http): add HEAD fallback`. [CONTRIBUTING.md](CONTRIBUTING.md) covers the development setup,
+repository layout, code style and the pull request process.
 
 ## License
 
