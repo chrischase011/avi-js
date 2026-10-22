@@ -26,6 +26,8 @@ describe('@avi/core', () => {
       'Patch',
       'Post',
       'Put',
+      'UseGuards',
+      'UseMiddleware',
       'createAvi',
       'createToken',
       'defineController',

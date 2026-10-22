@@ -15,21 +15,30 @@ export {
   Patch,
   Post,
   Put,
+  UseGuards,
+  UseMiddleware,
 } from './decorators.js';
 export type { CheckInject } from './decorators.js';
 export { defineModule } from './module.js';
 export type { AviModule, ModuleOptions, ModuleRef } from './module.js';
+export type { GuardClass, GuardRef, MiddlewareClass, MiddlewareRef, Route } from './pipeline.js';
 
 export { HTTP_METHODS, HttpError, reply } from '@avi/http';
 export type {
+  AviState,
   Context,
+  ErrorHandler,
+  Guard,
   Handler,
   HttpErrorOptions,
   HttpMethod,
   Logger,
+  Middleware,
+  Next,
   Params,
   Reply,
   ReplyInit,
+  ResponseInfo,
   RouteDefinition,
 } from '@avi/http';
 export { createToken } from '@avi/di';

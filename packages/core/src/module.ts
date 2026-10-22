@@ -1,5 +1,6 @@
 import type { Class, ModuleDefinition, Provider, Token } from '@avi/di';
 import type { ControllerDefinition } from './controller.js';
+import { checkRefs, type GuardRef, type MiddlewareRef } from './pipeline.js';
 import { controllerFromClass, injectableScopes, moduleClasses } from './registry.js';
 
 /** A module from `defineModule`, or a class decorated with `@Module`. */
@@ -14,6 +15,10 @@ export interface ModuleOptions {
   providers?: readonly Provider[];
   /** `defineController` results or `@Controller` classes. */
   controllers?: readonly (ControllerDefinition | Class)[];
+  /** Runs for this module's own controllers, after app middleware. */
+  middleware?: readonly MiddlewareRef[];
+  /** Checked for this module's own controllers, after app guards. */
+  guards?: readonly GuardRef[];
   /** Own providers, re-exported tokens, or imported modules to re-export. */
   exports?: readonly (Token | ModuleRef)[];
 }
@@ -24,6 +29,8 @@ export interface AviModule extends ModuleDefinition {
   readonly imports: readonly AviModule[];
   readonly providers: readonly Provider[];
   readonly controllers: readonly ControllerDefinition[];
+  readonly middleware: readonly MiddlewareRef[];
+  readonly guards: readonly GuardRef[];
   readonly exports: readonly (Token | AviModule)[];
 }
 
@@ -55,6 +62,8 @@ export function defineModule(options: ModuleOptions = {}): AviModule {
         typeof c === 'function' ? controllerFromClass(c) : c,
       ),
     ),
+    middleware: checkRefs(options.middleware, 'use', `${name} middleware`),
+    guards: checkRefs(options.guards, 'canActivate', `${name} guards`),
     exports: Object.freeze(
       (options.exports ?? []).map((entry) =>
         typeof entry === 'function' ? (moduleClasses.get(entry) ?? entry) : entry,

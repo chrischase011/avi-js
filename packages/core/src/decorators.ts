@@ -1,13 +1,24 @@
 import type { Class, ResolveTokens, Scope, Token } from '@avi/di';
 import type { Context, HttpMethod } from '@avi/http';
 import { defineModule, type ModuleOptions } from './module.js';
-import { controllerClasses, injectableScopes, moduleClasses, type RouteEntry } from './registry.js';
+import { checkRefs, type GuardRef, type MiddlewareRef } from './pipeline.js';
+import {
+  GUARDS,
+  METHOD_GUARDS,
+  METHOD_MIDDLEWARE,
+  MIDDLEWARE,
+  ROUTES,
+  controllerClasses,
+  injectableScopes,
+  moduleClasses,
+  ownList,
+  ownMethodList,
+  type RouteEntry,
+} from './registry.js';
 
 // TypeScript only fills in `context.metadata` when `Symbol.metadata` exists. Node.js does not
 // define it yet, so install the well-known symbol the spec and other libraries use.
 (Symbol as { metadata?: symbol }).metadata ??= Symbol.for('Symbol.metadata');
-
-const ROUTES = Symbol('avi.routes');
 
 type InjectOf<C> = C extends { inject: infer K extends readonly Token[] } ? K : [];
 
@@ -27,8 +38,41 @@ export function Controller(prefix = '/') {
     throw new TypeError(`Controller prefix must start with "/": ${prefix}`);
   return <C extends Class & CheckInject<C>>(value: C, context: ClassDecoratorContext<C>): void => {
     expectKind(context, 'class', '@Controller');
-    controllerClasses.set(value, { prefix, routes: collectRoutes(context.metadata) });
+    controllerClasses.set(value, { prefix, metadata: context.metadata });
   };
+}
+
+/** Adds middleware to every route of a controller class, or to one route method. */
+export function UseMiddleware(...middleware: MiddlewareRef[]) {
+  const refs = checkRefs(middleware, 'use', '@UseMiddleware');
+  return (_value: unknown, context: ClassDecoratorContext | ClassMethodDecoratorContext): void => {
+    attach(context, '@UseMiddleware', MIDDLEWARE, METHOD_MIDDLEWARE, refs);
+  };
+}
+
+/** Adds guards to every route of a controller class, or to one route method. */
+export function UseGuards(...guards: GuardRef[]) {
+  const refs = checkRefs(guards, 'canActivate', '@UseGuards');
+  return (_value: unknown, context: ClassDecoratorContext | ClassMethodDecoratorContext): void => {
+    attach(context, '@UseGuards', GUARDS, METHOD_GUARDS, refs);
+  };
+}
+
+function attach(
+  context: unknown,
+  label: string,
+  classKey: symbol,
+  methodKey: symbol,
+  refs: readonly unknown[],
+): void {
+  expectKind(context, ['class', 'method'], label);
+  const ctx = context as ClassDecoratorContext | ClassMethodDecoratorContext;
+  if (ctx.kind === 'class') {
+    ownList(ctx.metadata, classKey).push(...refs);
+    return;
+  }
+  if (ctx.static) throw new TypeError(`${label} cannot decorate static method ${String(ctx.name)}`);
+  ownMethodList(ctx.metadata, methodKey, String(ctx.name)).push(...refs);
 }
 
 export function Injectable(options: { scope?: Scope } = {}) {
@@ -66,7 +110,7 @@ function routeDecorator(method: HttpMethod) {
       expectKind(context, 'method', label);
       const name = String(context.name);
       if (context.static) throw new TypeError(`${label} cannot decorate static method ${name}`);
-      ownRoutes(context.metadata).push({
+      ownList<RouteEntry>(context.metadata, ROUTES).push({
         method,
         path,
         name,
@@ -84,33 +128,16 @@ export const Delete = routeDecorator('DELETE');
 export const Head = routeDecorator('HEAD');
 export const Options = routeDecorator('OPTIONS');
 
-function ownRoutes(metadata: DecoratorMetadata): RouteEntry[] {
-  const record = metadata as Record<symbol, RouteEntry[] | undefined>;
-  if (!Object.hasOwn(record, ROUTES)) record[ROUTES] = [];
-  return record[ROUTES] as RouteEntry[];
-}
-
-// Base class routes first, so inherited routes keep their declaration order.
-function collectRoutes(metadata: DecoratorMetadata | undefined): RouteEntry[] {
-  const chain: RouteEntry[][] = [];
-  for (
-    let m = metadata as object | null | undefined;
-    m;
-    m = Object.getPrototypeOf(m) as object | null
-  ) {
-    if (Object.hasOwn(m, ROUTES))
-      chain.unshift((m as Record<symbol, RouteEntry[]>)[ROUTES] as RouteEntry[]);
-  }
-  return chain.flat();
-}
-
-function expectKind(context: unknown, kind: string, label: string): void {
+function expectKind(context: unknown, kind: string | string[], label: string): void {
   if (typeof context !== 'object' || context === null || !('kind' in context)) {
     throw new TypeError(
       `${label}: Avi.js uses standard decorators. Turn off "experimentalDecorators" in tsconfig.json.`,
     );
   }
-  if (context.kind !== kind) throw new TypeError(`${label} can only decorate a ${kind}`);
+  const kinds = Array.isArray(kind) ? kind : [kind];
+  if (!kinds.includes(context.kind as string)) {
+    throw new TypeError(`${label} can only decorate a ${kinds.join(' or ')}`);
+  }
 }
 
 function usage(label: string): TypeError {
