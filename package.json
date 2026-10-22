@@ -20,6 +20,8 @@
     "bench:startup": "pnpm build && pnpm --filter @avi/benchmarks startup",
     "avi": "node packages/cli/dist/bin.js",
     "examples": "pnpm --filter \"./examples/*\" smoke",
+    "release:version": "node scripts/set-version.mjs",
+    "verify:artifacts": "pnpm build && node scripts/verify-artifacts.mjs",
     "verify": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm build && pnpm test && pnpm examples"
   },
   "devDependencies": {
