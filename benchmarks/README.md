@@ -179,7 +179,7 @@ Node.js 24.21.0, on mains power, other applications open.
 | JSON with param | `node:http` | 51,865 | 1 ms | 2 ms | 5 ms |      0 |
 | JSON with param | Avi.js      | 50,169 | 1 ms | 2 ms | 4 ms |      0 |
 
-### Validation overhead (Phase 6)
+### Validation overhead (0.1.0)
 
 Recorded on 2026-10-22, same machine and settings, after middleware and validation were added.
 
@@ -194,7 +194,7 @@ Recorded on 2026-10-22, same machine and settings, after middleware and validati
 
 On this run, validating the three-field body cost about 25% of throughput against the same route
 without a schema. Treat that as an order of magnitude, not a figure: the param case moved by about
-20% between this run and the Phase 2 baseline with no related code change.
+20% between this run and the first baseline with no related code change.
 
 A run just before this one was discarded: `node:http` fell to 19,680 req/s on the hello case and
 the validated route came out faster than the unvalidated one, which only happens when something
@@ -245,9 +245,9 @@ compare throughput, rerun on a dedicated machine with frequency scaling fixed, i
 load generator on a second machine. `BENCH_SERVERS=avi,fastify pnpm bench:http` limits a run to
 some servers.
 
-### Static-route fast path (Phase 7)
+### Static-route fast path (0.1.0)
 
-Phase 7 added a direct lookup for routes without parameters, checked before the trie. It was
+A direct lookup was added for routes without parameters, checked before the trie. It was
 measured as an A/B: the old and new `Router` builds were loaded into one process and benchmarked
 in pairs on the same probes.
 
@@ -261,7 +261,7 @@ Parameter routes first looked 20–50% slower with the fast path. Swapping which
 reversed that: whichever ran second was slower. That difference is a benchmark-order effect, not
 the change; the static-route gain held in both orders.
 
-### Startup (Phase 7)
+### Startup (0.1.0)
 
 `pnpm bench:startup` defines and initializes an app with 100 modules, 1,000 factory providers in
 dependency chains and 1,000 routes, 20 times in one process.
@@ -273,7 +273,7 @@ dependency chains and 1,000 routes, 20 times in one process.
 
 Two runs gave 10.2 / 3.6 ms and 11.6 / 3.8 ms.
 
-### Manifest verification (Phase 8)
+### Manifest verification (0.1.0)
 
 `BENCH_MANIFEST=1 pnpm bench:startup` builds a manifest with `describeApp()` and passes it to
 `createAvi({ manifest })`, inside the timed section.
@@ -321,7 +321,7 @@ change is kept because it removes an allocation and simplifies the code.
 
 - For parameter routes, `find` still allocates per request: the split segment array, the matched
   values, the params object and the match result. Fully static routes allocate nothing since
-  Phase 7.
+  0.1.0.
 - Percent-decoding uses `decodeURIComponent` per encoded segment.
 - Serializing responses: `JSON.stringify` is most of the work on list endpoints (about 19.5 µs of
   21 µs for 50 users in one process). A serializer compiled from the route's `response` schema is
