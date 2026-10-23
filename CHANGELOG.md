@@ -3,10 +3,24 @@
 All notable changes are listed here. Avi.js follows [Semantic Versioning](https://semver.org); all
 packages share one version.
 
-## Unreleased
+## 0.3.0 - 2026-10-23
 
 ### Added
 
+- **Typed client.** `avi client` reads an app's modules and controllers and writes `src/api.gen.ts`,
+  an `Api` type that references the app's own controllers, for both decorators and the explicit
+  API. `--check` fails in CI when it is out of date; routes it cannot follow get a warning with a
+  fix (AVI101 to AVI106).
+- **`@avijs/client`**: `createClient<Api>({ baseUrl })` calls routes by path with typed params,
+  query, body and response; non-2xx throws `AviClientError` with the status, error body and
+  request id; `api.raw` returns the `Response`. No dependencies; runs anywhere `fetch` does.
+- `createTestClient<Api>(...)` adds `client.api` with the same typed calls, returning
+  `{ ok, status, headers, body }` without throwing. Test responses gain `ok`.
+- Types for typed clients in `@avijs/core`: `MethodEndpoint`, `RouteEndpoint`, `Endpoint`,
+  `Jsonify`, `ResponseBody`, `RouteOf`.
+- Generated projects include `src/api.gen.ts`, a `client` script and a typed test.
+- Docs: chapter 15, Typed client. "Avi.js for NestJS developers" moves to the end as an appendix,
+  so Configuration and File uploads are now chapters 13 and 14.
 - A startup summary from `listen()`: modules, providers, config and routes checked, the address
   and the startup time; on failure, how far startup got, the failing step and its cause. A block in a
   terminal, one line in logs, a structured entry for loggers with `info`, nothing under
@@ -16,6 +30,10 @@ packages share one version.
 
 - Generated projects and the examples no longer print their own `Listening on` line.
 - `createTestClient` turns the startup summary off.
+- Type-only, for typed clients: `reply()` returns `Reply<T>`; `sse()` returns
+  `Reply<ReadableStream<Uint8Array>>`; `route()` returns `RouteOf<S, R>`; `defineController`
+  returns `ControllerDefinition<Routes>`; `RouteContext` carries its schema type. Runtime behavior
+  is unchanged.
 
 ## 0.2.1 - 2026-10-23
 

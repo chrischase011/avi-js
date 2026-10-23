@@ -1,4 +1,15 @@
 import {
+  fillPath,
+  queryString,
+  type ApiShape,
+  type EndpointAt,
+  type EndpointShape,
+  type Method,
+  type PathsOf,
+  type Query,
+  type RequestArgs,
+} from '@avijs/client';
+import {
   createAvi,
   type AviApp,
   type AviOptions,
@@ -7,13 +18,15 @@ import {
 } from '@avijs/core';
 
 export interface TestRequest {
-  /** Objects are sent as JSON; strings and bytes as they are. */
+  /** Objects are sent as JSON; strings, bytes and forms as they are. */
   body?: unknown;
   headers?: Record<string, string>;
-  query?: Record<string, string | readonly string[]>;
+  query?: Query;
 }
 
 export interface TestResponse {
+  /** True for a 2xx status. */
+  readonly ok: boolean;
   readonly status: number;
   readonly headers: Headers;
   /** Parsed JSON for JSON responses, otherwise the text. */
@@ -21,7 +34,7 @@ export interface TestResponse {
   readonly text: string;
 }
 
-export interface TestClient {
+export interface TestClient<A = never> {
   readonly app: AviApp;
   /** The base URL the app is listening on, such as `http://127.0.0.1:52341`. */
   readonly url: string;
@@ -31,18 +44,46 @@ export interface TestClient {
   put(path: string, body?: unknown, init?: TestRequest): Promise<TestResponse>;
   patch(path: string, body?: unknown, init?: TestRequest): Promise<TestResponse>;
   delete(path: string, init?: TestRequest): Promise<TestResponse>;
+  /**
+   * Calls typed by the `Api` that `avi client` generates, for `createTestClient<Api>(...)`.
+   * Same shape as `@avijs/client`, but a status never throws.
+   */
+  readonly api: TestApi<A>;
   /** Closes the app, which also disposes its providers. */
   close(): Promise<void>;
+}
+
+/** A response from `client.api`: `body` is typed when `ok` is true. */
+export type TypedTestResponse<T> =
+  | (Omit<TestResponse, 'ok' | 'body'> & { readonly ok: true; readonly body: T })
+  | (Omit<TestResponse, 'ok'> & { readonly ok: false });
+
+type TestCall<A, M extends Method> = <P extends PathsOf<A, M>>(
+  path: P,
+  ...args: RequestArgs<EndpointAt<A, M, P>>
+) => Promise<TypedTestResponse<ResponseOf<EndpointAt<A, M, P>>>>;
+
+type ResponseOf<E> = E extends EndpointShape ? E['response'] : never;
+
+export interface TestApi<A> {
+  readonly get: TestCall<A, 'GET'>;
+  readonly post: TestCall<A, 'POST'>;
+  readonly put: TestCall<A, 'PUT'>;
+  readonly patch: TestCall<A, 'PATCH'>;
+  readonly delete: TestCall<A, 'DELETE'>;
+  readonly head: TestCall<A, 'HEAD'>;
+  readonly options: TestCall<A, 'OPTIONS'>;
 }
 
 /**
  * Starts an app on a random local port and returns a small HTTP client for it. Pass a module and
  * options (including `overrides` to swap providers for fakes), or an app you built yourself.
+ * Pass the generated `Api` type for typed calls: `createTestClient<Api>(AppModule)`.
  */
-export async function createTestClient(
+export async function createTestClient<A extends ApiShape<A> = never>(
   target: AviApp | ModuleRef | ModuleOptions,
   options: AviOptions = {},
-): Promise<TestClient> {
+): Promise<TestClient<A>> {
   const app = isApp(target)
     ? target
     : createAvi({ startupSummary: false, ...options }).register(target);
@@ -51,9 +92,9 @@ export async function createTestClient(
 
   const request = async (method: string, path: string, init: TestRequest = {}) => {
     const headers = new Headers(init.headers);
-    let body: string | Uint8Array | undefined;
+    let body: string | Uint8Array | FormData | URLSearchParams | Blob | undefined;
     if (init.body !== undefined) {
-      if (typeof init.body === 'string' || init.body instanceof Uint8Array) {
+      if (isRawBody(init.body)) {
         body = init.body;
       } else {
         body = JSON.stringify(init.body);
@@ -68,8 +109,17 @@ export async function createTestClient(
     const text = await response.text();
     const type = response.headers.get('content-type') ?? '';
     const parsed: unknown = /[/+]json\b/.test(type) && text !== '' ? JSON.parse(text) : text;
-    return { status: response.status, headers: response.headers, body: parsed, text };
+    const { ok, status } = response;
+    return { ok, status, headers: response.headers, body: parsed, text };
   };
+
+  const typed =
+    (method: Method) =>
+    (path: string, init: TypedInit = {}) =>
+      request(method, fillPath(path, init.params), init);
+
+  const methods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'] as const;
+  const api = Object.fromEntries(methods.map((m) => [m.toLowerCase(), typed(m)]));
 
   return {
     app,
@@ -80,8 +130,23 @@ export async function createTestClient(
     put: (path, body, init) => request('PUT', path, { ...init, body }),
     patch: (path, body, init) => request('PATCH', path, { ...init, body }),
     delete: (path, init) => request('DELETE', path, init),
+    api: Object.freeze(api) as unknown as TestApi<A>,
     close: () => app.close(),
   };
+}
+
+interface TypedInit extends TestRequest {
+  params?: Readonly<Record<string, string | number>>;
+}
+
+function isRawBody(body: unknown): body is string | Uint8Array | FormData | URLSearchParams | Blob {
+  return (
+    typeof body === 'string' ||
+    body instanceof Uint8Array ||
+    body instanceof FormData ||
+    body instanceof URLSearchParams ||
+    body instanceof Blob
+  );
 }
 
 function isApp(value: unknown): value is AviApp {
@@ -91,14 +156,4 @@ function isApp(value: unknown): value is AviApp {
     typeof (value as Partial<AviApp>).listen === 'function' &&
     typeof (value as Partial<AviApp>).register === 'function'
   );
-}
-
-function queryString(query: TestRequest['query']): string {
-  if (!query) return '';
-  const params = new URLSearchParams();
-  for (const [key, value] of Object.entries(query)) {
-    for (const item of typeof value === 'string' ? [value] : value) params.append(key, item);
-  }
-  const text = params.toString();
-  return text ? `?${text}` : '';
 }

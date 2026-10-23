@@ -71,7 +71,7 @@ await app.listen(3000);
 ```
 
 ```sh
-curl localhost:3000/greet/Ada   # {"message":"Hello, Ada!"}
+curl localhost:3000/greet/Shiela   # {"message":"Hello, Shiela!"}
 ```
 
 `greeter` is typed as `GreetingService`, inferred from `inject`. No annotation needed.

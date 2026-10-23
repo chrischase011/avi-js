@@ -47,27 +47,38 @@ export interface RouteDocs {
  * schema once and use it in both places: `@Post('/', { schema: create })` and
  * `create(ctx: RouteContext<typeof create>)`.
  */
-export type RouteContext<S extends RouteSchema> = Context<InputOf<S>>;
+export type RouteContext<S extends RouteSchema> = Context<InputOf<S>> & {
+  /** Type-only: lets `avi client` find the schema from the handler. Never set. */
+  readonly '~schema'?: S;
+};
 
 /** A route whose handler is typed from its path and schema. Created with `route()`. */
-export interface TypedRoute<P extends string, S extends RouteSchema> {
+export interface TypedRoute<P extends string, S extends RouteSchema, R = ResultOf<S>> {
   readonly method: HttpMethod;
   readonly path: P;
   readonly schema?: S;
   readonly openapi?: RouteDocs;
   readonly middleware?: readonly MiddlewareRef[];
   readonly guards?: readonly GuardRef[];
-  readonly handler: (ctx: Context<InputOf<S>, PathParams<P>>) => ResultOf<S>;
+  readonly handler: (ctx: Context<InputOf<S>, PathParams<P>>) => R;
 }
+
+/** What `route()` returns: a plain `Route` that keeps its schema and result types. */
+export type RouteOf<S extends RouteSchema, R> = Route & {
+  /** Type-only, for `avi client`. Never set. */
+  readonly '~types'?: { readonly schema: S; readonly result: R };
+};
 
 /**
  * Declares a route with typed `ctx.params` (from the path) and `ctx.input` (from the schema).
  * At runtime it returns the definition unchanged.
  */
-export function route<const P extends string, S extends RouteSchema = NoInput>(
-  definition: TypedRoute<P, S>,
-): Route {
-  return definition as unknown as Route;
+export function route<
+  const P extends string,
+  S extends RouteSchema = NoInput,
+  R extends ResultOf<S> = ResultOf<S>,
+>(definition: TypedRoute<P, S, R>): RouteOf<S, R> {
+  return definition as unknown as RouteOf<S, R>;
 }
 
 export function isClass(value: unknown): boolean {

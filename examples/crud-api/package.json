@@ -6,13 +6,16 @@
   "scripts": {
     "start": "node dist/main.js",
     "smoke": "node dist/smoke.js",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "client": "avi client"
   },
   "dependencies": {
+    "@avijs/client": "workspace:*",
     "@avijs/core": "workspace:*",
     "valibot": "1.5.0"
   },
   "devDependencies": {
+    "@avijs/cli": "workspace:*",
     "@avijs/testing": "workspace:*"
   }
 }

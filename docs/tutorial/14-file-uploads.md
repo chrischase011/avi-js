@@ -1,4 +1,4 @@
-# 15. File uploads
+# 14. File uploads
 
 > **Status: Runnable.** Everything on this page works today.
 
@@ -95,4 +95,4 @@ be cleaned up in a `catch`. These limits are separate from the app's `bodyLimit`
 
 ## Next
 
-Back to the [tutorial index](README.md).
+[Chapter 15: Typed client](15-typed-client.md).

@@ -273,6 +273,9 @@ importers:
 
   examples/crud-api:
     dependencies:
+      '@avijs/client':
+        specifier: workspace:*
+        version: link:../../packages/client
       '@avijs/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -280,6 +283,9 @@ importers:
         specifier: 1.5.0
         version: 1.5.0(typescript@6.0.3)
     devDependencies:
+      '@avijs/cli':
+        specifier: workspace:*
+        version: link:../../packages/cli
       '@avijs/testing':
         specifier: workspace:*
         version: link:../../packages/testing
@@ -306,6 +312,15 @@ importers:
         specifier: 4.6.7
         version: 4.6.7
 
+  packages/client:
+    devDependencies:
+      '@avijs/core':
+        specifier: workspace:*
+        version: link:../core
+      valibot:
+        specifier: 1.5.0
+        version: 1.5.0(typescript@6.0.3)
+
   packages/compiler:
     dependencies:
       '@avijs/core':
@@ -314,6 +329,13 @@ importers:
       typescript:
         specifier: '>=5.8'
         version: 6.0.3
+    devDependencies:
+      '@avijs/client':
+        specifier: workspace:*
+        version: link:../client
+      valibot:
+        specifier: 1.5.0
+        version: 1.5.0(typescript@6.0.3)
 
   packages/core:
     dependencies:
@@ -377,9 +399,16 @@ importers:
 
   packages/testing:
     dependencies:
+      '@avijs/client':
+        specifier: workspace:*
+        version: link:../client
       '@avijs/core':
         specifier: workspace:*
         version: link:../core
+    devDependencies:
+      valibot:
+        specifier: 1.5.0
+        version: 1.5.0(typescript@6.0.3)
 
   packages/validation:
     dependencies:

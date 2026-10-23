@@ -57,7 +57,7 @@ import { AviFactory, Controller, Get, Injectable, Module } from '@avijs/core';
 @Injectable()
 class UsersService {
   findAll() {
-    return [{ id: 1, name: 'Ada' }];
+    return [{ id: 1, name: 'Shiela' }];
   }
 }
 
@@ -84,7 +84,7 @@ import { createAvi, defineController } from '@avijs/core';
 
 class UsersService {
   findAll() {
-    return [{ id: 1, name: 'Ada' }];
+    return [{ id: 1, name: 'Shiela' }];
   }
 }
 

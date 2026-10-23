@@ -1,42 +1,50 @@
-// Exercises every route through the test client, then shuts down.
+// Exercises every route through the typed client, then shuts down.
 import assert from 'node:assert/strict';
+import { AviClientError, createClient } from '@avijs/client';
 import { createTestClient } from '@avijs/testing';
+import type { Api } from './api.gen.js';
 import { AppModule } from './app.module.js';
 
-const client = await createTestClient(AppModule);
+const server = await createTestClient<Api>(AppModule);
+// What a frontend would do; Api comes from `avi client`.
+const api = createClient<Api>({ baseUrl: server.url });
 
 try {
-  const created = await client.post('/tasks', { title: '  Write docs  ' });
-  assert.equal(created.status, 201);
-  assert.equal(created.headers.get('location'), '/tasks/1');
+  const task = await api.post('/tasks', { body: { title: '  Write docs  ' } });
   assert.deepEqual(
-    { ...(created.body as object), createdAt: undefined },
+    { ...task, createdAt: undefined },
     { id: 1, title: 'Write docs', status: 'todo', createdAt: undefined },
   );
-  await client.post('/tasks', { title: 'Ship', status: 'doing' });
+  // The test client returns the status and headers too.
+  const second = await server.api.post('/tasks', { body: { title: 'Ship', status: 'doing' } });
+  assert.equal(second.status, 201);
+  assert.equal(second.headers.get('location'), '/tasks/2');
 
-  const doing = await client.get('/tasks', { query: { status: 'doing' } });
-  assert.equal((doing.body as { total: number }).total, 1);
-  const page = await client.get('/tasks', { query: { limit: '1', offset: '1' } });
+  const doing = await api.get('/tasks', { query: { status: 'doing' } });
+  assert.equal(doing.total, 1);
+  const page = await api.get('/tasks', { query: { limit: '1', offset: '1' } });
   assert.deepEqual(
-    (page.body as { items: { id: number }[] }).items.map((t) => t.id),
+    page.items.map((t) => t.id),
     [2],
   );
 
-  const updated = await client.patch('/tasks/1', { status: 'done' });
-  assert.equal((updated.body as { status: string }).status, 'done');
+  const updated = await api.patch('/tasks/:id', { params: { id: 1 }, body: { status: 'done' } });
+  assert.equal(updated.status, 'done');
 
-  assert.equal((await client.delete('/tasks/2')).status, 204);
-  assert.equal((await client.get('/tasks/2')).status, 404);
+  await api.delete('/tasks/:id', { params: { id: 2 } });
+  const missing = await api.get('/tasks/:id', { params: { id: 2 } }).catch((e: unknown) => e);
+  assert.ok(missing instanceof AviClientError);
+  assert.equal(missing.status, 404);
 
-  const invalid = await client.post('/tasks', { title: '', status: 'later' });
+  // Invalid input on purpose, so the untyped calls.
+  const invalid = await server.post('/tasks', { title: '', status: 'later' });
   assert.equal(invalid.status, 400);
   const issues = (invalid.body as { details: { issues: { path: string[] }[] } }).details.issues;
   assert.deepEqual(issues.map((issue) => issue.path[0]).sort(), ['status', 'title']);
-  assert.equal((await client.patch('/tasks/1', {})).status, 400);
-  assert.equal((await client.get('/tasks/abc')).status, 400);
+  assert.equal((await server.patch('/tasks/1', {})).status, 400);
+  assert.equal((await server.get('/tasks/abc')).status, 400);
 } finally {
-  await client.close();
+  await server.close();
 }
 
 console.log('crud-api smoke check passed');

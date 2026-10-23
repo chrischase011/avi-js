@@ -52,7 +52,7 @@ src/
 ```ts
 // src/services/users.ts
 export class UsersService {
-  #users = [{ id: '1', name: 'Ada' }];
+  #users = [{ id: '1', name: 'Shiela' }];
 
   findAll() {
     return this.#users;
@@ -107,7 +107,7 @@ import { Injectable } from '@avijs/core';
 
 @Injectable()
 export class UsersService {
-  #users = [{ id: '1', name: 'Ada' }];
+  #users = [{ id: '1', name: 'Shiela' }];
 
   findAll() {
     return this.#users;

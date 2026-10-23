@@ -166,6 +166,20 @@ describe.each(TEMPLATES.flatMap((t) => VALIDATORS.map((v) => [t, v] as const)))(
       log.mockRestore();
       expect(code).toBe(0);
     }, 60_000);
+
+    it('ships the Api that avi client generates', async () => {
+      const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+      const code = await main([
+        'client',
+        '--project',
+        path.join(project, 'tsconfig.json'),
+        '--out',
+        path.join(project, 'src/api.gen.ts'),
+        '--check',
+      ]);
+      log.mockRestore();
+      expect(code).toBe(0);
+    }, 60_000);
   },
 );
 
@@ -213,6 +227,8 @@ describe('avi', () => {
   });
 });
 
+const CLIENT_NOTE = 'Run `avi client` to add the new routes to src/api.gen.ts.';
+
 describe('avi generate', () => {
   async function project(
     template: 'modular' | 'minimal',
@@ -259,10 +275,12 @@ describe('avi generate', () => {
     expect((await generate(dir, 'co', 'posts')).out).toEqual([
       'CREATE src/modules/posts/posts.controller.ts',
       'UPDATE src/modules/posts/posts.module.ts',
+      CLIENT_NOTE,
     ]);
     expect((await generate(dir, 'controller', 'admin/reports')).out).toEqual([
       'CREATE src/modules/admin/reports/reports.controller.ts',
       'UPDATE src/app.module.ts',
+      CLIENT_NOTE,
     ]);
 
     expect(await read(dir, 'src/modules/posts/posts.module.ts')).toBe(
@@ -302,6 +320,7 @@ export class PostsModule {}
     expect((await generate(dir, 'controller', 'posts')).out).toEqual([
       'CREATE src/routes/posts.ts',
       'UPDATE src/app.ts',
+      CLIENT_NOTE,
     ]);
     const app = await read(dir, 'src/app.ts');
     expect(app).toContain('providers: [UsersService, PostsService]');
@@ -414,6 +433,7 @@ export class PostsModule {}
               `CREATE ${folder}/categories.controller.ts`,
               'UPDATE src/app.module.ts',
               NOTE,
+              CLIENT_NOTE,
             ]
           : [
               `CREATE ${folder}/categories.module.ts`,
@@ -421,6 +441,7 @@ export class PostsModule {}
               `CREATE ${folder}/categories.service.ts`,
               `CREATE ${folder}/categories.controller.ts`,
               'UPDATE src/app.module.ts',
+              CLIENT_NOTE,
             ],
       );
       expect(await read(dir, 'src/app.module.ts')).toContain(
@@ -446,12 +467,14 @@ export class PostsModule {}
               'CREATE src/routes/categories.ts',
               'UPDATE src/app.ts',
               NOTE,
+              CLIENT_NOTE,
             ]
           : [
               'CREATE src/schemas/categories.ts',
               'CREATE src/services/categories.ts',
               'CREATE src/routes/categories.ts',
               'UPDATE src/app.ts',
+              CLIENT_NOTE,
             ],
       );
       const app = await read(dir, 'src/app.ts');

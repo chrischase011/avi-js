@@ -178,4 +178,4 @@ providers, use middleware and guards ([Chapter 5](05-request-pipeline.md)).
 
 ## Next
 
-[Chapter 13: Avi.js for NestJS developers](13-from-nestjs.md).
+[Chapter 13: Configuration](13-configuration.md).

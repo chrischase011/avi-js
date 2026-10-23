@@ -1,10 +1,18 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { checkInjectLists, main, serializeManifest, writeManifest } from '../src/index.js';
-import { describeApp } from '@avijs/core';
+import ts from 'typescript';
+import { readProgram } from '../src/check.js';
+import {
+  checkInjectLists,
+  generateClient,
+  main,
+  serializeManifest,
+  writeManifest,
+} from '../src/index.js';
+import { createAvi, describeApp, type AviApp, type ModuleRef } from '@avijs/core';
 
 const fixtures = fileURLToPath(new URL('./fixtures/', import.meta.url));
 const project = path.join(fixtures, 'tsconfig.json');
@@ -136,5 +144,94 @@ describe('cli', () => {
     expect(await main([])).toBe(2);
     expect(error).toHaveBeenCalledWith(expect.stringContaining('Usage:'));
     error.mockRestore();
+  });
+});
+
+describe('generateClient', { timeout: 60_000 }, () => {
+  const client = path.join(fixtures, 'client');
+  const generate = (dir: string) =>
+    generateClient({
+      project: path.join(dir, 'tsconfig.json'),
+      out: path.join(dir, 'src/api.gen.ts'),
+    });
+
+  it('generates the committed Api for the fixture app', async () => {
+    const result = generate(client);
+    expect(result.source).toBe(await readFile(path.join(client, 'src/api.gen.ts'), 'utf8'));
+  });
+
+  it('explains every route it cannot reference', () => {
+    const found = generate(client).diagnostics.map((d) => [path.basename(d.file), d.line, d.code]);
+    expect(found).toEqual([
+      ['items.module.ts', 5, 'AVI102'],
+      ['items.module.ts', 15, 'AVI102'],
+      ['items.module.ts', 17, 'AVI102'],
+      ['users.controller.ts', 27, 'AVI105'],
+    ]);
+  });
+
+  it('gives a frontend exact types (consumer.ts asserts them)', () => {
+    const { program } = readProgram(path.join(client, 'tsconfig.json'));
+    const errors = ts
+      .getPreEmitDiagnostics(program)
+      .map((d) => ts.flattenDiagnosticMessageText(d.messageText, '\n'));
+    expect(errors).toEqual([]);
+  });
+
+  // Loaded by URL so this test program does not type-check the examples.
+  const example = async (name: string, file: string) =>
+    (await import(new URL(`../../../examples/${name}/src/${file}`, import.meta.url).href)) as {
+      AppModule?: ModuleRef;
+      createApp?: (options?: object) => AviApp;
+    };
+
+  it.each([
+    ['basic-api', async () => (await example('basic-api', 'app.ts')).createApp?.()],
+    ['modular-api', async () => (await example('modular-api', 'app.module.ts')).AppModule],
+    ['crud-api', async () => (await example('crud-api', 'app.module.ts')).AppModule],
+    ['auth-api', async () => (await example('auth-api', 'app.ts')).createApp?.({ secret: 'test' })],
+  ])('finds the same routes as the running %s', async (name, start) => {
+    const dir = fileURLToPath(new URL(`../../../examples/${name}/`, import.meta.url));
+    const result = generate(dir);
+    expect(result.diagnostics).toEqual([]);
+
+    const loaded = await start();
+    if (!loaded) throw new Error(`Cannot load ${name}`);
+    const app = 'listen' in loaded ? loaded : createAvi().register(loaded);
+    await app.init();
+    try {
+      const running = app.routes().map((r) => `${r.method} ${r.path}`);
+      expect(result.routes.map((r) => `${r.method} ${r.path}`).sort()).toEqual(running.sort());
+    } finally {
+      await app.close();
+    }
+  });
+});
+
+describe('avi-compile client', { timeout: 60_000 }, () => {
+  const client = path.join(fixtures, 'client');
+  const project = path.join(client, 'tsconfig.json');
+  let dir: string | undefined;
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    if (dir) await rm(dir, { recursive: true, force: true });
+  });
+
+  it('writes the file, then --check passes until routes change', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    dir = await mkdtemp(path.join(tmpdir(), 'avi-client-'));
+    const out = path.join(dir, 'api', 'api.gen.ts');
+
+    expect(await main(['client', '--project', project, '--out', out])).toBe(0);
+    expect(log).toHaveBeenCalledWith(`Wrote ${out}: 7 routes`);
+    expect(await main(['client', '--project', project, '--out', out, '--check'])).toBe(0);
+
+    // Reformatting is fine; a missing route is not.
+    const source = await readFile(out, 'utf8');
+    await writeFile(out, source.replaceAll(';', '').replaceAll('  ', '    '));
+    expect(await main(['client', '--project', project, '--out', out, '--check'])).toBe(0);
+    await writeFile(out, source.replace(/^.*'GET \/users'.*\n/m, ''));
+    expect(await main(['client', '--project', project, '--out', out, '--check'])).toBe(1);
+    expect(log).toHaveBeenLastCalledWith(`${out} is out of date: run avi client`);
   });
 });

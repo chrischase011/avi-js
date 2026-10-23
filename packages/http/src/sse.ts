@@ -28,7 +28,11 @@ const HEARTBEAT = encoder.encode(': ping\n\n');
  * them. `source` gets an abort signal for the client's disconnect; its `finally` blocks run when
  * the stream ends for any reason.
  */
-export function sse(ctx: Context, source: SseSource, options: SseOptions = {}): Reply {
+export function sse(
+  ctx: Context,
+  source: SseSource,
+  options: SseOptions = {},
+): Reply<ReadableStream<Uint8Array>> {
   const heartbeat = options.heartbeat ?? 15_000;
   if (heartbeat !== false && (!Number.isInteger(heartbeat) || heartbeat <= 0)) {
     throw new RangeError(

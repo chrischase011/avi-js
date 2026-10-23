@@ -16,17 +16,8 @@ export interface Diagnostic {
  * Decorated classes get this from the compiler already; this covers undecorated ones too.
  */
 export function checkInjectLists(project: string): Diagnostic[] {
-  const config = ts.getParsedCommandLineOfConfigFile(path.resolve(project), undefined, {
-    ...ts.sys,
-    onUnRecoverableConfigFileDiagnostic: (diagnostic) => {
-      throw new Error(ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'));
-    },
-  });
-  if (!config) throw new Error(`Cannot read ${project}`);
-
-  const program = ts.createProgram({ rootNames: config.fileNames, options: config.options });
+  const { program, roots } = readProgram(project);
   const checker = program.getTypeChecker();
-  const roots = new Set(config.fileNames.map((file) => path.resolve(file)));
   const diagnostics: Diagnostic[] = [];
 
   for (const source of program.getSourceFiles()) {
@@ -41,6 +32,20 @@ export function checkInjectLists(project: string): Diagnostic[] {
   return diagnostics.sort((a, b) =>
     a.file === b.file ? a.line - b.line || a.column - b.column : a.file.localeCompare(b.file),
   );
+}
+
+/** The project's program, and its own files (absolute paths). */
+export function readProgram(project: string): { program: ts.Program; roots: Set<string> } {
+  const config = ts.getParsedCommandLineOfConfigFile(path.resolve(project), undefined, {
+    ...ts.sys,
+    onUnRecoverableConfigFileDiagnostic: (diagnostic) => {
+      throw new Error(ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'));
+    },
+  });
+  if (!config) throw new Error(`Cannot read ${project}`);
+
+  const program = ts.createProgram({ rootNames: config.fileNames, options: config.options });
+  return { program, roots: new Set(config.fileNames.map((file) => path.resolve(file))) };
 }
 
 function checkClass(
@@ -128,7 +133,7 @@ function checkClass(
   });
 }
 
-function unwrap(expression: ts.Expression | undefined): ts.Expression | undefined {
+export function unwrap(expression: ts.Expression | undefined): ts.Expression | undefined {
   let current = expression;
   while (
     current &&

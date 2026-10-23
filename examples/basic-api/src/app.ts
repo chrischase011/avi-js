@@ -5,16 +5,16 @@ interface User {
   name: string;
 }
 
-const users: User[] = [{ id: 1, name: 'Ada' }];
+const users: User[] = [{ id: 1, name: 'Shiela' }];
 
-const hello = defineController({
+export const hello = defineController({
   routes: [
     { method: 'GET', path: '/', handler: () => ({ message: 'Hello, Avi' }) },
     { method: 'GET', path: '/health', handler: () => 'ok' },
   ],
 });
 
-const usersController = defineController({
+export const usersController = defineController({
   prefix: '/users',
   routes: [
     { method: 'GET', path: '/', handler: () => users },

@@ -125,7 +125,8 @@ writeFileSync(
 writeFileSync(
   path.join(consumer, 'src/app.ts'),
   `import assert from 'node:assert/strict';
-import { AviFactory, Controller, Get, Injectable, Module, createToken, route, defineController, type Context } from '@avijs/core';
+import { AviFactory, Controller, Get, Injectable, Module, createToken, route, defineController, type Context, type MethodEndpoint } from '@avijs/core';
+import { createClient } from '@avijs/client';
 import { createTestClient } from '@avijs/testing';
 import { generateOpenApi } from '@avijs/openapi';
 import { cors } from '@avijs/security';
@@ -158,10 +159,13 @@ class AppModule {}
 
 const app = await AviFactory.create(AppModule, { onRequest: [cors({ origin: 'https://a.example' })] });
 const client = await createTestClient(app);
-assert.deepEqual((await client.get('/greet/Ada')).body, { message: 'Hello, Ada!' });
+assert.deepEqual((await client.get('/greet/Shiela')).body, { message: 'Hello, Shiela!' });
 assert.equal((await client.post('/items', {})).status, 400);
-assert.equal((await client.get('/greet/Ada', { headers: { origin: 'https://a.example' } })).headers.get('access-control-allow-origin'), 'https://a.example');
+assert.equal((await client.get('/greet/Shiela', { headers: { origin: 'https://a.example' } })).headers.get('access-control-allow-origin'), 'https://a.example');
 assert.ok(generateOpenApi(app, { info: { title: 'T', version: '1' } }).paths['/greet/{name}']);
+interface Api { 'GET /greet/:name': MethodEndpoint<'/greet/:name', GreetController['greet']> }
+const greeting: { message: string } = await createClient<Api>({ baseUrl: client.url }).get('/greet/:name', { params: { name: 'Shiela' } });
+assert.deepEqual(greeting, { message: 'Hello, Shiela!' });
 await client.close();
 console.log('consumer app ok');
 `,
@@ -173,6 +177,7 @@ const core = require('@avijs/core');
 assert.equal(typeof core.createAvi, 'function');
 assert.equal(typeof require('@avijs/testing').createTestClient, 'function');
 assert.equal(typeof require('@avijs/multipart').readForm, 'function');
+assert.equal(typeof require('@avijs/client').createClient, 'function');
 console.log('require(esm) ok');
 `,
 );

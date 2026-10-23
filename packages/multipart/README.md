@@ -19,5 +19,5 @@ const { fields, files } = await readForm(ctx);
 ```
 
 Part of [Avi.js](https://github.com/chrischase011/avi-js). See the
-[file uploads chapter](https://chrischase011.github.io/avi-js/tutorial/15-file-uploads) of the
+[file uploads chapter](https://chrischase011.github.io/avi-js/tutorial/14-file-uploads) of the
 tutorial. Requires Node.js 22.12 or newer. MIT licensed.

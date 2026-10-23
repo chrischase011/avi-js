@@ -30,7 +30,7 @@ export function sendValue(res: ServerResponse, value: unknown, options: SendOpti
   let status: number | undefined;
   let headers: OutgoingHttpHeaders | undefined;
   if (value instanceof Reply) {
-    ({ body, status, headers } = value);
+    ({ body, status, headers } = value as Reply);
   }
 
   if (body instanceof Response) {

@@ -30,6 +30,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@avijs/cli': src('cli'),
+      '@avijs/client': src('client'),
       '@avijs/compiler': src('compiler'),
       'create-avi': src('create-avi'),
       '@avijs/core': src('core'),

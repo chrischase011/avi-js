@@ -1,4 +1,4 @@
-# 13. Avi.js for NestJS developers
+# Avi.js for NestJS developers
 
 > **Status: Runnable.** A map of familiar NestJS ideas to their Avi.js equivalents.
 
@@ -122,4 +122,4 @@ whichever style suits each part of an app.
 
 ## Next
 
-[Chapter 14: Configuration](14-configuration.md), or back to the [tutorial index](README.md).
+Back to the [tutorial index](README.md).

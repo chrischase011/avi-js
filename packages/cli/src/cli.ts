@@ -25,7 +25,10 @@ ${GENERATE_USAGE}
   avi check [--project tsconfig.json]
       Type-check every static inject list.
   avi manifest <entry.js> [--export AppModule] [--out avi.manifest.json]
-      Describe the app's modules, providers and routes.`;
+      Describe the app's modules, providers and routes.
+  avi client [--out src/api.gen.ts] [--project tsconfig.json] [--root file.ts#AppModule] [--check]
+      Generate the typed Api for @avijs/client from the app's routes. --check fails when the
+      file is out of date, for CI.`;
 
 export async function main(argv: readonly string[]): Promise<number> {
   const [command, ...rest] = argv;
@@ -39,6 +42,7 @@ export async function main(argv: readonly string[]): Promise<number> {
       return dev(rest);
     case 'check':
     case 'manifest':
+    case 'client':
       return compile(argv);
     default:
       console.error(USAGE);

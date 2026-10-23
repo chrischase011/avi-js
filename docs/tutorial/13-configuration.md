@@ -1,4 +1,4 @@
-# 14. Configuration
+# 13. Configuration
 
 > **Status: Runnable.** Everything on this page works today.
 
@@ -101,4 +101,4 @@ const client = await createTestClient(AppModule, {
 
 ## Next
 
-[Chapter 15: File uploads](15-file-uploads.md).
+[Chapter 14: File uploads](14-file-uploads.md).

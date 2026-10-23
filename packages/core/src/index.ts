@@ -40,6 +40,7 @@ export type {
   Route,
   RouteContext,
   RouteDocs,
+  RouteOf,
   TypedRoute,
 } from './pipeline.js';
 export type {
@@ -93,3 +94,4 @@ export type {
   TokenType,
   ValueProvider,
 } from '@avijs/di';
+export type { Endpoint, Jsonify, MethodEndpoint, ResponseBody, RouteEndpoint } from './endpoint.js';

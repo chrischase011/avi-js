@@ -35,7 +35,7 @@ import { AviFactory, Controller, Get, Injectable, Module, type Context } from '@
 @Injectable()
 class UsersService {
   findAll() {
-    return [{ id: 1, name: 'Ada' }];
+    return [{ id: 1, name: 'Shiela' }];
   }
 
   findOne(id: number) {
@@ -155,7 +155,7 @@ Avi.js is inspired by NestJS, so the decorators will look familiar. A few work d
 | `forwardRef()`                               | Cycles are reported at startup instead |
 
 Standard decorators have no parameter decorators, so handlers read everything from `ctx`.
-[Chapter 13](13-from-nestjs.md) has the full concept map.
+[Avi.js for NestJS developers](99-from-nestjs.md) has the full concept map.
 
 ## Tooling setup
 

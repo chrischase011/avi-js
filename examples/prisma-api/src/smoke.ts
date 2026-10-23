@@ -4,12 +4,12 @@ import { createTestClient } from '@avijs/testing';
 import { AppModule } from './app.module.js';
 
 const client = await createTestClient(AppModule);
-const email = `ada-${String(Date.now())}@example.com`;
+const email = `shiela-${String(Date.now())}@example.com`;
 
 try {
-  const ada = await client.post('/users', { email: ` ${email.toUpperCase()} `, name: 'Ada' });
-  assert.equal(ada.status, 201);
-  const user = ada.body as { id: number; email: string };
+  const shiela = await client.post('/users', { email: ` ${email.toUpperCase()} `, name: 'Shiela' });
+  assert.equal(shiela.status, 201);
+  const user = shiela.body as { id: number; email: string };
   assert.equal(user.email, email);
   assert.equal((await client.post('/users', { email, name: 'Again' })).status, 409);
 

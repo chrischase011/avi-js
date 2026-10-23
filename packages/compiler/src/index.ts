@@ -2,3 +2,5 @@ export { checkInjectLists } from './check.js';
 export type { Diagnostic } from './check.js';
 export { main } from './cli.js';
 export { serializeManifest, writeManifest } from './manifest.js';
+export { generateClient } from './client.js';
+export type { ClientRoute, GenerateClientOptions, GeneratedClient } from './client.js';

@@ -3,7 +3,10 @@ import type { HttpMethod } from '@avijs/http';
 import { checkRouteSchema } from '@avijs/validation';
 import { checkRefs, type GuardRef, type MiddlewareRef, type Route } from './pipeline.js';
 
-export interface ControllerOptions<K extends readonly Token[] = []> {
+export interface ControllerOptions<
+  K extends readonly Token[] = [],
+  R extends readonly Route[] = readonly Route[],
+> {
   /** Used in manifests and error messages. Default: 'controller <prefix>'. */
   name?: string;
   /** Path prefix for every route. Default: `/`. */
@@ -14,7 +17,7 @@ export interface ControllerOptions<K extends readonly Token[] = []> {
   middleware?: readonly MiddlewareRef[];
   /** Checked for every route in this controller, after app and module guards. */
   guards?: readonly GuardRef[];
-  routes: readonly Route[] | ((...deps: ResolveTokens<K>) => readonly Route[]);
+  routes: R | ((...deps: ResolveTokens<K>) => R);
 }
 
 /** The normalized shape both controller styles produce. */
@@ -23,7 +26,7 @@ export interface StaticRoute {
   readonly path: string;
 }
 
-export interface ControllerDefinition {
+export interface ControllerDefinition<R extends readonly Route[] = readonly Route[]> {
   readonly name: string;
   readonly prefix: string;
   readonly inject: readonly Token[];
@@ -32,11 +35,14 @@ export interface ControllerDefinition {
   /** Routes known without creating the controller; 'dynamic' for a routes factory. */
   readonly staticRoutes: readonly StaticRoute[] | 'dynamic';
   createRoutes(deps: readonly unknown[]): readonly Route[];
+  /** Type-only: the routes as written, for `avi client`. Never set. */
+  readonly '~routes'?: R;
 }
 
-export function defineController<const K extends readonly Token[] = []>(
-  options: ControllerOptions<K>,
-): ControllerDefinition {
+export function defineController<
+  const K extends readonly Token[] = [],
+  const R extends readonly Route[] = readonly Route[],
+>(options: ControllerOptions<K, R>): ControllerDefinition<R> {
   const prefix = options.prefix ?? '/';
   if (!prefix.startsWith('/')) {
     throw new TypeError(`Controller prefix must start with "/": ${prefix}`);
