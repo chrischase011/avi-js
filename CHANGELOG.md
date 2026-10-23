@@ -3,6 +3,38 @@
 All notable changes are listed here. Avi.js follows [Semantic Versioning](https://semver.org); all
 packages share one version.
 
+## 0.2.0 - 2026-10-23
+
+### Added
+
+- `RouteContext<typeof schema>` types a decorator handler from its route schema object, instead of
+  `Context<InputOf<{ body: typeof X }>>`. Generated code and the examples use it.
+- `sse(ctx, generator)` streams server-sent events with backpressure, heartbeats and an abort
+  signal for client disconnects.
+- Request ids: `ctx.id`, sent back as `x-request-id` (an incoming one is reused), passed to
+  `onResponse` and to error logs. Configure or turn off with `requestId`.
+- `jsonLogger()` writes JSON lines; `logRequests(logger)` logs every response. `Logger` gains
+  optional `warn` and `info`, and `error` receives `{ requestId, method, path }`.
+- `defineConfig(schema)`: typed config from environment variables and an optional `.env` file,
+  validated at startup with every problem listed and values redacted. Inject it with
+  `Config.module`; `avi check` understands config tokens. New projects get a `src/config.ts`.
+- `rateLimit({ limit, window })` in `@avijs/security`: `429` with `Retry-After` and `RateLimit-*`
+  headers, per-route limits through `.guard`, a capped in-memory store and a pluggable store.
+- `ctx.ip`, with a `trustProxy` option for apps behind proxies (`X-Forwarded-For` is ignored by
+  default).
+- `@avijs/multipart`: `multipart(ctx)` streams uploads part by part and `readForm(ctx)` buffers
+  small forms, with size and count limits on by default (`413`), built on `@fastify/busboy`.
+- `avi new --validator valibot|zod|none` (default `valibot`): the templates validate the users
+  routes with route schemas, including response schemas. `npm create avi` asks for it.
+- `avi g resource` generates schemas with the project's Valibot or Zod (or `--validator`): request
+  bodies drop unknown fields, and updates need at least one field.
+
+### Changed
+
+- `generateOpenApi` names the route and schema when a JSON Schema converter fails.
+- Generating a resource without a validation library prints a note that request bodies are stored
+  as sent.
+
 ## 0.1.2 - 2026-10-22
 
 ### Added
