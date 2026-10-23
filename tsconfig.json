@@ -9,6 +9,7 @@
     { "path": "./packages/testing/tsconfig.build.json" },
     { "path": "./packages/openapi/tsconfig.build.json" },
     { "path": "./packages/security/tsconfig.build.json" },
+    { "path": "./packages/multipart/tsconfig.build.json" },
     { "path": "./packages/cli/tsconfig.build.json" },
     { "path": "./packages/create-avi/tsconfig.build.json" },
     { "path": "./examples/basic-api/tsconfig.build.json" },

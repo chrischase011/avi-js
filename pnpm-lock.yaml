@@ -298,6 +298,13 @@ importers:
       typescript:
         specifier: '>=5.8'
         version: 6.0.3
+    devDependencies:
+      valibot:
+        specifier: 1.5.0
+        version: 1.5.0(typescript@6.0.3)
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
 
   packages/compiler:
     dependencies:
@@ -337,15 +344,30 @@ importers:
 
   packages/http: {}
 
+  packages/multipart:
+    dependencies:
+      '@avijs/http':
+        specifier: workspace:*
+        version: link:../http
+      '@fastify/busboy':
+        specifier: 3.2.4
+        version: 3.2.4
+
   packages/openapi:
     dependencies:
       '@avijs/core':
         specifier: workspace:*
         version: link:../core
     devDependencies:
+      '@valibot/to-json-schema':
+        specifier: 1.8.0
+        version: 1.8.0(valibot@1.5.0(typescript@6.0.3))
       valibot:
         specifier: 1.5.0
         version: 1.5.0(typescript@6.0.3)
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
 
   packages/security:
     dependencies:
@@ -460,6 +482,9 @@ packages:
 
   '@fastify/ajv-compiler@4.0.7':
     resolution: {integrity: sha512-VP0yIfwlc1ohj733keYDqyHm1VWeP9VQxYomunhr90jkC4aNNibbkrRiaNgPgqj1ORxUenILR4qzA/ppYBNAtQ==}
+
+  '@fastify/busboy@3.2.4':
+    resolution: {integrity: sha512-lQS8xcXT54rdJb+wlG/Q7SMSdtkZEpLPHooSDUZyyZm9LJD7X1kONPhVoPaHq+dsPtWUGGLIz9gBNhs9qKbylw==}
 
   '@fastify/cors@11.3.1':
     resolution: {integrity: sha512-gZXNzd6FLHzOIfvoK4+Az3Wko2V6Y0MIsLxpyo4AEYl7a9q1JBPwPaxLea4nkr++8FCiJiPpYYo6E02uZW0dqw==}
@@ -852,6 +877,11 @@ packages:
 
   '@ungap/structured-clone@1.4.0':
     resolution: {integrity: sha512-1mEZtMKPM09vDmQt5y7YvmN2+DFTP7Tg0EWXdic8/C6VRnpb33e4ghisCIE3WZjsE2N8mf+QV1Zqh7ZFYLWInQ==}
+
+  '@valibot/to-json-schema@1.8.0':
+    resolution: {integrity: sha512-a0M+uwCuQZEPAo65NYkFSJ14O5c213KoSZmPdoCfuFvUhfULi4T2Z6Tpjv6lTVMW9RoLm74RpRAjNEa43KcN+g==}
+    peerDependencies:
+      valibot: ^1.5.0
 
   '@vitejs/plugin-vue@6.0.10':
     resolution: {integrity: sha512-b80aUQh3n+qEzzZm5oQp3rT2QImeCx58K6eFl/RkJ3d65KW0kTuv5lNsLRVAjbW9YRUpo/wzmvzMgV34bTAItA==}
@@ -2264,6 +2294,9 @@ packages:
     resolution: {integrity: sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==}
     engines: {node: '>=10'}
 
+  zod@4.6.7:
+    resolution: {integrity: sha512-g8W2D2kU6a8untc053fX1uVBKzM7yqAxW/3zwk83+6RyF2+SKOuV+c0wBDhUwzV1PaGapmZH+rmcUzPf+3CGwg==}
+
   zwitch@2.0.4:
     resolution: {integrity: sha512-bXE4cR/kVZhKZX/RjPEflHaKVhUVl85noU3v6b8apfQEc1x4A+zBxjZ4lN8LqGd6WZ3dl98pY4o717VFmoPp+A==}
 
@@ -2346,6 +2379,8 @@ snapshots:
       ajv: 8.20.0
       ajv-formats: 3.0.1(ajv@8.20.0)
       fast-uri: 4.2.3
+
+  '@fastify/busboy@3.2.4': {}
 
   '@fastify/cors@11.3.1':
     dependencies:
@@ -2726,6 +2761,10 @@ snapshots:
       eslint-visitor-keys: 5.0.1
 
   '@ungap/structured-clone@1.4.0': {}
+
+  '@valibot/to-json-schema@1.8.0(valibot@1.5.0(typescript@6.0.3))':
+    dependencies:
+      valibot: 1.5.0(typescript@6.0.3)
 
   '@vitejs/plugin-vue@6.0.10(vite@8.3.4(@types/node@22.20.5))(vue@3.5.44(typescript@6.0.3))':
     dependencies:
@@ -4142,5 +4181,7 @@ snapshots:
   wrappy@1.0.2: {}
 
   yocto-queue@0.1.0: {}
+
+  zod@4.6.7: {}
 
   zwitch@2.0.4: {}

@@ -172,6 +172,7 @@ writeFileSync(
 const core = require('@avijs/core');
 assert.equal(typeof core.createAvi, 'function');
 assert.equal(typeof require('@avijs/testing').createTestClient, 'function');
+assert.equal(typeof require('@avijs/multipart').readForm, 'function');
 console.log('require(esm) ok');
 `,
 );
