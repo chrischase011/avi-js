@@ -1,4 +1,4 @@
-import { createToken } from '@avijs/core';
+import { createToken, defineConfig, type StandardSchemaV1 } from '@avijs/core';
 
 class Db {
   query() {
@@ -85,4 +85,17 @@ export class PrismaLike {
 export class GenericMismatch {
   static inject = [Client] as const;
   constructor(readonly db: Db) {}
+}
+
+// Config tokens are InjectionToken subtypes; they resolve to the schema's output.
+const Settings = defineConfig({} as StandardSchemaV1<unknown, { port: number }>);
+
+export class UsesSettings {
+  static inject = [Settings] as const;
+  constructor(readonly settings: { port: number }) {}
+}
+
+export class WrongSettings {
+  static inject = [Settings] as const;
+  constructor(readonly port: string) {}
 }

@@ -59,6 +59,17 @@ describe('checkInjectLists', () => {
     ]);
   });
 
+  it('resolves config tokens to their schema output', () => {
+    expect(forClass('UsesSettings')).toEqual([]);
+    expect(forClass('WrongSettings')).toEqual([
+      expect.objectContaining({
+        code: 'AVI004',
+        message:
+          'WrongSettings.inject[0] provides { port: number; }, but parameter "port" expects string',
+      }),
+    ]);
+  });
+
   it('warns about lists it cannot check', () => {
     expect(forClass('Dynamic')).toEqual([
       expect.objectContaining({ code: 'AVI002', severity: 'warning' }),
@@ -116,7 +127,7 @@ describe('cli', () => {
   it('exits 1 when inject lists have errors', async () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
     expect(await main(['check', '--project', project])).toBe(1);
-    expect(log).toHaveBeenLastCalledWith('5 error(s), 1 warning(s) in static inject lists');
+    expect(log).toHaveBeenLastCalledWith('6 error(s), 1 warning(s) in static inject lists');
     log.mockRestore();
   });
 

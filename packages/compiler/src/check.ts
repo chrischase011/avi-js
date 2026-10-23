@@ -159,5 +159,13 @@ function tokenType(
     const value = checker.getTypeArguments(type as ts.TypeReference)[0];
     return value && { type: value, generic: false };
   }
+  // Subtypes such as config tokens: InjectionToken<T> carries T in a phantom `[tokenType]` key.
+  const phantom = type
+    .getProperties()
+    .find((property) => property.getEscapedName().toString().startsWith('__@tokenType'));
+  if (phantom) {
+    const value = checker.getNonNullableType(checker.getTypeOfSymbolAtLocation(phantom, element));
+    return { type: value, generic: false };
+  }
   return undefined;
 }
