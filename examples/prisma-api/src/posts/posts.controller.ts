@@ -5,8 +5,8 @@ import {
   Patch,
   Post,
   reply,
-  type Context,
-  type InputOf,
+  type RouteContext,
+  type RouteSchema,
 } from '@avijs/core';
 import * as v from 'valibot';
 import { Id } from '../schemas.js';
@@ -27,29 +27,33 @@ const ListPosts = v.object({
   ),
 });
 
+const list = { query: ListPosts } satisfies RouteSchema;
+const create = { body: CreatePost } satisfies RouteSchema;
+const byId = { params: Id } satisfies RouteSchema;
+
 @Controller('/posts')
 export class PostsController {
   static inject = [PostsService] as const;
 
   constructor(private readonly posts: PostsService) {}
 
-  @Get('/', { schema: { query: ListPosts } })
-  list(ctx: Context<InputOf<{ query: typeof ListPosts }>>) {
+  @Get('/', { schema: list })
+  list(ctx: RouteContext<typeof list>) {
     return this.posts.list(ctx.input.query.published);
   }
 
-  @Post('/', { schema: { body: CreatePost } })
-  async create(ctx: Context<InputOf<{ body: typeof CreatePost }>>) {
+  @Post('/', { schema: create })
+  async create(ctx: RouteContext<typeof create>) {
     return reply(await this.posts.create(ctx.input.body), { status: 201 });
   }
 
-  @Patch('/:id/publish', { schema: { params: Id } })
-  publish(ctx: Context<InputOf<{ params: typeof Id }>>) {
+  @Patch('/:id/publish', { schema: byId })
+  publish(ctx: RouteContext<typeof byId>) {
     return this.posts.publish(ctx.input.params.id);
   }
 
-  @Delete('/:id', { schema: { params: Id } })
-  remove(ctx: Context<InputOf<{ params: typeof Id }>>) {
+  @Delete('/:id', { schema: byId })
+  remove(ctx: RouteContext<typeof byId>) {
     return this.posts.remove(ctx.input.params.id);
   }
 }
