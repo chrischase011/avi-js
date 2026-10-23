@@ -233,7 +233,11 @@ describe('errors', () => {
     const body = await res.text();
     expect(JSON.parse(body)).toEqual({ statusCode: 500, error: 'Internal Server Error' });
     expect(body).not.toContain('hunter2');
-    expect(logger.error).toHaveBeenCalledWith('Request failed: GET /boom', error);
+    expect(logger.error).toHaveBeenCalledWith(
+      'Request failed: GET /boom',
+      error,
+      expect.objectContaining({ method: 'GET' }),
+    );
   });
 
   it('handles rejected promises the same way', async () => {

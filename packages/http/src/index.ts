@@ -8,6 +8,18 @@ export type { HttpMethod } from './methods.js';
 export { isReply, reply } from './reply.js';
 export type { Reply, ReplyInit } from './reply.js';
 export { Router } from './router.js';
+export { sse } from './sse.js';
+export type { ServerSentEvent, SseOptions, SseSource } from './sse.js';
 export type { Handler, Params, RouteDefinition, RouteMatch } from './router.js';
+export { jsonLogger, logRequests } from './logging.js';
+export type { JsonLoggerOptions, LogRequestsOptions } from './logging.js';
 export { HttpServer } from './server.js';
-export type { ErrorHandler, Logger, RequestHook, ResponseInfo, ServerOptions } from './server.js';
+export type {
+  ErrorHandler,
+  LogFields,
+  Logger,
+  RequestHook,
+  RequestIdOptions,
+  ResponseInfo,
+  ServerOptions,
+} from './server.js';

@@ -187,6 +187,7 @@ describe('streamed responses', () => {
     expect(logger.error).toHaveBeenCalledWith(
       'Response stream failed: GET /',
       expect.objectContaining({ message: 'disk gone' }),
+      expect.objectContaining({ method: 'GET' }),
     );
   });
 });

@@ -1,5 +1,7 @@
+import { randomUUID } from 'node:crypto';
 import {
   createServer,
+  validateHeaderName,
   type IncomingMessage,
   type OutgoingHttpHeaders,
   type Server,
@@ -14,8 +16,29 @@ import type { HttpMethod } from './methods.js';
 import { clearHeaders, sendError, sendOptions, sendValue, statusOf } from './respond.js';
 import type { Handler, RouteMatch, Router } from './router.js';
 
+/** Context added to log entries, such as the request id. */
+export interface LogFields {
+  readonly requestId?: string;
+  readonly method?: string;
+  readonly path?: string;
+  readonly [field: string]: unknown;
+}
+
+/** Avi.js logs errors through `error`; `warn` and `info` are optional. */
 export interface Logger {
-  error(message: string, error: unknown): void;
+  error(message: string, error: unknown, fields?: LogFields): void;
+  warn?(message: string, fields?: LogFields): void;
+  info?(message: string, fields?: LogFields): void;
+}
+
+export interface RequestIdOptions {
+  /** Header read and sent back. Default: `x-request-id`. */
+  header?: string;
+  /**
+   * Reuse an incoming id when it is short, visible ASCII. Default: `true`. Set `false` when
+   * clients are untrusted and ids must be unique.
+   */
+  trustIncoming?: boolean;
 }
 
 /**
@@ -31,6 +54,8 @@ export type ErrorHandler = (error: unknown, ctx: Context) => unknown;
 export type RequestHook = (ctx: Context) => unknown;
 
 export interface ResponseInfo {
+  /** The request id, as in `ctx.id`. */
+  readonly id: string;
   readonly method: string;
   readonly path: string;
   /** The matched route pattern, e.g. `/users/:id`. */
@@ -58,6 +83,13 @@ export interface ServerOptions {
   /** Receives 5xx errors. Default: `console.error`. */
   logger?: Logger;
   errorHandler?: ErrorHandler;
+  /** Gives every request an id, sent back in a response header. `false` turns it off. */
+  requestId?: RequestIdOptions | false;
+  /**
+   * How many proxies in front of the app to trust for `X-Forwarded-For` when working out
+   * `ctx.ip`. Default `0`: use the socket address, since clients can send any header.
+   */
+  trustProxy?: number;
   /** Run in order before routing, for every request. */
   onRequest?: readonly RequestHook[];
   /** Called after every response. Errors are logged, never sent. */
@@ -72,10 +104,12 @@ const PASSED_THROUGH = [
 ] as const;
 
 const consoleLogger: Logger = {
-  error(message, error) {
-    console.error(message, error);
+  error(message, error, fields) {
+    console.error(fields?.requestId ? `${message} [${fields.requestId}]` : message, error);
   },
 };
+
+const INCOMING_ID = /^[\x21-\x7e]{1,128}$/;
 
 const NO_PARAMS = Object.freeze(Object.create(null) as Record<string, string>);
 
@@ -87,6 +121,8 @@ export class HttpServer {
   readonly #logger: Logger;
   readonly #errorHandler: ErrorHandler | undefined;
   readonly #hooks: readonly RequestHook[] | undefined;
+  readonly #requestId: { header: string; trust: boolean } | undefined;
+  readonly #trustProxy: number;
   readonly #onResponse: ((info: ResponseInfo) => unknown) | undefined;
   #server: Server | undefined;
   #closing: Promise<void> | undefined;
@@ -99,6 +135,8 @@ export class HttpServer {
     this.#errorHandler = optionalFunction('errorHandler', options.errorHandler);
     this.#onResponse = optionalFunction('onResponse', options.onResponse);
     this.#hooks = hookList(options.onRequest);
+    this.#requestId = requestIdOptions(options.requestId);
+    this.#trustProxy = nonNegative('trustProxy', options.trustProxy ?? 0);
     this.#nodeOptions = {};
     for (const name of PASSED_THROUGH) {
       const value = options[name];
@@ -164,8 +202,11 @@ export class HttpServer {
     const method = req.method ?? 'GET';
     const match = this.#router.find(method, path);
 
-    if (this.#onResponse) {
-      this.#observe(res, method, path, match.kind === 'found' ? match.route : undefined);
+    const ids = this.#requestId;
+    let id: string | undefined;
+    if (ids) {
+      const incoming = ids.trust ? req.headers[ids.header] : undefined;
+      id = typeof incoming === 'string' && INCOMING_ID.test(incoming) ? incoming : randomUUID();
     }
 
     const ctx = new RequestContext(
@@ -176,7 +217,14 @@ export class HttpServer {
       match.kind === 'found' ? match.params : NO_PARAMS,
       queryStart === -1 ? '' : url.slice(queryStart + 1),
       this.#bodyLimit,
+      id,
+      this.#trustProxy,
     );
+    if (ids && id) ctx.presetHeader(ids.header, id);
+
+    if (this.#onResponse) {
+      this.#observe(res, ctx, match.kind === 'found' ? match.route : undefined);
+    }
 
     if (this.#hooks) this.#runHooks(this.#hooks, 0, ctx, res, match);
     else this.#dispatch(ctx, res, match);
@@ -267,7 +315,11 @@ export class HttpServer {
         headers: ctx.responseHeaders,
         close: this.#closing !== undefined,
         onStreamError: (error) => {
-          this.#logger.error(`Response stream failed: ${ctx.method} ${ctx.path}`, error);
+          this.#logger.error(
+            `Response stream failed: ${ctx.method} ${ctx.path}`,
+            error,
+            fieldsOf(ctx),
+          );
         },
       });
     } catch (error) {
@@ -279,7 +331,9 @@ export class HttpServer {
   #fail(ctx: RequestContext, res: ServerResponse, error: unknown): void {
     const expected =
       error instanceof RequestAbortedError || (error instanceof HttpError && error.status < 500);
-    if (!expected) this.#logger.error(`Request failed: ${ctx.method} ${ctx.path}`, error);
+    if (!expected) {
+      this.#logger.error(`Request failed: ${ctx.method} ${ctx.path}`, error, fieldsOf(ctx));
+    }
     if (res.destroyed) return;
 
     const errorHandler = this.#errorHandler;
@@ -326,18 +380,23 @@ export class HttpServer {
   }
 
   #fallback(ctx: RequestContext, res: ServerResponse, error: unknown, handlerError: unknown): void {
-    this.#logger.error(`errorHandler failed: ${ctx.method} ${ctx.path}`, handlerError);
+    this.#logger.error(
+      `errorHandler failed: ${ctx.method} ${ctx.path}`,
+      handlerError,
+      fieldsOf(ctx),
+    );
     if (!res.destroyed) sendError(res, error, ctx.responseHeaders, this.#closing !== undefined);
   }
 
-  #observe(res: ServerResponse, method: string, path: string, route: string | undefined): void {
+  #observe(res: ServerResponse, ctx: RequestContext, route: string | undefined): void {
     const onResponse = this.#onResponse;
     if (!onResponse) return;
     const start = performance.now();
     res.once('close', () => {
       const info: ResponseInfo = {
-        method,
-        path,
+        id: ctx.id,
+        method: ctx.method,
+        path: ctx.path,
         route,
         status: res.statusCode,
         duration: performance.now() - start,
@@ -346,7 +405,7 @@ export class HttpServer {
       Promise.resolve()
         .then(() => onResponse(info))
         .catch((error: unknown) => {
-          this.#logger.error('onResponse failed', error);
+          this.#logger.error('onResponse failed', error, fieldsOf(ctx));
         });
     });
   }
@@ -357,6 +416,19 @@ function nonNegative(name: string, value: number): number {
     throw new RangeError(`${name} must be a non-negative integer, got ${String(value)}`);
   }
   return value;
+}
+
+function fieldsOf(ctx: Context): LogFields {
+  return { requestId: ctx.id, method: ctx.method, path: ctx.path };
+}
+
+function requestIdOptions(
+  options: RequestIdOptions | false | undefined,
+): { header: string; trust: boolean } | undefined {
+  if (options === false) return undefined;
+  const header = (options?.header ?? 'x-request-id').toLowerCase();
+  validateHeaderName(header);
+  return { header, trust: options?.trustIncoming ?? true };
 }
 
 function hookList(hooks: readonly RequestHook[] | undefined): readonly RequestHook[] | undefined {

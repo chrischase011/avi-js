@@ -6,6 +6,7 @@ import {
   type OutgoingHttpHeaders,
   type ServerResponse,
 } from 'node:http';
+import { randomUUID } from 'node:crypto';
 import { HttpError, RequestAbortedError } from './errors.js';
 import type { HttpMethod } from './methods.js';
 import type { Params } from './router.js';
@@ -27,6 +28,13 @@ export type NoInput = Record<never, never>;
  */
 export interface Context<I extends object = NoInput, P extends object = Params> {
   readonly method: HttpMethod;
+  /** This request's id: a trusted incoming `x-request-id`, else a generated UUID. */
+  readonly id: string;
+  /**
+   * The client's IP address: the socket's, or with `trustProxy` the one your trusted proxies
+   * report in `X-Forwarded-For`.
+   */
+  readonly ip: string;
   /** Raw path without the query string. */
   readonly path: string;
   /** Decoded route parameters. A trailing `*` is available as `params['*']`. */
@@ -59,6 +67,9 @@ export class RequestContext implements Context {
   #body: Promise<Buffer> | undefined;
   #state: (AviState & Record<string, unknown>) | undefined;
   #headers: OutgoingHttpHeaders | undefined;
+  #id: string | undefined;
+  #ip: string | undefined;
+  readonly #trustProxy: number;
   /** Set once by the validation step, before the handler runs. */
   input: NoInput = EMPTY_INPUT;
 
@@ -70,10 +81,23 @@ export class RequestContext implements Context {
     readonly params: Params,
     rawQuery: string,
     bodyLimit: number,
+    id?: string,
+    trustProxy = 0,
   ) {
     this.#res = res;
     this.#rawQuery = rawQuery;
     this.#bodyLimit = bodyLimit;
+    this.#id = id;
+    this.#trustProxy = trustProxy;
+  }
+
+  get ip(): string {
+    return (this.#ip ??= clientIp(this.req, this.#trustProxy));
+  }
+
+  // Without request ids enabled, an id is only made if something asks for it.
+  get id(): string {
+    return (this.#id ??= randomUUID());
   }
 
   get headers(): IncomingHttpHeaders {
@@ -91,6 +115,11 @@ export class RequestContext implements Context {
   /** Headers collected through `setHeader`, if any. */
   get responseHeaders(): OutgoingHttpHeaders | undefined {
     return this.#headers;
+  }
+
+  /** Adds a header Avi.js has already validated. */
+  presetHeader(name: string, value: string): void {
+    (this.#headers ??= {})[name] = value;
   }
 
   setHeader(name: string, value: string | number | readonly string[]): void {
@@ -130,6 +159,22 @@ export class RequestContext implements Context {
       throw new HttpError(400, 'Malformed JSON body', { cause: error });
     }
   }
+}
+
+/**
+ * Each trusted proxy appends the address it received the request from. Counting `trustProxy`
+ * hops back from the socket gives the client as the outermost trusted proxy saw it.
+ */
+function clientIp(req: IncomingMessage, trustProxy: number): string {
+  const socket = req.socket.remoteAddress ?? '';
+  const forwarded = req.headers['x-forwarded-for'];
+  if (trustProxy === 0 || typeof forwarded !== 'string') return socket;
+  const hops = forwarded
+    .split(',')
+    .map((address) => address.trim())
+    .filter(Boolean);
+  const chain = [socket, ...hops.reverse()];
+  return chain[Math.min(trustProxy, chain.length - 1)] ?? socket;
 }
 
 function isJson(contentType: string | undefined): boolean {

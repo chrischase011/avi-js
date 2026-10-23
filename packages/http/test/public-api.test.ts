@@ -10,6 +10,9 @@ it('exposes only the reviewed runtime exports', () => {
     'Router',
     'compose',
     'isReply',
+    'jsonLogger',
+    'logRequests',
     'reply',
+    'sse',
   ]);
 });

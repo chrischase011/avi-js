@@ -180,10 +180,15 @@ describe('errorHandler', () => {
     const res = await fetch(url);
     expect(res.status).toBe(500);
     expect(await res.json()).toEqual({ statusCode: 500, error: 'Internal Server Error' });
-    expect(logger.error).toHaveBeenCalledWith('Request failed: GET /', original);
+    expect(logger.error).toHaveBeenCalledWith(
+      'Request failed: GET /',
+      original,
+      expect.objectContaining({ method: 'GET' }),
+    );
     expect(logger.error).toHaveBeenCalledWith(
       'errorHandler failed: GET /',
       expect.objectContaining({ message: 'handler bug' }),
+      expect.objectContaining({ method: 'GET' }),
     );
   });
 });
@@ -250,6 +255,7 @@ describe('onResponse', () => {
     expect(logger.error).toHaveBeenCalledWith(
       'onResponse failed',
       expect.objectContaining({ message: 'metrics down' }),
+      expect.objectContaining({ method: 'GET' }),
     );
   });
 
