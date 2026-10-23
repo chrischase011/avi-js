@@ -7,7 +7,9 @@ import {
   type AviApp,
   type StandardSchemaV1,
 } from '@avijs/core';
+import { toJsonSchema as valibotToJsonSchema } from '@valibot/to-json-schema';
 import * as v from 'valibot';
+import { z } from 'zod';
 import { afterEach, describe, expect, it } from 'vitest';
 import { generateOpenApi, openApiPath, type JsonSchema } from '../src/index.js';
 
@@ -182,5 +184,98 @@ describe('openApiPath', () => {
     ['/files/*', '/files/{wildcard}', ['wildcard']],
   ])('converts %s', (input, path, names) => {
     expect(openApiPath(input)).toEqual({ path, names });
+  });
+});
+
+// The schemas generated projects use, through the real libraries.
+describe('generateOpenApi with schema libraries', () => {
+  async function document(
+    schema: { params: StandardSchemaV1; body: StandardSchemaV1; response: StandardSchemaV1 },
+    toJsonSchema?: Parameters<typeof generateOpenApi>[1]['toJsonSchema'],
+  ) {
+    const users = defineController({
+      prefix: '/users',
+      routes: [
+        route({ method: 'POST', path: '/:id', schema, handler: () => ({ id: 1, name: 'a' }) }),
+      ],
+    });
+    const app = await initialized(createAvi().register({ controllers: [users] }));
+    const doc = generateOpenApi(app, {
+      info: { title: 'T', version: '1' },
+      ...(toJsonSchema ? { toJsonSchema } : {}),
+    });
+    return doc.paths['/users/{id}']?.['post'];
+  }
+
+  const expected = {
+    parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+    requestBody: {
+      content: {
+        'application/json': {
+          schema: {
+            type: 'object',
+            properties: { name: { type: 'string', minLength: 1 } },
+            required: ['name'],
+          },
+        },
+      },
+    },
+    responses: {
+      '200': {
+        content: {
+          'application/json': {
+            schema: {
+              type: 'object',
+              properties: { id: { type: 'number' }, name: { type: 'string' } },
+            },
+          },
+        },
+      },
+    },
+  };
+
+  it('reads Zod 4 schemas without a converter', async () => {
+    const operation = await document({
+      params: z.object({ id: z.string() }),
+      body: z.object({ name: z.string().min(1) }),
+      response: z.object({ id: z.number(), name: z.string() }),
+    });
+    expect(operation).toMatchObject(expected);
+  });
+
+  it('names the route and part when a converter fails', async () => {
+    const schemas = {
+      params: v.object({ id: v.pipe(v.string(), v.transform(Number)) }),
+      body: v.object({ name: v.string() }),
+      response: v.object({ id: v.number(), name: v.string() }),
+    };
+    await expect(
+      document(schemas, (schema) => valibotToJsonSchema(schema as never) as JsonSchema),
+    ).rejects.toThrow(
+      'Cannot convert the params schema of POST /users/:id to JSON Schema: The "transform" action cannot be converted to JSON Schema.',
+    );
+    const lenient = await document(
+      schemas,
+      (schema) => valibotToJsonSchema(schema as never, { errorMode: 'ignore' }) as JsonSchema,
+    );
+    expect(lenient?.parameters).toEqual([
+      { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+    ]);
+  });
+
+  it('reads Valibot schemas through @valibot/to-json-schema', async () => {
+    const schemas = {
+      params: v.object({ id: v.string() }),
+      body: v.object({ name: v.pipe(v.string(), v.minLength(1)) }),
+      response: v.object({ id: v.number(), name: v.string() }),
+    };
+    expect(await document(schemas)).toMatchObject({
+      requestBody: { content: { 'application/json': { schema: {} } } },
+    });
+    const operation = await document(
+      schemas,
+      (schema) => valibotToJsonSchema(schema as never) as JsonSchema,
+    );
+    expect(operation).toMatchObject(expected);
   });
 });

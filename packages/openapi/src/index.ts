@@ -69,8 +69,20 @@ const VALIDATION_ERROR: JsonSchema = {
 
 /** Builds an OpenAPI 3.1 document from an initialized app's routes and schemas. */
 export function generateOpenApi(app: AviApp, options: OpenApiOptions): OpenApiDocument {
-  const convert = (schema: StandardSchemaV1 | undefined, io: 'input' | 'output') =>
-    schema ? (options.toJsonSchema ?? standardJsonSchema)(schema, io) : undefined;
+  const toJson = options.toJsonSchema ?? standardJsonSchema;
+  const convert = (route: RouteInfo, part: 'params' | 'query' | 'body' | 'response') => {
+    const schema = route.schema?.[part];
+    if (!schema) return undefined;
+    try {
+      return toJson(schema, part === 'response' ? 'output' : 'input');
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        `Cannot convert the ${part} schema of ${route.method} ${route.path} to JSON Schema: ${reason}`,
+        { cause: error },
+      );
+    }
+  };
 
   const paths: OpenApiDocument['paths'] = {};
   let usesValidation = false;
@@ -80,7 +92,7 @@ export function generateOpenApi(app: AviApp, options: OpenApiOptions): OpenApiDo
     const operation: Operation = { ...route.openapi, responses: {} };
     const parameters: Parameter[] = [];
 
-    const params = objectProperties(convert(route.schema?.params, 'input'));
+    const params = objectProperties(convert(route, 'params'));
     for (const name of names) {
       parameters.push({
         name,
@@ -90,18 +102,18 @@ export function generateOpenApi(app: AviApp, options: OpenApiOptions): OpenApiDo
       });
     }
 
-    const query = objectProperties(convert(route.schema?.query, 'input'));
+    const query = objectProperties(convert(route, 'query'));
     for (const [name, schema] of Object.entries(query.properties)) {
       parameters.push({ name, in: 'query', required: query.required.includes(name), schema });
     }
     if (parameters.length > 0) operation.parameters = parameters;
 
     if (route.schema?.body) {
-      const body = convert(route.schema.body, 'input') ?? {};
+      const body = convert(route, 'body') ?? {};
       operation.requestBody = { required: true, content: { 'application/json': { schema: body } } };
     }
 
-    const response = convert(route.schema?.response, 'output');
+    const response = convert(route, 'response');
     operation.responses['200'] = response
       ? { description: 'OK', content: { 'application/json': { schema: response } } }
       : { description: 'OK' };
