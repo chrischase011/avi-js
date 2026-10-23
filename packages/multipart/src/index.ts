@@ -15,6 +15,14 @@ export interface MultipartLimits {
   parts?: number;
 }
 
+export interface MultipartOptions extends MultipartLimits {
+  /**
+   * File types to accept, such as `image/png` or `image/*`. A file of another type gets `415`
+   * before it is read. This checks the type the client claims; check the bytes too when it matters.
+   */
+  accept?: readonly string[];
+}
+
 export interface FieldPart {
   readonly kind: 'field';
   readonly name: string;
@@ -46,10 +54,14 @@ const DEFAULTS: Required<MultipartLimits> = {
 /**
  * Reads a `multipart/form-data` body part by part, without buffering files. Limits are enforced
  * while reading: `413` as soon as one is exceeded, `400` for a malformed body, `415` for another
- * content type.
+ * content type or a file type `accept` does not list.
  */
-export async function* multipart(ctx: Context, limits: MultipartLimits = {}): AsyncGenerator<Part> {
-  const max = resolveLimits(limits);
+export async function* multipart(
+  ctx: Context,
+  options: MultipartOptions = {},
+): AsyncGenerator<Part> {
+  const max = resolveLimits(options);
+  const accepts = acceptor(options.accept);
   const type = ctx.headers['content-type'];
   if (!type || !/^multipart\/form-data\s*;/i.test(type)) {
     throw new HttpError(415, 'Expected a multipart/form-data body');
@@ -96,6 +108,16 @@ export async function* multipart(ctx: Context, limits: MultipartLimits = {}): As
   };
 
   busboy.on('file', (name, source, filename, _encoding, mimeType) => {
+    if (accepts && !accepts(mimeType)) {
+      source.resume();
+      fail(
+        new HttpError(
+          415,
+          `File ${name} has type ${mimeType || '(none)'}; expected ${(options.accept ?? []).join(', ')}`,
+        ),
+      );
+      return;
+    }
     // Callers get our own stream, so every failure reaches them as an HttpError (400 or 413)
     // rather than the parser's plain errors, which would become 500s.
     const stream = new PassThrough();
@@ -204,7 +226,7 @@ export interface UploadedFile {
   readonly buffer: Buffer;
 }
 
-export interface ReadFormOptions extends MultipartLimits {
+export interface ReadFormOptions extends MultipartOptions {
   /** Most bytes buffered across all files and fields. Default: 10 MiB. */
   maxTotalSize?: number;
 }
@@ -259,6 +281,33 @@ function resolveLimits(limits: MultipartLimits): Required<MultipartLimits> {
     if (value !== undefined) resolved[key] = positive(key, value);
   }
   return resolved;
+}
+
+/** A matcher for `accept`: exact types and `type/*`, ignoring case and parameters. */
+function acceptor(
+  accept: readonly string[] | undefined,
+): ((mimeType: string) => boolean) | undefined {
+  if (accept === undefined) return undefined;
+  if (!Array.isArray(accept) || accept.length === 0) {
+    throw new RangeError('multipart: accept must list at least one type, such as image/png');
+  }
+  const exact = new Set<string>();
+  const families = new Set<string>();
+  for (const entry of accept as readonly unknown[]) {
+    const type = typeof entry === 'string' ? entry.trim().toLowerCase() : '';
+    const match = /^([a-z0-9][\w.+-]*)\/([a-z0-9][\w.+-]*|\*)$/.exec(type);
+    if (!match) {
+      throw new RangeError(
+        `multipart: accept entries look like image/png or image/*, got ${String(entry)}`,
+      );
+    }
+    if (match[2] === '*') families.add(match[1] ?? '');
+    else exact.add(type);
+  }
+  return (mimeType) => {
+    const type = (mimeType.split(';')[0] ?? '').trim().toLowerCase();
+    return exact.has(type) || families.has(type.split('/')[0] ?? '');
+  };
 }
 
 function positive(name: string, value: number): number {

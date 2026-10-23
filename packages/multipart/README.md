@@ -10,7 +10,7 @@ npm install @avijs/multipart
 import { multipart, readForm } from '@avijs/multipart';
 
 // Stream each file where it belongs; nothing is buffered.
-for await (const part of multipart(ctx, { fileSize: 5_000_000 })) {
+for await (const part of multipart(ctx, { fileSize: 5_000_000, accept: ['image/*'] })) {
   if (part.kind === 'file') await pipeline(part.stream, createWriteStream(tmpPath()));
 }
 

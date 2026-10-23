@@ -3,6 +3,24 @@
 All notable changes are listed here. Avi.js follows [Semantic Versioning](https://semver.org); all
 packages share one version.
 
+## 0.4.0 - 2026-10-23
+
+### Added
+
+- `@avijs/multipart`: an `accept` option for `multipart()` and `readForm()` lists the file types a
+  form may contain, exactly (`application/pdf`) or by family (`image/*`). A file of another type
+  gets `415` before it is read.
+- Benchmarks you can trust on a noisy machine: servers run in interleaved rounds in random order
+  with `node:http` as a canary, report the median, range and server CPU time per request, and
+  check that every server answers alike first. New cases: a 50-item list and an authenticated
+  `POST`. `bench:inproc` runs Avi's whole request path in one process, `bench:profile` shows where
+  the time goes, and `bench:baseline` saves a build to compare a change against.
+
+### Changed
+
+- Reading a JSON body skips a copy and an extra step: about 0.2 µs less per request, measured on
+  the operations themselves (too small to show in an HTTP benchmark).
+
 ## 0.3.0 - 2026-10-23
 
 ### Added

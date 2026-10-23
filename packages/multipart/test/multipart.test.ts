@@ -196,6 +196,37 @@ describe('readForm', () => {
     const { url } = await serve((ctx) => readForm(ctx, { files: 0 }));
     expect((await post(url, form([['a', '1']]))).status).toBe(500);
   });
+
+  it('accepts only the listed file types, exact or by family', async () => {
+    const { url } = await formServer({ accept: ['image/*', 'application/PDF'] });
+    const ok = await post(
+      url,
+      form([
+        ['a', file('png', 'image/png'), 'a.png'],
+        ['b', file('pdf', 'application/pdf'), 'b.pdf'],
+        ['note', 'fields are not affected'],
+      ]),
+    );
+    expect(ok.status).toBe(200);
+    expect((ok.body['files'] as unknown[]).length).toBe(2);
+
+    const rejected = await post(url, form([['doc', file('x', 'text/html'), 'x.html']]));
+    expect(rejected).toEqual({
+      status: 415,
+      body: expect.objectContaining({
+        message: 'File doc has type text/html; expected image/*, application/PDF',
+      }) as unknown,
+    });
+  });
+
+  it('rejects an accept list that cannot match anything', async () => {
+    for (const accept of [[], ['png'], ['image/'], ['*/*x']]) {
+      const { url } = await serve((ctx) => readForm(ctx, { accept }));
+      expect((await post(url, form([['a', '1']]))).status).toBe(500);
+      await server?.close();
+      server = undefined;
+    }
+  });
 });
 
 describe('multipart', () => {
@@ -220,6 +251,28 @@ describe('multipart', () => {
       status: 200,
       body: ['file:one.bin', 'field:between', 'file:two.bin'] as unknown as Record<string, unknown>,
     });
+  });
+
+  it('stops at the first file of a type accept does not list, before it is read', async () => {
+    const seen: string[] = [];
+    const { url } = await serve(async (ctx) => {
+      for await (const part of multipart(ctx, { accept: ['text/plain'] })) {
+        seen.push(part.kind === 'file' ? `file:${part.filename}` : `field:${part.value}`);
+        if (part.kind === 'file') await part.stream.resume().toArray();
+      }
+      return seen;
+    });
+    const res = await post(
+      url,
+      form([
+        ['a', file('ok'), 'ok.txt'],
+        ['b', file('<svg/>', 'IMAGE/SVG+XML'), 'evil.svg'],
+        ['c', 'after'],
+      ]),
+    );
+    expect(res.status).toBe(415);
+    // Small bodies are parsed at once, so the failure can come before earlier parts are handed out.
+    expect(seen).not.toContain('file:evil.svg');
   });
 
   it('lets the caller stop early', async () => {

@@ -6,48 +6,151 @@ server, Fastify, Hono and NestJS. They are **not** performance claims.
 ## Running
 
 ```sh
-pnpm bench:router   # Router.find micro-benchmarks (mitata)
-pnpm bench:http     # HTTP load test (autocannon): Avi, node:http, Fastify, Hono, NestJS
-pnpm bench:startup  # init() time for 100 modules, 1,000 providers, 1,000 routes
+pnpm bench:http      # HTTP load test (autocannon), interleaved rounds: Avi, node:http, Fastify, Hono, NestJS
+pnpm bench:inproc    # Avi's whole request path in one process, without TCP (mitata)
+pnpm bench:profile echo   # CPU profile of the Avi server under load, top functions by self time
+pnpm bench:baseline  # save the current build; then BENCH_SERVERS=baseline,avi pnpm bench:http
+pnpm bench:router    # Router.find micro-benchmarks (mitata)
+pnpm bench:startup   # init() time for 100 modules, 1,000 providers, 1,000 routes
 ```
 
 `bench:http` options, as environment variables:
 
-| Variable            | Default | Meaning                                                                                          |
-| ------------------- | ------- | ------------------------------------------------------------------------------------------------ |
-| `BENCH_CONNECTIONS` | `100`   | Concurrent connections                                                                           |
-| `BENCH_WARMUP`      | `3`     | Warm-up seconds, discarded                                                                       |
-| `BENCH_RUNS`        | `3`     | Measured runs; the median is kept                                                                |
-| `BENCH_DURATION`    | `10`    | Seconds per measured run                                                                         |
-| `BENCH_SERVERS`     | all     | Comma-separated servers to run: `node`, `avi`, `fastify`, `hono`, `nest-express`, `nest-fastify` |
+| Variable            | Default | Meaning                                                                                                      |
+| ------------------- | ------- | ------------------------------------------------------------------------------------------------------------ |
+| `BENCH_ROUNDS`      | `5`     | Rounds; every server runs once per round, in a new random order                                              |
+| `BENCH_DURATION`    | `10`    | Seconds per server per round                                                                                 |
+| `BENCH_WARMUP`      | `3`     | Warm-up seconds per server, discarded                                                                        |
+| `BENCH_CONNECTIONS` | `100`   | Concurrent connections                                                                                       |
+| `BENCH_SERVERS`     | all     | Servers to run: `node`, `avi`, `avi-defaults`, `fastify`, `hono`, `nest-express`, `nest-fastify`, `baseline` |
+| `BENCH_CASES`       | all     | Cases to run: `hello`, `param`, `list`, `echo`, `orders`, `validated`                                        |
+| `BENCH_PIN`         | on      | `0` turns off pinning servers and the load generator to separate CPU halves                                  |
+
+Each run is saved to `results/` (not committed) with the machine, Node version, git commit and
+settings.
 
 ## Method
 
-**Router** (`src/router.ts`): `Router.find` against a 40-route REST-style table
-(`src/routes.ts`) with static, parameter and catch-all routes. mitata handles warm-up, iteration
-counts and dead-code elimination.
+**HTTP** (`src/http.ts`). Each server runs in its own child process; autocannon runs in the parent
+on the same machine, pinned to the other half of the CPUs.
 
-**HTTP** (`src/http.ts`): each server runs in its own child process; autocannon runs in the parent
-on the same machine. Both servers answer the same two requests with identical bodies and headers
-(`content-type`, `content-length`, `x-content-type-options`):
+- **Same answers first.** Before any load, every server's response to each case (status, JSON
+  body, `location`) is compared with `node:http`'s; a difference stops the run.
+- **Interleaved rounds.** After a warm-up, every server runs once per round in a new random order,
+  so heat and turbo boost spread evenly instead of favoring whoever runs first.
+- **A canary.** `node:http` runs in every round. A round where it falls more than 15% below its
+  own median is dropped for every server: the machine was busy.
+- **Median and range.** Requests per second are reported as the median and the min–max range of
+  the kept rounds. When two servers' ranges overlap, the run shows no difference between them,
+  whatever the medians say, and the output says so.
+- **CPU per request.** Each server reports its own user and system CPU time; divided by the
+  requests it served, that is the work per request, steadier than throughput on a busy machine.
 
-| Case            | Request          | Response            |
-| --------------- | ---------------- | ------------------- |
-| JSON hello      | `GET /`          | `{"hello":"world"}` |
-| JSON with param | `GET /users/123` | `{"id":"123"}`      |
+| Case        | Request                                 | Response                                     |
+| ----------- | --------------------------------------- | -------------------------------------------- |
+| `hello`     | `GET /`                                 | `{"hello":"world"}`                          |
+| `param`     | `GET /users/123`                        | `{"id":"123"}`                               |
+| `list`      | `GET /list`                             | 50 users, about 6 KB of JSON                 |
+| `echo`      | `POST /echo` with a 3-field JSON body   | The body                                     |
+| `orders`    | `POST /orders`, bearer token, JSON body | `201`, `location` header, the body and an id |
+| `validated` | `POST /validated`, same body as `echo`  | The body, after a Valibot schema (Avi only)  |
 
-The Avi server also registers the rest of the 40-route table, so the router does real work. The
-`node:http` server uses `if` checks and string slicing instead of a router.
+Every server also registers the rest of a 40-route REST-style table (`src/routes.ts`), so routers
+do real work; `node:http` uses `if` checks instead. The Avi server runs with request ids off, like
+the others; `avi-defaults` keeps them on. Remaining differences: Hono sends `application/json`
+without `charset`, Avi.js and `node:http` add `x-content-type-options`, NestJS checks the token
+in a guard class, Fastify in a `preHandler`, Hono in a middleware.
 
-Two more cases run on the Avi server only, to measure validation overhead. Both `POST` the same
-body, `{"name":"Ada","email":"ada@example.com","age":36}`, and echo it back:
+**In one process** (`src/inproc.ts`). Real `IncomingMessage` and `ServerResponse` objects over a
+socket that discards its output go through Avi's request handler, so routing, context, pipeline,
+body reading and the response run without TCP. With a saved baseline, both builds run side by
+side.
 
-| Case                 | Route             | Work                                                   |
-| -------------------- | ----------------- | ------------------------------------------------------ |
-| POST JSON, no schema | `POST /echo`      | `ctx.json()`                                           |
-| POST JSON, validated | `POST /validated` | Valibot `object` with string, email and integer checks |
+**Router** (`src/router.ts`): `Router.find` against the 40-route table with static, parameter and
+catch-all routes. mitata handles warm-up, iteration counts and dead-code elimination.
 
-## Baseline results
+## Results (0.4.0)
+
+Recorded on 2026-10-23. Windows 11 laptop, 13th Gen Intel Core i5-13420H (12 logical CPUs),
+Node.js 24.21.0, mains power. 100 connections, 5 rounds × 5 s after a 3 s warm-up, pinned.
+Fastify 5.12.7, Hono 4.13.13 on `@hono/node-server` 2.1.5, NestJS 12.2.0.
+
+### HTTP
+
+| Case     | Server           | Req/s (median) | Range         | CPU µs/req |
+| -------- | ---------------- | -------------: | ------------- | ---------: |
+| `param`  | `node:http`      |         20,563 | 18,172–22,866 |       34.1 |
+| `param`  | Avi.js           |         19,016 | 15,887–20,510 |       39.4 |
+| `param`  | Fastify          |         17,648 | 16,143–25,530 |       44.1 |
+| `param`  | Hono             |         18,386 | 14,225–21,746 |       46.8 |
+| `param`  | NestJS (Express) |         13,812 | 9,128–15,026  |       67.6 |
+| `param`  | NestJS (Fastify) |         17,206 | 6,500–20,210  |       52.6 |
+| `list`   | `node:http`      |         25,589 | 23,819–27,806 |       39.4 |
+| `list`   | Avi.js           |         24,160 | 21,461–25,272 |       41.2 |
+| `list`   | Fastify          |         24,419 | 20,251–24,827 |       41.1 |
+| `list`   | Hono             |         23,563 | 21,342–24,184 |       41.3 |
+| `list`   | NestJS (Express) |         16,395 | 15,762–17,086 |       60.9 |
+| `list`   | NestJS (Fastify) |         22,198 | 21,672–22,846 |       45.3 |
+| `echo`   | `node:http`      |         36,555 | 35,261–39,485 |       26.1 |
+| `echo`   | Avi.js           |         32,251 | 26,261–33,088 |       30.4 |
+| `echo`   | Fastify          |         34,218 | 24,744–36,029 |       28.2 |
+| `echo`   | Hono             |         31,925 | 25,912–33,229 |       30.2 |
+| `echo`   | NestJS (Express) |         18,629 | 17,991–18,910 |       54.7 |
+| `echo`   | NestJS (Fastify) |         27,240 | 13,529–27,512 |       35.9 |
+| `orders` | `node:http`      |         25,737 | 18,914–33,077 |       36.1 |
+| `orders` | Avi.js           |         24,536 | 13,183–31,883 |       42.8 |
+| `orders` | Fastify          |         24,210 | 15,767–32,074 |       39.3 |
+| `orders` | Hono             |         22,091 | 10,580–26,373 |       43.3 |
+| `orders` | NestJS (Express) |         12,842 | 9,396–18,341  |       75.9 |
+| `orders` | NestJS (Fastify) |         26,606 | 16,034–27,934 |       37.6 |
+
+What this run shows, and only this:
+
+- **Every server answered every request, with no errors,** and all of them answered alike.
+- **Where the ranges do not overlap:** Avi.js was faster than NestJS on Express on `param`, `list`
+  and `echo`, and slower than `node:http` on `echo` (about 12% fewer requests per second, 4 µs
+  more CPU per request).
+- **Everything else overlaps,** including Avi.js against Fastify, Hono and NestJS on Fastify in
+  every case: no difference shown. The `hello` case is left out of the table because its ranges
+  spanned 4,842–40,120 req/s; the laptop throttled during it.
+- **Rounds were dropped** in four of the six cases because `node:http` fell more than 15% below its
+  median. This is a laptop with other applications open. Ranking frameworks needs a quiet,
+  dedicated machine.
+
+### Avi.js in one process
+
+`pnpm bench:inproc`, same laptop, time per request through Avi's whole request handler without
+TCP:
+
+| Case    | Time per request |
+| ------- | ---------------: |
+| `hello` |       about 3 µs |
+| `param` |     about 3.3 µs |
+| `echo`  |        7 to 8 µs |
+| `list`  |      about 21 µs |
+
+On `list`, `JSON.stringify` of the 50 users alone takes about 19.5 µs: serializing the response is
+almost all of Avi's work there. A CPU profile of the `echo` case under load puts about 9% of the
+samples in `@avijs` code; the rest is Node's HTTP layer, the socket and V8.
+
+### Reading a JSON body (0.4.0)
+
+`src/body.ts` measures the operations behind `ctx.json()` before and after the 0.4.0 change, two
+runs:
+
+| Operation                   |     Before |      After |
+| --------------------------- | ---------: | ---------: |
+| Join a one-chunk body       |  72–124 ns | under 1 ns |
+| Check `application/json`    |   20–22 ns | under 1 ns |
+| `ctx.json()` on a read body | 599–703 ns | 558–588 ns |
+
+That saves about 0.2 µs per JSON request, about 3% of Avi's own work on `echo`: real, and far too
+small for an HTTP run on this machine to show.
+
+## Earlier results
+
+Before 0.4.0, servers ran one after another in a fixed order and the median of 3 runs was kept.
+Read these with the warnings that come with them.
 
 Recorded on 2026-10-22. Windows 11 laptop, 13th Gen Intel Core i5-13420H (12 logical CPUs),
 Node.js 24.21.0, on mains power, other applications open.
@@ -183,7 +286,7 @@ Two runs gave 10.2 / 3.6 ms and 11.6 / 3.8 ms.
 The timing includes building the manifest, which a real deployment does at build time, so it
 overstates the cost. Either way, verifying a manifest adds work and does not speed startup up.
 
-## Reading these numbers
+### Reading these numbers
 
 - Run-to-run noise on this machine is large. Between two router runs, the encoded-param probe
   moved from about 470 ns to about 800 ns. Both servers did more requests per second on the
@@ -220,3 +323,8 @@ change is kept because it removes an allocation and simplifies the code.
   values, the params object and the match result. Fully static routes allocate nothing since
   Phase 7.
 - Percent-decoding uses `decodeURIComponent` per encoded segment.
+- Serializing responses: `JSON.stringify` is most of the work on list endpoints (about 19.5 µs of
+  21 µs for 50 users in one process). A serializer compiled from the route's `response` schema is
+  the next candidate.
+- The interleaved run above showed `node:http` ahead of Avi.js on `echo` by about 4 µs of CPU per
+  request; worth a profile on a quiet machine.

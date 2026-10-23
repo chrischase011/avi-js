@@ -7,7 +7,11 @@
     "router": "node dist/router.js",
     "http": "node dist/http.js",
     "typecheck": "tsc -p tsconfig.json",
-    "startup": "node dist/startup.js"
+    "startup": "node dist/startup.js",
+    "profile": "node dist/profile.js",
+    "baseline": "node dist/baseline.js",
+    "inproc": "node dist/inproc.js",
+    "body": "node dist/body.js"
   },
   "dependencies": {
     "@avijs/core": "workspace:*",

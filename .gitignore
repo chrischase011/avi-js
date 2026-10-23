@@ -18,3 +18,6 @@ web/src/tutorial/
 web/src/examples.md
 web/src/public/
 web/src/.vitepress/cache/
+
+# Local benchmark runs
+benchmarks/results/

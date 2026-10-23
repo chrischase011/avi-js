@@ -83,13 +83,34 @@ Other content types get `415`, and malformed bodies `400`. If the client disconn
 be cleaned up in a `catch`. These limits are separate from the app's `bodyLimit`, which applies to
 `ctx.json()` and `ctx.text()`.
 
+## Accepting only some file types
+
+`accept` lists the file types a form may contain, exactly (`application/pdf`) or by family
+(`image/*`). The first file of another type stops reading with `415`, before any of it is read:
+
+```ts
+const { files } = await readForm(ctx, { accept: ['image/png', 'image/jpeg', 'application/pdf'] });
+
+for await (const part of multipart(ctx, { accept: ['image/*'] })) {
+  // every part.kind === 'file' here is an image type
+}
+```
+
+```text
+415 File avatar has type text/html; expected image/png, image/jpeg, application/pdf
+```
+
+Matching ignores case and parameters such as `; charset=utf-8`. Text fields are not affected.
+`accept` checks the type the client claims; for files you will serve back, also check their
+first bytes (a PNG starts with `89 50 4E 47`).
+
 ## Treat file details as untrusted
 
 - **File names come from the client.** Directories are removed (`../../etc/passwd` arrives as
   `passwd`), but never use the name as a path: store files under a name you generate, as above,
   and keep the original only for display.
-- **`mimeType` is what the client claims.** Check the file's content if the type matters, for
-  example for images you will serve back.
+- **`mimeType` is what the client claims**, and so is what `accept` checks. Check the file's
+  content if the type matters, for example for images you will serve back.
 - A field named `__proto__` or `constructor` is just a field; `readForm` cannot be used to change
   objects' prototypes.
 

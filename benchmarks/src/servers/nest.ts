@@ -6,18 +6,24 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   HttpCode,
+  Injectable,
   Module,
   Param,
   Post,
   RequestMapping,
   RequestMethod,
+  UseGuards,
+  type CanActivate,
+  type ExecutionContext,
   type INestApplication,
 } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter } from '@nestjs/platform-fastify';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { LIST, TOKEN } from '../data.js';
 import { FILLER } from '../routes.js';
 
 const fastify = process.argv[3] === 'fastify';
@@ -32,7 +38,21 @@ class AppController {
   echo(body: unknown) {
     return body;
   }
+  list() {
+    return LIST;
+  }
+  orders(body: object) {
+    return { id: 1, ...body };
+  }
 }
+
+class AuthGuard implements CanActivate {
+  canActivate(context: ExecutionContext): boolean {
+    const req = context.switchToHttp().getRequest<{ headers: Record<string, unknown> }>();
+    return req.headers['authorization'] === TOKEN;
+  }
+}
+Injectable()(AuthGuard);
 
 type Decorator = (target: object, key: string, descriptor: PropertyDescriptor) => void;
 const proto = AppController.prototype as unknown as Record<string, unknown>;
@@ -47,6 +67,12 @@ decorate('hello', [Get('/')]);
 decorate('user', [Get('/users/:id')], Param('id'));
 // Nest answers POST with 201 by default; the other servers send 200.
 decorate('echo', [Post('/echo'), HttpCode(200)], Body());
+decorate('list', [Get('/list')]);
+decorate(
+  'orders',
+  [Post('/orders'), HttpCode(201), Header('location', '/orders/1'), UseGuards(AuthGuard)],
+  Body(),
+);
 FILLER.forEach(([method, path], i) => {
   const name = `filler${String(i)}`;
   Object.defineProperty(proto, name, { value: () => null, writable: true, configurable: true });

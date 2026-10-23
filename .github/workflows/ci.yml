@@ -54,6 +54,27 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm verify:artifacts
 
+  benchmarks:
+    # A smoke run: every server starts, answers each case like node:http, and survives load.
+    # Shared runners are too noisy for the numbers to mean anything.
+    name: Benchmarks smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm --filter @avijs/benchmarks http
+        env:
+          BENCH_DURATION: '1'
+          BENCH_WARMUP: '1'
+          BENCH_ROUNDS: '1'
+          BENCH_CONNECTIONS: '10'
+
   audit:
     name: Dependency audit
     runs-on: ubuntu-latest

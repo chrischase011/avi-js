@@ -152,9 +152,9 @@ export class RequestContext implements Context {
     if (!isJson(this.req.headers['content-type'])) {
       throw new HttpError(415, 'Expected a JSON request body');
     }
-    const text = await this.text();
+    const body = await (this.#body ??= readBody(this.req, this.#bodyLimit));
     try {
-      return JSON.parse(text) as unknown;
+      return JSON.parse(body.toString('utf8')) as unknown;
     } catch (error) {
       throw new HttpError(400, 'Malformed JSON body', { cause: error });
     }
@@ -179,6 +179,7 @@ function clientIp(req: IncomingMessage, trustProxy: number): string {
 
 function isJson(contentType: string | undefined): boolean {
   if (!contentType) return false;
+  if (contentType === 'application/json') return true;
   const end = contentType.indexOf(';');
   const mime = (end === -1 ? contentType : contentType.slice(0, end)).trim().toLowerCase();
   return mime === 'application/json' || (mime.startsWith('application/') && mime.endsWith('+json'));
@@ -215,7 +216,8 @@ function readBody(req: IncomingMessage, limit: number): Promise<Buffer> {
     };
     const onEnd = () => {
       cleanup();
-      resolve(Buffer.concat(chunks, size));
+      // Small bodies arrive in one chunk; use it as is instead of copying.
+      resolve(chunks.length === 1 ? (chunks[0] as Buffer) : Buffer.concat(chunks, size));
     };
     const onError = (error: Error) => {
       cleanup();

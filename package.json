@@ -22,7 +22,10 @@
     "examples": "pnpm --filter \"./examples/*\" smoke",
     "release:version": "node scripts/set-version.mjs",
     "verify:artifacts": "pnpm build && node scripts/verify-artifacts.mjs",
-    "verify": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm build && pnpm test && pnpm examples"
+    "verify": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm build && pnpm test && pnpm examples",
+    "bench:profile": "pnpm build && pnpm --filter @avijs/benchmarks profile",
+    "bench:baseline": "pnpm build && pnpm --filter @avijs/benchmarks baseline",
+    "bench:inproc": "pnpm build && pnpm --filter @avijs/benchmarks inproc"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
