@@ -7,8 +7,8 @@ import { parseArgs } from 'node:util';
 export type Ask = (question: string, fallback: string) => Promise<string>;
 
 /**
- * `avi new` for `npm create avi`. Asks for the project name and template when they are missing
- * and `ask` is given; by default it asks only in an interactive terminal.
+ * `avi new` for `npm create avi`. Asks for the project name, template and validator when the name
+ * is missing and `ask` is given; by default it asks only in an interactive terminal.
  */
 export async function create(
   argv: readonly string[],
@@ -21,6 +21,7 @@ export async function create(
     strict: false,
     options: {
       template: { type: 'string' },
+      validator: { type: 'string' },
       dir: { type: 'string' },
       'avi-version': { type: 'string' },
       from: { type: 'string' },
@@ -31,6 +32,9 @@ export async function create(
     args.unshift(await ask('Project name', 'my-avi-app'));
     if (values.template === undefined) {
       args.push('--template', await ask('Template, modular or minimal', 'modular'));
+    }
+    if (values.validator === undefined) {
+      args.push('--validator', await ask('Validation library, valibot, zod or none', 'valibot'));
     }
   }
   return main(['new', ...args]);

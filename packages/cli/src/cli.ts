@@ -7,15 +7,18 @@ import path from 'node:path';
 import { parseArgs } from 'node:util';
 import { GENERATE_USAGE, generate } from './generate.js';
 import { templateFiles } from './templates.js';
+import { VALIDATORS, type Validator } from './validators.js';
 
 const { version } = createRequire(import.meta.url)('../package.json') as { version: string };
 
 const USAGE = `Usage:
-  avi new <name> [--template modular|minimal] [--dir .] [--avi-version ^x.y.z] [--from <dir>]
+  avi new <name> [--template modular|minimal] [--validator valibot|zod|none] [--dir .]
+          [--avi-version ^x.y.z] [--from <dir>]
       Create a project. The modular template (default) uses modules and decorators;
-      minimal uses plain routes and services. --from points at a folder of packed
-      @avijs tarballs (pnpm pack) to install instead of the registry. --avi-version
-      defaults to this CLI's version.
+      minimal uses plain routes and services. --validator picks the schema library for
+      route validation (default valibot); none keeps handwritten checks. --from points at
+      a folder of packed @avijs tarballs (pnpm pack) to install instead of the registry.
+      --avi-version defaults to this CLI's version.
 ${GENERATE_USAGE}
   avi dev [--project tsconfig.json] [--entry dist/main.js]
       Compile, then recompile and restart on every change.
@@ -49,6 +52,7 @@ async function create(args: readonly string[]): Promise<number> {
     allowPositionals: true,
     options: {
       template: { type: 'string', default: 'modular' },
+      validator: { type: 'string', default: 'valibot' },
       dir: { type: 'string', default: '.' },
       'avi-version': { type: 'string', default: `^${version}` },
       from: { type: 'string' },
@@ -65,6 +69,12 @@ async function create(args: readonly string[]): Promise<number> {
     return 2;
   }
 
+  const validator = values.validator as Validator;
+  if (!VALIDATORS.includes(validator)) {
+    console.error(`Unknown validator "${values.validator}". Use ${VALIDATORS.join(', ')}.`);
+    return 2;
+  }
+
   const target = path.resolve(values.dir, name);
   if (existsSync(target) && (await readdir(target)).length > 0) {
     console.error(`${target} already exists and is not empty`);
@@ -74,6 +84,7 @@ async function create(args: readonly string[]): Promise<number> {
   const files = templateFiles({
     name,
     template,
+    validator,
     aviVersion: values['avi-version'],
     ...(values.from ? { localPackages: await localPackages(values.from, target) } : {}),
   });
@@ -83,7 +94,7 @@ async function create(args: readonly string[]): Promise<number> {
     await writeFile(destination, content);
   }
 
-  console.log(`Created ${name} (${template}) in ${target}
+  console.log(`Created ${name} (${template}, ${validator === 'none' ? 'no validator' : validator}) in ${target}
 
 Next:
   cd ${path.relative(process.cwd(), target) || '.'}

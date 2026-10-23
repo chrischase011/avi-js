@@ -1,3 +1,5 @@
+import { SYNTAX, VALIDATOR_VERSIONS, type SchemaSyntax, type Validator } from './validators.js';
+
 export type TemplateName = 'modular' | 'minimal';
 
 export interface TemplateOptions {
@@ -11,22 +13,29 @@ export interface TemplateOptions {
    * each other resolve locally too.
    */
   localPackages?: Readonly<Record<string, string>>;
+  /** How the users routes validate input. Default: `valibot`. */
+  validator?: Validator;
 }
 
 /** Every file of a new project, keyed by its path relative to the project folder. */
 export function templateFiles(options: TemplateOptions): Record<string, string> {
-  return {
-    ...shared(options),
-    ...(options.template === 'modular' ? modular() : minimal()),
-  };
+  const validator = options.validator ?? 'valibot';
+  const syntax = validator === 'none' ? undefined : SYNTAX[validator];
+  const files = options.template === 'modular' ? modular() : minimal();
+  if (syntax) {
+    Object.assign(
+      files,
+      options.template === 'modular' ? modularSchemas(syntax) : minimalSchemas(syntax),
+    );
+    if (options.template === 'modular') delete files['src/modules/users/dto/create-user.dto.ts'];
+  }
+  return { ...shared(options, validator), ...files };
 }
 
-function shared({
-  name,
-  template,
-  aviVersion,
-  localPackages,
-}: TemplateOptions): Record<string, string> {
+function shared(
+  { name, template, aviVersion, localPackages }: TemplateOptions,
+  validator: Validator,
+): Record<string, string> {
   const spec = (pkg: string) => localPackages?.[pkg] ?? aviVersion;
   const pkg = {
     name,
@@ -40,7 +49,10 @@ function shared({
       check: 'avi check',
       test: 'tsc && node --test "dist/**/*.test.js"',
     },
-    dependencies: { '@avijs/core': spec('@avijs/core') },
+    dependencies: {
+      '@avijs/core': spec('@avijs/core'),
+      ...(validator === 'none' ? {} : { [validator]: VALIDATOR_VERSIONS[validator] }),
+    },
     devDependencies: {
       '@avijs/cli': spec('@avijs/cli'),
       '@avijs/testing': spec('@avijs/testing'),
@@ -68,7 +80,7 @@ function shared({
   return {
     'package.json': `${JSON.stringify(pkg, null, 2)}\n`,
     'tsconfig.json': `${JSON.stringify(tsconfig, null, 2)}\n`,
-    '.gitignore': 'node_modules/\ndist/\n',
+    '.gitignore': 'node_modules/\ndist/\n.env\n',
     'README.md': `# ${name}
 
 An [Avi.js](https://github.com/chrischase011/avi-js) API (${template} template).
@@ -85,7 +97,10 @@ Then open http://localhost:3000/health and http://localhost:3000/users.
   };
 }
 
-const MAIN_LISTEN = `const { port } = await app.listen(Number(process.env['PORT'] ?? 3000));
+const MAIN_LISTEN = listenOn("Number(process.env['PORT'] ?? 3000)");
+
+function listenOn(port: string): string {
+  return `const { port } = await app.listen(${port});
 console.log(\`Listening on http://localhost:\${String(port)}\`);
 
 const shutdown = () => {
@@ -94,6 +109,19 @@ const shutdown = () => {
 process.once('SIGINT', shutdown);
 process.once('SIGTERM', shutdown);
 `;
+}
+
+/** `src/config.ts`: environment variables checked at startup. */
+function configFile(syntax: SchemaSyntax): string {
+  return `import { defineConfig } from '@avijs/core';
+${syntax.import}
+
+// Environment variables, checked when the app starts. A .env file is read too, if present.
+const env = ${syntax.object([['PORT', syntax.port]])};
+
+export const Config = defineConfig(env, { envFile: '.env' });
+`;
+}
 
 function modular(): Record<string, string> {
   return {
@@ -329,5 +357,235 @@ test('answers 404 for an unknown user', async () => {
   assert.equal((await client.get('/users/99')).status, 404);
 });
 `,
+  };
+}
+
+const REJECTS_NAMELESS = `test('rejects a user without a name', async () => {
+  const res = await client.post('/users', {});
+  assert.equal(res.status, 400);
+  const body = res.body as { details: { issues: { in: string; path: string[] }[] } };
+  assert.deepEqual(
+    body.details.issues.map((issue) => \`\${issue.in}.\${issue.path.join('.')}\`),
+    ['body.name'],
+  );
+});
+`;
+
+/** The users feature with route schemas instead of a handwritten parser. */
+function modularSchemas(syntax: SchemaSyntax): Record<string, string> {
+  return {
+    'src/config.ts': configFile(syntax),
+    'src/main.ts': `import { AviFactory } from '@avijs/core';
+import { AppModule } from './app.module.js';
+import { Config } from './config.js';
+
+const app = await AviFactory.create(AppModule);
+${listenOn('app.get(Config).PORT')}`,
+    'src/app.module.ts': `import { Module } from '@avijs/core';
+import { HealthController } from './common/health.controller.js';
+import { Config } from './config.js';
+import { UsersModule } from './modules/users/users.module.js';
+
+@Module({ imports: [Config.module, UsersModule], controllers: [HealthController] })
+export class AppModule {}
+`,
+    'src/modules/users/dto/user.dto.ts': `${syntax.import}
+
+export const UserId = ${syntax.id};
+
+export const CreateUserDto = ${syntax.object([['name', syntax.text(100, 'name is required')]])};
+export type CreateUserDto = ${syntax.infer('CreateUserDto')};
+
+// Responses are checked against these and lose any field not listed, so internals cannot leak.
+export const User = ${syntax.object([
+      ['id', syntax.number],
+      ['name', syntax.string],
+    ])};
+export type User = ${syntax.infer('User')};
+
+export const UserList = ${syntax.array('User')};
+`,
+    'src/modules/users/users.service.ts': `import { Injectable } from '@avijs/core';
+import type { CreateUserDto, User } from './dto/user.dto.js';
+
+@Injectable()
+export class UsersService {
+  readonly #users: User[] = [{ id: 1, name: 'Ada' }];
+
+  findAll(): User[] {
+    return this.#users;
+  }
+
+  findOne(id: number): User | undefined {
+    return this.#users.find((user) => user.id === id);
+  }
+
+  create(dto: CreateUserDto): User {
+    const user = { id: this.#users.length + 1, name: dto.name };
+    this.#users.push(user);
+    return user;
+  }
+}
+`,
+    'src/modules/users/users.controller.ts': `import {
+  Controller,
+  Get,
+  HttpError,
+  Post,
+  reply,
+  type RouteContext,
+  type RouteSchema,
+} from '@avijs/core';
+import { CreateUserDto, User, UserId, UserList } from './dto/user.dto.js';
+import { UsersService } from './users.service.js';
+
+const findOne = { params: UserId, response: User } satisfies RouteSchema;
+const create = { body: CreateUserDto, response: User } satisfies RouteSchema;
+
+@Controller('/users')
+export class UsersController {
+  static inject = [UsersService] as const;
+
+  constructor(private readonly users: UsersService) {}
+
+  @Get('/', { schema: { response: UserList } })
+  findAll() {
+    return this.users.findAll();
+  }
+
+  @Get('/:id', { schema: findOne })
+  findOne(ctx: RouteContext<typeof findOne>) {
+    const user = this.users.findOne(ctx.input.params.id);
+    if (!user) throw new HttpError(404, 'User not found');
+    return user;
+  }
+
+  @Post('/', { schema: create })
+  create(ctx: RouteContext<typeof create>) {
+    return reply(this.users.create(ctx.input.body), { status: 201 });
+  }
+}
+`,
+    'src/modules/users/users.test.ts': `import assert from 'node:assert/strict';
+import { after, before, test } from 'node:test';
+import { createTestClient, type TestClient } from '@avijs/testing';
+import { AppModule } from '../../app.module.js';
+
+let client: TestClient;
+before(async () => {
+  client = await createTestClient(AppModule);
+});
+after(() => client.close());
+
+test('lists users', async () => {
+  const res = await client.get('/users');
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body, [{ id: 1, name: 'Ada' }]);
+});
+
+test('creates a user', async () => {
+  const res = await client.post('/users', { name: '  Grace  ', role: 'admin' });
+  assert.equal(res.status, 201);
+  assert.deepEqual(res.body, { id: 2, name: 'Grace' });
+});
+
+${REJECTS_NAMELESS}`,
+  };
+}
+
+function minimalSchemas(syntax: SchemaSyntax): Record<string, string> {
+  return {
+    'src/config.ts': configFile(syntax),
+    'src/main.ts': `import { createApp } from './app.js';
+import { Config } from './config.js';
+
+const app = createApp();
+await app.init();
+${listenOn('app.get(Config).PORT')}`,
+    'src/app.ts': `import { createAvi } from '@avijs/core';
+import { Config } from './config.js';
+import { healthRoutes } from './routes/health.js';
+import { usersRoutes } from './routes/users.js';
+import { UsersService } from './services/users.js';
+
+export function createApp() {
+  return createAvi().register({
+    imports: [Config.module],
+    providers: [UsersService],
+    controllers: [healthRoutes, usersRoutes],
+  });
+}
+`,
+    'src/routes/users.ts': `import { HttpError, defineController, reply, route } from '@avijs/core';
+${syntax.import}
+import { UsersService } from '../services/users.js';
+
+const UserId = ${syntax.id};
+
+const CreateUser = ${syntax.object([['name', syntax.text(100, 'name is required')]])};
+
+// Responses are checked against this and lose any field not listed, so internals cannot leak.
+const User = ${syntax.object([
+      ['id', syntax.number],
+      ['name', syntax.string],
+    ])};
+
+export const usersRoutes = defineController({
+  prefix: '/users',
+  inject: [UsersService],
+  routes: (users) => [
+    route({
+      method: 'GET',
+      path: '/',
+      schema: { response: ${syntax.array('User')} },
+      handler: () => users.findAll(),
+    }),
+    route({
+      method: 'GET',
+      path: '/:id',
+      schema: { params: UserId, response: User },
+      handler: (ctx) => {
+        const user = users.findOne(ctx.input.params.id);
+        if (!user) throw new HttpError(404, 'User not found');
+        return user;
+      },
+    }),
+    route({
+      method: 'POST',
+      path: '/',
+      schema: { body: CreateUser, response: User },
+      handler: (ctx) => reply(users.create(ctx.input.body.name), { status: 201 }),
+    }),
+  ],
+});
+`,
+    'src/app.test.ts': `import assert from 'node:assert/strict';
+import { after, before, test } from 'node:test';
+import { createTestClient, type TestClient } from '@avijs/testing';
+import { createApp } from './app.js';
+
+let client: TestClient;
+before(async () => {
+  client = await createTestClient(createApp());
+});
+after(() => client.close());
+
+test('lists users', async () => {
+  const res = await client.get('/users');
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body, [{ id: 1, name: 'Ada' }]);
+});
+
+test('creates a user', async () => {
+  const res = await client.post('/users', { name: '  Grace  ', role: 'admin' });
+  assert.equal(res.status, 201);
+  assert.deepEqual(res.body, { id: 2, name: 'Grace' });
+});
+
+test('answers 404 for an unknown user', async () => {
+  assert.equal((await client.get('/users/99')).status, 404);
+});
+
+${REJECTS_NAMELESS}`,
   };
 }

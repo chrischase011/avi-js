@@ -31,7 +31,7 @@ describe('create', () => {
     expect(existsSync(path.join(dir, 'my-app/src/routes/users.ts'))).toBe(true);
   });
 
-  it('asks for the name and template when the name is missing', async () => {
+  it('asks for the name, template and validator when the name is missing', async () => {
     const ask = vi.fn((question: string, fallback: string) =>
       Promise.resolve(question.startsWith('Template') ? 'minimal' : fallback),
     );
@@ -39,15 +39,18 @@ describe('create', () => {
     expect(ask.mock.calls.map(([question]) => question)).toEqual([
       'Project name',
       'Template, modular or minimal',
+      'Validation library, valibot, zod or none',
     ]);
     expect(await name('my-avi-app')).toBe('my-avi-app');
     expect(existsSync(path.join(dir, 'my-avi-app/src/routes/users.ts'))).toBe(true);
   });
 
-  it('only asks for the name when the template is given', async () => {
+  it('only asks for what is missing', async () => {
     const ask = vi.fn(() => Promise.resolve('named'));
-    expect(await create(['--template', 'modular', '--dir', dir], ask)).toBe(0);
+    const args = ['--template', 'modular', '--validator', 'zod', '--dir', dir];
+    expect(await create(args, ask)).toBe(0);
     expect(ask).toHaveBeenCalledTimes(1);
+    expect(await readFile(path.join(dir, 'named/package.json'), 'utf8')).toContain('"zod"');
     expect(existsSync(path.join(dir, 'named/src/app.module.ts'))).toBe(true);
   });
 

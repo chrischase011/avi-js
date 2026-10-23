@@ -1,6 +1,6 @@
 // Generates each template, compiles it, runs its tests and starts it, against the local packages.
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdir, mkdtemp, readFile, rm, symlink } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, realpath, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -29,11 +29,14 @@ async function linkPackages(project: string): Promise<void> {
     ['@avijs/core', 'packages/core'],
     ['@avijs/testing', 'packages/testing'],
     ['@types/node', 'node_modules/@types/node'],
+    // Generated projects import their validator; the CLI has both as dev dependencies.
+    ['valibot', 'packages/cli/node_modules/valibot'],
+    ['zod', 'packages/cli/node_modules/zod'],
   ];
   for (const [name, target] of links) {
     const at = path.join(project, 'node_modules', name);
     await mkdir(path.dirname(at), { recursive: true });
-    await symlink(path.join(root, target), at, 'junction');
+    await symlink(await realpath(path.join(root, target)), at, 'junction');
   }
 }
 
@@ -73,70 +76,97 @@ function startAndGet(project: string, urlPath: string): Promise<{ status: number
   });
 }
 
-describe.each(['modular', 'minimal'] as const)('avi new --template %s', (template) => {
-  let project: string;
+const TEMPLATES = ['modular', 'minimal'] as const;
+const VALIDATORS = ['valibot', 'zod', 'none'] as const;
 
-  beforeAll(async () => {
-    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
-    const code = await main(['new', `demo-${template}`, '--template', template, '--dir', workdir]);
-    log.mockRestore();
-    expect(code).toBe(0);
-    project = path.join(workdir, `demo-${template}`);
-    await linkPackages(project);
-  });
+describe.each(TEMPLATES.flatMap((t) => VALIDATORS.map((v) => [t, v] as const)))(
+  'avi new --template %s --validator %s',
+  (template, validator) => {
+    let project: string;
+    const name = `demo-${template}-${validator}`;
 
-  it('writes the documented layout', async () => {
-    const files = Object.keys(templateFiles({ name: 'x', template, aviVersion: 'latest' }));
-    expect(files).toEqual(
-      expect.arrayContaining(
-        template === 'modular'
-          ? [
-              'src/main.ts',
-              'src/app.module.ts',
-              'src/modules/users/users.module.ts',
-              'src/common/health.controller.ts',
-            ]
-          : ['src/main.ts', 'src/routes/users.ts', 'src/services/users.ts'],
-      ),
-    );
-    const pkg = JSON.parse(await readFile(path.join(project, 'package.json'), 'utf8')) as {
-      name: string;
-      dependencies: Record<string, string>;
-    };
-    expect(pkg.name).toBe(`demo-${template}`);
-    const cli = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8')) as {
-      version: string;
-    };
-    expect(pkg.dependencies['@avijs/core']).toBe(`^${cli.version}`);
-  });
-
-  it('compiles', () => {
-    const result = run([tsc, '-p', 'tsconfig.json'], project);
-    expect(result.stdout + result.stderr).toBe('');
-    expect(result.status).toBe(0);
-  }, 60_000);
-
-  it('passes its own tests', () => {
-    const result = run(['--test', 'dist/**/*.test.js'], project);
-    expect(result.status, result.stdout + result.stderr).toBe(0);
-    expect(result.stdout).toMatch(/pass 3/);
-  }, 60_000);
-
-  it('serves requests', async () => {
-    expect(await startAndGet(project, '/health')).toEqual({ status: 200, body: 'ok' });
-    expect(await startAndGet(project, '/users/1')).toEqual({
-      status: 200,
-      body: '{"id":1,"name":"Ada"}',
+    beforeAll(async () => {
+      const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+      const code = await main([
+        'new',
+        name,
+        '--template',
+        template,
+        '--validator',
+        validator,
+        '--dir',
+        workdir,
+      ]);
+      log.mockRestore();
+      expect(code).toBe(0);
+      project = path.join(workdir, name);
+      await linkPackages(project);
     });
-  }, 60_000);
 
-  it('passes avi check', async () => {
-    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
-    const code = await main(['check', '--project', path.join(project, 'tsconfig.json')]);
-    log.mockRestore();
-    expect(code).toBe(0);
-  }, 60_000);
-});
+    it('writes the documented layout', async () => {
+      const files = Object.keys(
+        templateFiles({ name: 'x', template, validator, aviVersion: 'latest' }),
+      );
+      expect(files).toEqual(
+        expect.arrayContaining(
+          template === 'modular'
+            ? [
+                'src/main.ts',
+                'src/app.module.ts',
+                'src/modules/users/users.module.ts',
+                'src/common/health.controller.ts',
+                validator === 'none'
+                  ? 'src/modules/users/dto/create-user.dto.ts'
+                  : 'src/modules/users/dto/user.dto.ts',
+              ]
+            : ['src/main.ts', 'src/routes/users.ts', 'src/services/users.ts'],
+        ),
+      );
+      const pkg = JSON.parse(await readFile(path.join(project, 'package.json'), 'utf8')) as {
+        name: string;
+        dependencies: Record<string, string>;
+      };
+      expect(pkg.name).toBe(name);
+      if (validator === 'none') expect(Object.keys(pkg.dependencies)).toEqual(['@avijs/core']);
+      else expect(pkg.dependencies[validator]).toMatch(/^\^\d/);
+      const cli = JSON.parse(
+        await readFile(new URL('../package.json', import.meta.url), 'utf8'),
+      ) as {
+        version: string;
+      };
+      expect(pkg.dependencies['@avijs/core']).toBe(`^${cli.version}`);
+    });
+
+    it('compiles', () => {
+      const result = run([tsc, '-p', 'tsconfig.json'], project);
+      expect(result.stdout + result.stderr).toBe('');
+      expect(result.status).toBe(0);
+    }, 60_000);
+
+    it('passes its own tests', () => {
+      const result = run(['--test', 'dist/**/*.test.js'], project);
+      expect(result.status, result.stdout + result.stderr).toBe(0);
+      // The minimal template adds a validation test when it has schemas.
+      const tests = template === 'minimal' && validator !== 'none' ? 4 : 3;
+      expect(result.stdout).toMatch(new RegExp(`pass ${String(tests)}`));
+    }, 60_000);
+
+    it('serves requests', async () => {
+      expect(await startAndGet(project, '/health')).toEqual({ status: 200, body: 'ok' });
+      expect(await startAndGet(project, '/users/1')).toEqual({
+        status: 200,
+        body: '{"id":1,"name":"Ada"}',
+      });
+    }, 60_000);
+
+    it('passes avi check', async () => {
+      const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+      const code = await main(['check', '--project', path.join(project, 'tsconfig.json')]);
+      log.mockRestore();
+      expect(code).toBe(0);
+    }, 60_000);
+  },
+);
 
 describe('avi', () => {
   it('refuses to overwrite a non-empty folder', async () => {
@@ -183,9 +213,13 @@ describe('avi', () => {
 });
 
 describe('avi generate', () => {
-  async function project(template: 'modular' | 'minimal', name: string): Promise<string> {
+  async function project(
+    template: 'modular' | 'minimal',
+    name: string,
+    validator = 'valibot',
+  ): Promise<string> {
     const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
-    await main(['new', name, '--template', template, '--dir', workdir]);
+    await main(['new', name, '--template', template, '--validator', validator, '--dir', workdir]);
     log.mockRestore();
     const dir = path.join(workdir, name);
     await linkPackages(dir);
@@ -245,7 +279,7 @@ export class PostsModule {}
       "import { ReportsController } from './modules/admin/reports/reports.controller.js';",
     );
     expect(app).toContain(
-      '@Module({ imports: [UsersModule, PostsModule], controllers: [HealthController, ReportsController] })',
+      '@Module({ imports: [Config.module, UsersModule, PostsModule], controllers: [HealthController, ReportsController] })',
     );
     expect(await read(dir, 'src/modules/posts/posts.controller.ts')).toContain(
       'static inject = [PostsService] as const;',
@@ -301,7 +335,7 @@ export class PostsModule {}
     expect((await generate(path.join(workdir, 'nowhere'), 'service', 'x')).code).toBe(1);
   }, 60_000);
 
-  /** Runs create, read, update and delete against a running app. */
+  /** Runs a CRUD sequence against a running app and returns each status and body. */
   async function crud(dir: string, prefix: string) {
     return withApp(dir, async (base) => {
       const send = async (method: string, urlPath: string, body?: unknown) => {
@@ -319,59 +353,126 @@ export class PostsModule {}
         await send('GET', '/1'),
         await send('POST', '', [1, 2]),
         await send('GET', '/abc'),
+        await send('POST', '', { title: 'Two', role: 'admin' }),
+        await send('PATCH', '/1', {}),
         await send('DELETE', '/1'),
         await send('GET', '/1'),
       ].map((r) => [r.status, r.body] as const);
     });
   }
 
-  const EXPECTED_CRUD = [
+  const shared = [
     [201, { title: 'Hello', id: 1 }],
     [200, [{ title: 'Hello', id: 1 }]],
     [200, { title: 'Hi', id: 1 }],
     [200, { title: 'Hi', id: 1 }],
-    [400, expect.objectContaining({ message: 'Expected a JSON object' })],
-    [400, expect.objectContaining({ message: 'id must be an integer' })],
-    [204, undefined],
-    [404, expect.objectContaining({ message: 'Category 1 not found' })],
   ];
+  const notFound = [404, expect.objectContaining({ message: 'Category 1 not found' })];
 
-  it('creates a CRUD resource in a modular project', async () => {
-    const dir = await project('modular', 'res-modular');
+  const EXPECTED_CRUD = {
+    // Without a validator, extra fields are stored as sent; the generator warns about it.
+    none: [
+      ...shared,
+      [400, expect.objectContaining({ message: 'Expected a JSON object' })],
+      [400, expect.objectContaining({ message: 'id must be an integer' })],
+      [201, { title: 'Two', role: 'admin', id: 2 }],
+      [200, { title: 'Hi', id: 1 }],
+      [204, undefined],
+      notFound,
+    ],
+    schema: [
+      ...shared,
+      [400, expect.objectContaining({ message: 'Validation failed' })],
+      [400, expect.objectContaining({ message: 'Validation failed' })],
+      [201, { title: 'Two', id: 2 }],
+      [
+        400,
+        expect.objectContaining({
+          details: { issues: [expect.objectContaining({ message: 'nothing to update' })] },
+        }),
+      ],
+      [204, undefined],
+      notFound,
+    ],
+  };
 
-    expect((await generate(dir, 'res', 'shop/categories')).out).toEqual([
-      'CREATE src/modules/shop/categories/categories.module.ts',
-      'CREATE src/modules/shop/categories/categories.service.ts',
-      'CREATE src/modules/shop/categories/categories.controller.ts',
-      'UPDATE src/app.module.ts',
-    ]);
-    expect(await read(dir, 'src/app.module.ts')).toContain(
-      "import { CategoriesModule } from './modules/shop/categories/categories.module.js';",
-    );
+  const NOTE: unknown = expect.stringContaining('NOTE   No validation library');
 
-    const result = run([tsc, '-p', 'tsconfig.json'], dir);
-    expect(result.stdout + result.stderr).toBe('');
-    expect(await crud(dir, '/categories')).toEqual(EXPECTED_CRUD);
+  describe.each(['valibot', 'zod', 'none'] as const)('resource with validator %s', (validator) => {
+    const expected = validator === 'none' ? EXPECTED_CRUD.none : EXPECTED_CRUD.schema;
 
-    const again = await generate(dir, 'resource', 'shop/categories');
-    expect(again.code).toBe(1);
-    expect(again.err[0]).toContain('already exists');
-  }, 120_000);
+    it('creates a CRUD resource in a modular project', async () => {
+      const dir = await project('modular', `res-modular-${validator}`, validator);
 
-  it('creates a CRUD resource in a minimal project', async () => {
-    const dir = await project('minimal', 'res-minimal');
+      const folder = 'src/modules/shop/categories';
+      expect((await generate(dir, 'res', 'shop/categories')).out).toEqual(
+        validator === 'none'
+          ? [
+              `CREATE ${folder}/categories.module.ts`,
+              `CREATE ${folder}/categories.service.ts`,
+              `CREATE ${folder}/categories.controller.ts`,
+              'UPDATE src/app.module.ts',
+              NOTE,
+            ]
+          : [
+              `CREATE ${folder}/categories.module.ts`,
+              `CREATE ${folder}/categories.schemas.ts`,
+              `CREATE ${folder}/categories.service.ts`,
+              `CREATE ${folder}/categories.controller.ts`,
+              'UPDATE src/app.module.ts',
+            ],
+      );
+      expect(await read(dir, 'src/app.module.ts')).toContain(
+        "import { CategoriesModule } from './modules/shop/categories/categories.module.js';",
+      );
 
-    expect((await generate(dir, 'resource', 'categories')).out).toEqual([
-      'CREATE src/services/categories.ts',
-      'CREATE src/routes/categories.ts',
-      'UPDATE src/app.ts',
-    ]);
-    const app = await read(dir, 'src/app.ts');
-    expect(app).toContain('providers: [UsersService, CategoriesService]');
-    expect(app).toContain('controllers: [healthRoutes, usersRoutes, categoriesRoutes]');
+      const result = run([tsc, '-p', 'tsconfig.json'], dir);
+      expect(result.stdout + result.stderr).toBe('');
+      expect(await crud(dir, '/categories')).toEqual(expected);
 
-    const result = run([tsc, '-p', 'tsconfig.json'], dir);
-    expect(result.stdout + result.stderr).toBe('');
-    expect(await crud(dir, '/categories')).toEqual(EXPECTED_CRUD);
-  }, 120_000);
+      const again = await generate(dir, 'resource', 'shop/categories');
+      expect(again.code).toBe(1);
+      expect(again.err[0]).toContain('already exists');
+    }, 120_000);
+
+    it('creates a CRUD resource in a minimal project', async () => {
+      const dir = await project('minimal', `res-minimal-${validator}`, validator);
+
+      expect((await generate(dir, 'resource', 'categories')).out).toEqual(
+        validator === 'none'
+          ? [
+              'CREATE src/services/categories.ts',
+              'CREATE src/routes/categories.ts',
+              'UPDATE src/app.ts',
+              NOTE,
+            ]
+          : [
+              'CREATE src/schemas/categories.ts',
+              'CREATE src/services/categories.ts',
+              'CREATE src/routes/categories.ts',
+              'UPDATE src/app.ts',
+            ],
+      );
+      const app = await read(dir, 'src/app.ts');
+      expect(app).toContain('providers: [UsersService, CategoriesService]');
+      expect(app).toContain('controllers: [healthRoutes, usersRoutes, categoriesRoutes]');
+
+      const result = run([tsc, '-p', 'tsconfig.json'], dir);
+      expect(result.stdout + result.stderr).toBe('');
+      expect(await crud(dir, '/categories')).toEqual(expected);
+    }, 120_000);
+  });
+
+  it('detects the validator from package.json, or takes --validator', async () => {
+    const dir = await project('modular', 'res-detect', 'zod');
+    const files = async (...extra: string[]) =>
+      (await generate(dir, 'res', 'tags', '--dry-run', ...extra)).out;
+
+    expect(await files()).toContain('CREATE src/modules/tags/tags.schemas.ts');
+    expect(await files('--validator', 'none')).toEqual(expect.arrayContaining([NOTE]));
+
+    const unknown = await generate(dir, 'res', 'tags', '--validator', 'yup');
+    expect(unknown.code).toBe(2);
+    expect(unknown.err[0]).toContain('Unknown validator "yup"');
+  }, 60_000);
 });

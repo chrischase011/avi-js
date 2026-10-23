@@ -1,8 +1,15 @@
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 import ts from 'typescript';
+import {
+  SYNTAX,
+  VALIDATORS,
+  detectValidator,
+  type SchemaSyntax,
+  type Validator,
+} from './validators.js';
 
 type Kind = 'module' | 'controller' | 'service' | 'resource';
 type Layout = 'modular' | 'minimal';
@@ -23,7 +30,8 @@ export const GENERATE_USAGE = `  avi generate <module|controller|service|resourc
       Create a module, controller or service and register it. Short: avi g co admin/posts.
       Modular projects get src/modules/<path>/<name>.<kind>.ts, registered in the nearest
       module; minimal projects get src/routes/<path>.ts or src/services/<path>.ts, registered
-      in src/app.ts. A resource (avi g res posts) creates all of them with CRUD routes.`;
+      in src/app.ts. A resource (avi g res posts) creates all of them with CRUD routes, validated
+      with the project's valibot or zod (--validator valibot|zod|none to choose).`;
 
 interface Names {
   /** kebab-case file name, e.g. `user-profile`. */
@@ -79,6 +87,7 @@ export async function generate(args: readonly string[]): Promise<number> {
     options: {
       root: { type: 'string', default: '.' },
       'dry-run': { type: 'boolean', default: false },
+      validator: { type: 'string' },
     },
   });
   const [kindArg, target] = positionals;
@@ -110,12 +119,20 @@ export async function generate(args: readonly string[]): Promise<number> {
     return 1;
   }
 
+  const validator = (values.validator ??
+    detectValidator(readJson(path.join(root, 'package.json')))) as Validator;
+  if (!VALIDATORS.includes(validator)) {
+    console.error(`Unknown validator "${validator}". Use ${VALIDATORS.join(', ')}.`);
+    return 2;
+  }
+  const syntax = validator === 'none' ? undefined : SYNTAX[validator];
+
   const names = toNames(segments.at(-1) as string);
   const dirs = segments.slice(0, -1);
   const plan = new Plan();
   try {
-    if (layout === 'modular') await modular(plan, src, kind, dirs, names);
-    else await minimal(plan, src, kind, dirs, names);
+    if (layout === 'modular') await modular(plan, src, kind, dirs, names, syntax);
+    else await minimal(plan, src, kind, dirs, names, syntax);
   } catch (error) {
     if (!(error instanceof GenerateError)) throw error;
     console.error(error.message);
@@ -131,14 +148,29 @@ async function modular(
   kind: Kind,
   dirs: readonly string[],
   names: Names,
+  syntax: SchemaSyntax | undefined,
 ): Promise<void> {
   const folder = path.join(src, 'modules', ...dirs, names.file);
 
   if (kind === 'resource') {
     const module = path.join(folder, `${names.file}.module.ts`);
     plan.create(module, resourceModule(names));
-    plan.create(path.join(folder, `${names.file}.service.ts`), crudService(names, true));
-    plan.create(path.join(folder, `${names.file}.controller.ts`), crudController(names));
+    if (syntax) {
+      const schemas = `./${names.file}.schemas.js`;
+      plan.create(path.join(folder, `${names.file}.schemas.ts`), resourceSchemas(names, syntax));
+      plan.create(
+        path.join(folder, `${names.file}.service.ts`),
+        typedService(names, true, schemas),
+      );
+      plan.create(
+        path.join(folder, `${names.file}.controller.ts`),
+        typedController(names, schemas),
+      );
+    } else {
+      plan.create(path.join(folder, `${names.file}.service.ts`), crudService(names, true));
+      plan.create(path.join(folder, `${names.file}.controller.ts`), crudController(names));
+      plan.notes.push(UNVALIDATED);
+    }
     const parent = nearestModule(plan, src, path.dirname(folder));
     await register(plan, parent, 'imports', `${names.pascal}Module`, module);
     return;
@@ -219,6 +251,7 @@ async function minimal(
   kind: Kind,
   dirs: readonly string[],
   names: Names,
+  syntax: SchemaSyntax | undefined,
 ): Promise<void> {
   if (kind === 'module') {
     throw new GenerateError(
@@ -231,8 +264,19 @@ async function minimal(
 
   if (kind === 'resource') {
     const routes = path.join(src, 'routes', ...dirs, `${names.file}.ts`);
-    plan.create(service, crudService(names, false));
-    plan.create(routes, crudRoutes(names, importPath(routes, service)));
+    if (syntax) {
+      const schemas = path.join(src, 'schemas', ...dirs, `${names.file}.ts`);
+      plan.create(schemas, resourceSchemas(names, syntax));
+      plan.create(service, typedService(names, false, importPath(service, schemas)));
+      plan.create(
+        routes,
+        typedRoutes(names, importPath(routes, service), importPath(routes, schemas)),
+      );
+    } else {
+      plan.create(service, crudService(names, false));
+      plan.create(routes, crudRoutes(names, importPath(routes, service)));
+      plan.notes.push(UNVALIDATED);
+    }
     await register(plan, app, 'providers', serviceClass, service);
     await register(plan, app, 'controllers', `${names.camel}Routes`, routes);
     return;
@@ -563,6 +607,180 @@ export const ${field}Routes = defineController({
       path: '/:id',
       handler: (ctx) => {
         ${field}.remove(idOf(ctx.params.id));
+      },
+    }),
+  ],
+});
+`;
+}
+
+function readJson(file: string): unknown {
+  try {
+    return JSON.parse(readFileSync(file, 'utf8')) as unknown;
+  } catch {
+    return undefined;
+  }
+}
+
+const UNVALIDATED =
+  'NOTE   No validation library in package.json: request bodies are stored as sent. Install valibot\n       or zod and generate with --validator to get schemas that reject unknown fields.';
+
+/** Names of a resource's schemas: `posts` → `PostId`, `CreatePost`, `UpdatePost`. */
+function schemaNames(names: Names) {
+  const item = singular(names.pascal);
+  return { item, id: `${item}Id`, create: `Create${item}`, update: `Update${item}` };
+}
+
+function resourceSchemas(names: Names, syntax: SchemaSyntax): string {
+  const { id, create, update } = schemaNames(names);
+  return `${syntax.import}
+
+export const ${id} = ${syntax.id};
+
+// Add your fields here. Fields not listed are dropped from request bodies.
+export const ${create} = ${syntax.object([['title', syntax.text(200, 'title is required')]])};
+export type ${create} = ${syntax.infer(create)};
+
+export const ${update} = ${syntax.partialNonEmpty(create)};
+export type ${update} = ${syntax.infer(update)};
+`;
+}
+
+function typedService(names: Names, decorated: boolean, schemas: string): string {
+  const { item, create, update } = schemaNames(names);
+  const imports = decorated ? 'HttpError, Injectable' : 'HttpError';
+  return `import { ${imports} } from '@avijs/core';
+import type { ${create}, ${update} } from '${schemas}';
+
+export type ${item} = { id: number } & ${create};
+
+/** Keeps ${names.file} in memory. Swap the Map for your database; the routes stay the same. */
+${decorated ? '@Injectable()\n' : ''}export class ${names.pascal}Service {
+  readonly #items = new Map<number, ${item}>();
+  #nextId = 1;
+
+  findAll(): ${item}[] {
+    return [...this.#items.values()];
+  }
+
+  findOne(id: number): ${item} {
+    const item = this.#items.get(id);
+    if (!item) throw new HttpError(404, \`${item} \${String(id)} not found\`);
+    return item;
+  }
+
+  create(data: ${create}): ${item} {
+    const item = { ...data, id: this.#nextId++ };
+    this.#items.set(item.id, item);
+    return item;
+  }
+
+  update(id: number, data: ${update}): ${item} {
+    const item = { ...this.findOne(id), ...data, id };
+    this.#items.set(id, item);
+    return item;
+  }
+
+  remove(id: number): void {
+    this.findOne(id);
+    this.#items.delete(id);
+  }
+}
+`;
+}
+
+function typedController(names: Names, schemas: string): string {
+  const { id, create, update } = schemaNames(names);
+  const service = `${names.pascal}Service`;
+  const field = names.camel;
+  return `import {
+  Controller,
+  Delete,
+  Get,
+  Patch,
+  Post,
+  reply,
+  type RouteContext,
+  type RouteSchema,
+} from '@avijs/core';
+import { ${create}, ${id}, ${update} } from '${schemas}';
+import { ${service} } from './${names.file}.service.js';
+
+const byId = { params: ${id} } satisfies RouteSchema;
+const create = { body: ${create} } satisfies RouteSchema;
+const update = { params: ${id}, body: ${update} } satisfies RouteSchema;
+
+@Controller('/${names.file}')
+export class ${names.pascal}Controller {
+  static inject = [${service}] as const;
+
+  constructor(private readonly ${field}: ${service}) {}
+
+  @Get()
+  findAll() {
+    return this.${field}.findAll();
+  }
+
+  @Get('/:id', { schema: byId })
+  findOne(ctx: RouteContext<typeof byId>) {
+    return this.${field}.findOne(ctx.input.params.id);
+  }
+
+  @Post('/', { schema: create })
+  create(ctx: RouteContext<typeof create>) {
+    return reply(this.${field}.create(ctx.input.body), { status: 201 });
+  }
+
+  @Patch('/:id', { schema: update })
+  update(ctx: RouteContext<typeof update>) {
+    return this.${field}.update(ctx.input.params.id, ctx.input.body);
+  }
+
+  @Delete('/:id', { schema: byId })
+  remove(ctx: RouteContext<typeof byId>) {
+    this.${field}.remove(ctx.input.params.id);
+  }
+}
+`;
+}
+
+function typedRoutes(names: Names, serviceImport: string, schemas: string): string {
+  const { id, create, update } = schemaNames(names);
+  const service = `${names.pascal}Service`;
+  const field = names.camel;
+  return `import { defineController, reply, route } from '@avijs/core';
+import { ${create}, ${id}, ${update} } from '${schemas}';
+import { ${service} } from '${serviceImport}';
+
+export const ${field}Routes = defineController({
+  prefix: '/${names.file}',
+  inject: [${service}],
+  routes: (${field}) => [
+    route({ method: 'GET', path: '/', handler: () => ${field}.findAll() }),
+    route({
+      method: 'GET',
+      path: '/:id',
+      schema: { params: ${id} },
+      handler: (ctx) => ${field}.findOne(ctx.input.params.id),
+    }),
+    route({
+      method: 'POST',
+      path: '/',
+      schema: { body: ${create} },
+      handler: (ctx) => reply(${field}.create(ctx.input.body), { status: 201 }),
+    }),
+    route({
+      method: 'PATCH',
+      path: '/:id',
+      schema: { params: ${id}, body: ${update} },
+      handler: (ctx) => ${field}.update(ctx.input.params.id, ctx.input.body),
+    }),
+    route({
+      method: 'DELETE',
+      path: '/:id',
+      schema: { params: ${id} },
+      handler: (ctx) => {
+        ${field}.remove(ctx.input.params.id);
       },
     }),
   ],

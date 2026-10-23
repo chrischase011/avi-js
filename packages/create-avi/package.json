@@ -1,6 +1,6 @@
 {
   "name": "create-avi",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Create an Avi.js project: npm create avi@latest my-app",
   "keywords": [
     "avi",

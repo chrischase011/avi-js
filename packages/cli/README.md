@@ -8,7 +8,7 @@ npm install -D @avijs/cli
 
 | Command                   | What it does                                                                           |
 | ------------------------- | -------------------------------------------------------------------------------------- |
-| `avi new <name>`          | Creates a project (`--template modular` or `minimal`). Also `npm create avi`           |
+| `avi new <name>`          | Creates a project; see `--template` and `--validator`. Also `npm create avi`           |
 | `avi g <kind> <path>`     | Adds a `module`, `controller`, `service`, or a whole CRUD `resource`, and registers it |
 | `avi dev`                 | Compiles, then recompiles and restarts on every change                                 |
 | `avi check`               | Type-checks every `static inject` list                                                 |
