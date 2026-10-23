@@ -2,6 +2,8 @@ import './decorators.js';
 
 export { AviFactory, createAvi } from './app.js';
 export type { AviApp, AviOptions, RouteInfo } from './app.js';
+export { ConfigError, defineConfig } from './config.js';
+export type { ConfigOptions, ConfigToken } from './config.js';
 export { defineController } from './controller.js';
 export { describeApp } from './describe.js';
 export type {
@@ -36,6 +38,7 @@ export type {
   MiddlewareClass,
   MiddlewareRef,
   Route,
+  RouteContext,
   RouteDocs,
   TypedRoute,
 } from './pipeline.js';
@@ -49,7 +52,7 @@ export type {
   ValidationIssue,
 } from '@avijs/validation';
 
-export { HTTP_METHODS, HttpError, reply } from '@avijs/http';
+export { HTTP_METHODS, HttpError, jsonLogger, logRequests, reply, sse } from '@avijs/http';
 export type {
   AviState,
   Context,
@@ -58,6 +61,9 @@ export type {
   Handler,
   HttpErrorOptions,
   HttpMethod,
+  JsonLoggerOptions,
+  LogFields,
+  LogRequestsOptions,
   Logger,
   Middleware,
   Next,
@@ -66,8 +72,12 @@ export type {
   Reply,
   ReplyInit,
   RequestHook,
+  RequestIdOptions,
   ResponseInfo,
   RouteDefinition,
+  ServerSentEvent,
+  SseOptions,
+  SseSource,
 } from '@avijs/http';
 export { createToken } from '@avijs/di';
 export type {

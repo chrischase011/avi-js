@@ -8,6 +8,8 @@ import {
   type Context,
   type NoInput,
   type PathParams,
+  type RouteContext,
+  type RouteSchema,
 } from '../src/index.js';
 
 const CreateUser = v.object({ name: v.string() });
@@ -113,6 +115,41 @@ describe('route decorators with schemas', () => {
       // @ts-expect-error body is { name: string }, not a number
       @Post('/', { schema: { body: CreateUser } })
       create(ctx: Context<{ body: number }>) {
+        return ctx.input.body;
+      }
+    }
+    expectTypeOf(Users).not.toBeNever();
+  });
+});
+
+describe('RouteContext', () => {
+  const create = { body: CreateUser } satisfies RouteSchema;
+  const update = { params: v.object({ id: v.string() }), body: CreateUser } satisfies RouteSchema;
+
+  it('types ctx.input from a schema declared once', () => {
+    @Controller()
+    class Users {
+      @Post('/', { schema: create })
+      create(ctx: RouteContext<typeof create>) {
+        expectTypeOf(ctx.input.body).toEqualTypeOf<{ name: string }>();
+        return ctx.input.body.name;
+      }
+
+      @Post('/:id', { schema: update })
+      update(ctx: RouteContext<typeof update>) {
+        expectTypeOf(ctx.input.params).toEqualTypeOf<{ id: string }>();
+        return ctx.input.body.name;
+      }
+    }
+    expectTypeOf(Users).not.toBeNever();
+  });
+
+  it('rejects a context for another schema', () => {
+    @Controller()
+    class Users {
+      // @ts-expect-error the route validates PublicUser, not CreateUser
+      @Post('/:id', { schema: { body: PublicUser } })
+      create(ctx: RouteContext<typeof create>) {
         return ctx.input.body;
       }
     }

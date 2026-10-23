@@ -1,5 +1,14 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { createAvi, defineController, reply, type AviApp } from '../src/index.js';
+import {
+  Controller,
+  Get,
+  createAvi,
+  defineController,
+  reply,
+  sse,
+  type AviApp,
+  type Context,
+} from '../src/index.js';
 
 let app: AviApp | undefined;
 
@@ -163,5 +172,36 @@ describe('createAvi', () => {
     expect((await fetch(url)).headers.get('x-hook')).toBe('1');
     expect(order).toEqual(['hook', 'middleware', 'handler']);
     expect((await fetch(`${url}/missing`)).headers.get('x-hook')).toBe('1');
+  });
+});
+
+describe('sse', () => {
+  it('streams events from decorator and explicit controllers', async () => {
+    @Controller('/a')
+    class Decorated {
+      @Get('/')
+      events(ctx: Context) {
+        return sse(ctx, function* () {
+          yield { event: 'from', data: 'decorator' };
+        });
+      }
+    }
+    const explicit = defineController({
+      prefix: '/b',
+      routes: [
+        {
+          method: 'GET',
+          path: '/',
+          handler: (ctx) =>
+            sse(ctx, function* () {
+              yield { event: 'from', data: 'explicit' };
+            }),
+        },
+      ],
+    });
+    const url = await serve(createAvi().register({ controllers: [Decorated, explicit] }));
+
+    expect(await (await fetch(`${url}/a`)).text()).toBe('event: from\ndata: decorator\n\n');
+    expect(await (await fetch(`${url}/b`)).text()).toBe('event: from\ndata: explicit\n\n');
   });
 });

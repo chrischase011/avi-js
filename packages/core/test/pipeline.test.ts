@@ -236,6 +236,7 @@ describe('middleware behavior', () => {
     expect(logger.error).toHaveBeenCalledWith(
       'Request failed: GET /',
       expect.objectContaining({ message: 'next() was called more than once' }),
+      expect.objectContaining({ method: 'GET' }),
     );
   });
 

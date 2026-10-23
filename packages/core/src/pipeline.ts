@@ -42,6 +42,13 @@ export interface RouteDocs {
   readonly deprecated?: boolean;
 }
 
+/**
+ * The context of a handler for route schema `S`, with `ctx.input` typed from it. Declare the
+ * schema once and use it in both places: `@Post('/', { schema: create })` and
+ * `create(ctx: RouteContext<typeof create>)`.
+ */
+export type RouteContext<S extends RouteSchema> = Context<InputOf<S>>;
+
 /** A route whose handler is typed from its path and schema. Created with `route()`. */
 export interface TypedRoute<P extends string, S extends RouteSchema> {
   readonly method: HttpMethod;

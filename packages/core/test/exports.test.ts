@@ -14,6 +14,7 @@ describe('@avijs/core', () => {
   it('exposes only the documented runtime exports', () => {
     expect(Object.keys(core).sort()).toEqual([
       'AviFactory',
+      'ConfigError',
       'Controller',
       'Delete',
       'Get',
@@ -31,11 +32,15 @@ describe('@avijs/core', () => {
       'UseMiddleware',
       'createAvi',
       'createToken',
+      'defineConfig',
       'defineController',
       'defineModule',
       'describeApp',
+      'jsonLogger',
+      'logRequests',
       'reply',
       'route',
+      'sse',
     ]);
   });
 });

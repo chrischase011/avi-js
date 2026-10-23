@@ -318,7 +318,9 @@ describe('explicit and decorator apps', () => {
       for (const [path, init] of requests) {
         const res = await fetch(`${base}${path}`, init);
         const headers = Object.fromEntries(
-          [...res.headers].filter(([name]) => !['date', 'keep-alive', 'connection'].includes(name)),
+          [...res.headers].filter(
+            ([name]) => !['date', 'keep-alive', 'connection', 'x-request-id'].includes(name),
+          ),
         );
         results.push({ path, status: res.status, headers, body: await res.text() });
       }

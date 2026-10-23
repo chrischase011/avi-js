@@ -182,6 +182,7 @@ describe('response schemas', () => {
     expect(logger.error).toHaveBeenCalledWith(
       'Request failed: GET /me',
       expect.objectContaining({ message: 'Response does not match its schema' }),
+      expect.objectContaining({ method: 'GET', path: '/me' }),
     );
   });
 });

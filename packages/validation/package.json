@@ -1,6 +1,6 @@
 {
   "name": "@avijs/validation",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Standard Schema validation for Avi.js routes.",
   "keywords": [
     "avi",

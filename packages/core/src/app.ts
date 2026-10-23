@@ -110,8 +110,8 @@ class Application implements AviApp {
     this.#manifest = options.manifest;
     this.#overrides = options.overrides ?? [];
     this.#logger = options.logger ?? {
-      error(message, error) {
-        console.error(message, error);
+      error(message, error, fields) {
+        console.error(fields?.requestId ? `${message} [${fields.requestId}]` : message, error);
       },
     };
   }
@@ -246,6 +246,7 @@ class Application implements AviApp {
           this.#logger.error(
             `Failed to dispose request-scoped providers: ${ctx.method} ${ctx.path}`,
             error,
+            { requestId: ctx.id, method: ctx.method, path: ctx.path },
           );
         });
       }
