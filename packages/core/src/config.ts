@@ -26,6 +26,13 @@ export interface ConfigToken<T> extends InjectionToken<T> {
   load(): Promise<T>;
 }
 
+const CONFIG = Symbol('avi.config');
+
+/** True for tokens made by `defineConfig`. */
+export function isConfigToken(value: unknown): value is ConfigToken<unknown> {
+  return typeof value === 'object' && value !== null && CONFIG in value;
+}
+
 /** Thrown when the environment does not match the config schema. Never contains the values. */
 export class ConfigError extends Error {
   constructor(
@@ -79,6 +86,7 @@ export function defineConfig<S extends StandardSchemaV1>(
   };
   config.provider = { provide: config, useFactory: load };
   config.module = defineModule({ name, providers: [config.provider], exports: [config] });
+  Object.defineProperty(config, CONFIG, { value: true });
   return Object.freeze(config);
 }
 

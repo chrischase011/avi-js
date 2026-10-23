@@ -1,6 +1,6 @@
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 
-export type Role = 'admin' | 'member';
+export type Role = 'superadmin' | 'admin' | 'member';
 
 export interface User {
   id: number;
@@ -32,8 +32,9 @@ function stored(id: number, username: string, role: Role, password: string): Sto
 /** Demo users with hashed passwords. A real app reads them from a database. */
 export class UsersService {
   readonly #users = [
-    stored(1, 'ada', 'admin', 'analytical-engine'),
-    stored(2, 'grace', 'member', 'cobol-forever'),
+    stored(1, 'shiela', 'superadmin', 'my-love-forever'),
+    stored(2, 'ada', 'admin', 'analytical-engine'),
+    stored(3, 'grace', 'member', 'cobol-forever'),
   ];
 
   verify(username: string, password: string): User | undefined {

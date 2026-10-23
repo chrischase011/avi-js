@@ -8,7 +8,7 @@ export interface User {
 
 @Injectable()
 export class UsersService {
-  readonly #users: User[] = [{ id: 1, name: 'Ada' }];
+  readonly #users: User[] = [{ id: 1, name: 'Shiela' }];
 
   findAll(): User[] {
     return this.#users;

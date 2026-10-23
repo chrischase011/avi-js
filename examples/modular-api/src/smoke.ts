@@ -10,7 +10,7 @@ const url = `http://127.0.0.1:${String(port)}`;
 
 try {
   assert.equal(await (await fetch(`${url}/health`)).text(), 'ok');
-  assert.deepEqual(await (await fetch(`${url}/users/1`)).json(), { id: 1, name: 'Ada' });
+  assert.deepEqual(await (await fetch(`${url}/users/1`)).json(), { id: 1, name: 'Shiela' });
 
   const created = await fetch(`${url}/users`, {
     method: 'POST',

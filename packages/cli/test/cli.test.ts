@@ -48,7 +48,8 @@ function run(args: string[], cwd: string) {
 async function withApp<T>(project: string, use: (base: string) => Promise<T>): Promise<T> {
   const child = spawn(process.execPath, ['dist/main.js'], {
     cwd: project,
-    env: { ...process.env, PORT: '0' },
+    // NODE_ENV=test would turn the startup summary off, and the URL is read from it.
+    env: { ...process.env, PORT: '0', NODE_ENV: 'development' },
   });
   try {
     const base = await new Promise<string>((resolve, reject) => {
@@ -56,7 +57,7 @@ async function withApp<T>(project: string, use: (base: string) => Promise<T>): P
       child.stdout.setEncoding('utf8');
       child.stdout.on('data', (chunk: string) => {
         output += chunk;
-        const match = /Listening on (http:\/\/\S+)/.exec(output);
+        const match = /listening on (http:\/\/\S+)/.exec(output);
         if (match?.[1]) resolve(match[1]);
       });
       child.once('exit', (code) => {
@@ -155,7 +156,7 @@ describe.each(TEMPLATES.flatMap((t) => VALIDATORS.map((v) => [t, v] as const)))(
       expect(await startAndGet(project, '/health')).toEqual({ status: 200, body: 'ok' });
       expect(await startAndGet(project, '/users/1')).toEqual({
         status: 200,
-        body: '{"id":1,"name":"Ada"}',
+        body: '{"id":1,"name":"Shiela"}',
       });
     }, 60_000);
 

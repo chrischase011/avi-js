@@ -159,6 +159,53 @@ const app = createAvi({
 });
 ```
 
+## Startup summary
+
+When the server is up, `listen()` reports what Avi.js checked on the way:
+
+```text
+AVI.JS 0.3.0 · Application bootstrap
+
+✓ 3 modules loaded
+✓ Dependency graph validated
+✓ 2 providers resolved
+✓ Config validated (1 variable)
+✓ 4 routes registered
+✓ HTTP server ready on http://localhost:3000
+
+Startup completed in 5.3 ms
+```
+
+Every line is a check that ran: the module graph, every provider created, `defineConfig`
+validated, every route registered. The time runs from `createAvi()` to the moment the server
+accepts connections. If startup fails, the summary shows how far it got and the failing step,
+with the error and its cause:
+
+```text
+✓ 2 modules loaded
+✓ Dependency graph validated
+✗ Providers: Failed to create Database in DatabaseModule
+  connect ECONNREFUSED 127.0.0.1:5432
+
+Startup failed after 1.1 ms
+```
+
+Where it goes depends on where the output goes:
+
+| Situation                    | Output                                                     |
+| ---------------------------- | ---------------------------------------------------------- |
+| A terminal                   | The block above, in color (plain with `NO_COLOR`)          |
+| Logs, containers, CI         | One line: `Avi.js 0.3.0 started in 5.3 ms: 3 modules, ...` |
+| A logger with `info`         | One structured entry, `Application started`, with counts   |
+| `NODE_ENV=test`, test client | Nothing                                                    |
+
+```ts
+createAvi({ startupSummary: 'routes' }); // also list every route with its controller
+createAvi({ startupSummary: false }); // nothing at all
+```
+
+It runs once, after startup, and costs about 25 microseconds; requests never touch it.
+
 ## A production entry point
 
 ```ts

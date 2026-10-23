@@ -18,12 +18,13 @@ try {
   assert.equal((await login('nobody', 'x')).status, 401);
   assert.equal((await client.post('/auth/login', { username: 'ada' })).status, 400);
 
+  const shiela = await login('shiela', 'my-love-forever');
   const ada = await login('ada', 'analytical-engine');
   const grace = await login('grace', 'cobol-forever');
   assert.equal(ada.status, 200);
 
   const me = await client.get('/me', as(grace.token));
-  assert.deepEqual(me.body, { id: 2, username: 'grace', role: 'member' });
+  assert.deepEqual(me.body, { id: 3, username: 'grace', role: 'member' });
   assert.equal(me.headers.get('x-frame-options'), 'DENY');
 
   const anonymous = await client.get('/me');
@@ -32,7 +33,8 @@ try {
   assert.equal((await client.get('/me', as('forged.token'))).status, 401);
 
   assert.equal((await client.get('/admin/stats', as(grace.token))).status, 403);
-  assert.deepEqual((await client.get('/admin/stats', as(ada.token))).body, { users: 2 });
+  assert.deepEqual((await client.get('/admin/stats', as(ada.token))).body, { users: 3 });
+  assert.equal((await client.get('/admin/stats', as(shiela.token))).status, 200);
 
   const preflight = await client.request('OPTIONS', '/me', {
     headers: { origin: 'http://localhost:5173', 'access-control-request-method': 'GET' },

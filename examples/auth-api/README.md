@@ -2,13 +2,14 @@
 
 Sign-in, protected routes and roles, written with the explicit API (no decorators).
 
-| Route              | Who                     | Does                                         |
-| ------------------ | ----------------------- | -------------------------------------------- |
-| `POST /auth/login` | anyone                  | `{ username, password }` → `{ token, user }` |
-| `GET /me`          | signed in               | The current user                             |
-| `GET /admin/stats` | signed in, role `admin` | `{ users }`                                  |
+| Route              | Who                                     | Does                                         |
+| ------------------ | --------------------------------------- | -------------------------------------------- |
+| `POST /auth/login` | anyone                                  | `{ username, password }` → `{ token, user }` |
+| `GET /me`          | signed in                               | The current user                             |
+| `GET /admin/stats` | signed in, role `superadmin` or `admin` | `{ users }`                                  |
 
-Demo users: `ada` / `analytical-engine` (admin) and `grace` / `cobol-forever` (member).
+Demo users: `shiela` / `my-love-forever` (superadmin), `ada` / `analytical-engine` (admin) and
+`grace` / `cobol-forever` (member).
 
 What it shows:
 

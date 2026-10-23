@@ -43,7 +43,9 @@ export async function createTestClient(
   target: AviApp | ModuleRef | ModuleOptions,
   options: AviOptions = {},
 ): Promise<TestClient> {
-  const app = isApp(target) ? target : createAvi(options).register(target);
+  const app = isApp(target)
+    ? target
+    : createAvi({ startupSummary: false, ...options }).register(target);
   const { port } = await app.listen(0, '127.0.0.1');
   const url = `http://127.0.0.1:${String(port)}`;
 

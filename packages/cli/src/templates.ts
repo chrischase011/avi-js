@@ -100,8 +100,7 @@ Then open http://localhost:3000/health and http://localhost:3000/users.
 const MAIN_LISTEN = listenOn("Number(process.env['PORT'] ?? 3000)");
 
 function listenOn(port: string): string {
-  return `const { port } = await app.listen(${port});
-console.log(\`Listening on http://localhost:\${String(port)}\`);
+  return `await app.listen(${port});
 
 const shutdown = () => {
   void app.close().then(() => process.exit(0));
@@ -164,7 +163,7 @@ export interface User {
 
 @Injectable()
 export class UsersService {
-  readonly #users: User[] = [{ id: 1, name: 'Ada' }];
+  readonly #users: User[] = [{ id: 1, name: 'Shiela' }];
 
   findAll(): User[] {
     return this.#users;
@@ -236,7 +235,7 @@ after(() => client.close());
 test('lists users', async () => {
   const res = await client.get('/users');
   assert.equal(res.status, 200);
-  assert.deepEqual(res.body, [{ id: 1, name: 'Ada' }]);
+  assert.deepEqual(res.body, [{ id: 1, name: 'Shiela' }]);
 });
 
 test('creates a user', async () => {
@@ -313,7 +312,7 @@ export const usersRoutes = defineController({
 }
 
 export class UsersService {
-  readonly #users: User[] = [{ id: 1, name: 'Ada' }];
+  readonly #users: User[] = [{ id: 1, name: 'Shiela' }];
 
   findAll(): User[] {
     return this.#users;
@@ -344,7 +343,7 @@ after(() => client.close());
 test('lists users', async () => {
   const res = await client.get('/users');
   assert.equal(res.status, 200);
-  assert.deepEqual(res.body, [{ id: 1, name: 'Ada' }]);
+  assert.deepEqual(res.body, [{ id: 1, name: 'Shiela' }]);
 });
 
 test('creates a user', async () => {
@@ -410,7 +409,7 @@ import type { CreateUserDto, User } from './dto/user.dto.js';
 
 @Injectable()
 export class UsersService {
-  readonly #users: User[] = [{ id: 1, name: 'Ada' }];
+  readonly #users: User[] = [{ id: 1, name: 'Shiela' }];
 
   findAll(): User[] {
     return this.#users;
@@ -480,7 +479,7 @@ after(() => client.close());
 test('lists users', async () => {
   const res = await client.get('/users');
   assert.equal(res.status, 200);
-  assert.deepEqual(res.body, [{ id: 1, name: 'Ada' }]);
+  assert.deepEqual(res.body, [{ id: 1, name: 'Shiela' }]);
 });
 
 test('creates a user', async () => {
@@ -573,7 +572,7 @@ after(() => client.close());
 test('lists users', async () => {
   const res = await client.get('/users');
   assert.equal(res.status, 200);
-  assert.deepEqual(res.body, [{ id: 1, name: 'Ada' }]);
+  assert.deepEqual(res.body, [{ id: 1, name: 'Shiela' }]);
 });
 
 test('creates a user', async () => {

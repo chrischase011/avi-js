@@ -2,8 +2,7 @@ import { AviFactory } from '@avijs/core';
 import { AppModule } from './app.module.js';
 
 const app = await AviFactory.create(AppModule);
-const { port } = await app.listen(Number(process.env['PORT'] ?? 3000));
-console.log(`Tasks API on http://localhost:${String(port)}/tasks`);
+await app.listen(Number(process.env['PORT'] ?? 3000));
 
 const shutdown = () => {
   void app.close().then(() => process.exit(0));

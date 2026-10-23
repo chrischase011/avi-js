@@ -3,6 +3,20 @@
 All notable changes are listed here. Avi.js follows [Semantic Versioning](https://semver.org); all
 packages share one version.
 
+## Unreleased
+
+### Added
+
+- A startup summary from `listen()`: modules, providers, config and routes checked, the address
+  and the startup time; on failure, how far startup got, the failing step and its cause. A block in a
+  terminal, one line in logs, a structured entry for loggers with `info`, nothing under
+  `NODE_ENV=test`. `startupSummary: 'routes'` lists every route; `false` turns it off.
+
+### Changed
+
+- Generated projects and the examples no longer print their own `Listening on` line.
+- `createTestClient` turns the startup summary off.
+
 ## 0.2.1 - 2026-10-23
 
 ### Fixed

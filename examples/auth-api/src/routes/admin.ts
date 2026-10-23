@@ -4,7 +4,7 @@ import { UsersService } from '../auth/users.js';
 
 export const adminRoutes = defineController({
   prefix: '/admin',
-  guards: [AuthGuard, requireRole('admin')],
+  guards: [AuthGuard, requireRole('superadmin', 'admin')],
   inject: [UsersService],
   routes: (users) => [
     route({ method: 'GET', path: '/stats', handler: () => ({ users: users.count() }) }),

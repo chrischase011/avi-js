@@ -17,9 +17,19 @@ npm run dev
 ```
 
 ```text
-Listening on http://localhost:3000
+AVI.JS 0.3.0 · Application bootstrap
+
+✓ 3 modules loaded
+✓ Dependency graph validated
+✓ 2 providers resolved
+✓ Config validated (1 variable)
+✓ 4 routes registered
+✓ HTTP server ready on http://localhost:3000
+
+Startup completed in 5.3 ms
 ```
 
+That summary lists what Avi.js checked before accepting requests ([chapter 7](07-production.md#startup-summary)).
 Open http://localhost:3000/users. `npm run dev` recompiles and restarts on every change.
 
 Without a name, `npm create avi@latest` asks for the name, the template and the validation

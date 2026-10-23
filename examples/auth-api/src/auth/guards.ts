@@ -19,7 +19,7 @@ export class AuthGuard {
   }
 }
 
-/** Lets the request through only for users with `role`. Use after AuthGuard. */
-export function requireRole(role: Role): Guard {
-  return (ctx) => ctx.state.user?.role === role;
+/** Lets the request through only for users with one of `roles`. Use after AuthGuard. */
+export function requireRole(...roles: Role[]): Guard {
+  return (ctx) => roles.some((role) => ctx.state.user?.role === role);
 }

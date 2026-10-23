@@ -12,7 +12,10 @@ import {
   type ServerOptions,
 } from '@avijs/http';
 import { withValidation, type RouteSchema } from '@avijs/validation';
+import { createRequire } from 'node:module';
 import type { AddressInfo } from 'node:net';
+import { performance } from 'node:perf_hooks';
+import { isConfigToken } from './config.js';
 import { joinPath, type ControllerDefinition } from './controller.js';
 import { checkConsumers, injectOf } from './consumers.js';
 import { describeModules, firstDifference, type AppDescription } from './describe.js';
@@ -33,6 +36,16 @@ import {
   type RouteDocs,
 } from './pipeline.js';
 import { REQUEST, REQUEST_TOKENS } from './request.js';
+import {
+  addressUrl,
+  formatSummary,
+  summaryFields,
+  summaryLine,
+  type StartupReport,
+  type StartupStep,
+} from './summary.js';
+
+const { version } = createRequire(import.meta.url)('../package.json') as { version: string };
 
 export interface AviOptions extends ServerOptions {
   /** Runs first, for every route. */
@@ -49,6 +62,12 @@ export interface AviOptions extends ServerOptions {
    * An override that matches no provider is an error.
    */
   overrides?: readonly Provider[];
+  /**
+   * What `listen()` reports once the app is up: modules, providers, config, routes and the
+   * startup time. `'routes'` also lists every route; `false` reports nothing. Default: on,
+   * except when `NODE_ENV` is `test`. A logger with `info` receives it as one structured entry.
+   */
+  startupSummary?: boolean | 'routes';
 }
 
 export interface AviApp {
@@ -75,6 +94,13 @@ export interface RouteInfo {
   readonly openapi: RouteDocs | undefined;
 }
 
+/** The error and its causes, one per line. */
+function describeFailure(error: unknown, depth = 0): string {
+  if (!(error instanceof Error)) return String(error);
+  if (error.cause === undefined || depth === 4) return error.message;
+  return `${error.message}\n${describeFailure(error.cause, depth + 1)}`;
+}
+
 export function createAvi(options: AviOptions = {}): AviApp {
   return new Application(options);
 }
@@ -99,6 +125,10 @@ class Application implements AviApp {
   readonly #manifest: AppDescription | undefined;
   readonly #overrides: readonly Provider[];
   readonly #logger: Logger;
+  readonly #summary: false | 'basic' | 'routes';
+  readonly #createdAt = performance.now();
+  readonly #report: StartupReport = { version, durationMs: 0 };
+  #step: StartupStep = 'Dependency graph';
   #container: Container | undefined;
   #routes: readonly RouteInfo[] | undefined;
   #init: Promise<void> | undefined;
@@ -109,6 +139,8 @@ class Application implements AviApp {
     this.#guards = checkRefs(options.guards, 'canActivate', 'App guards');
     this.#manifest = options.manifest;
     this.#overrides = options.overrides ?? [];
+    const summary = options.startupSummary ?? process.env['NODE_ENV'] !== 'test';
+    this.#summary = summary === 'routes' ? 'routes' : summary ? 'basic' : false;
     this.#logger = options.logger ?? {
       error(message, error, fields) {
         console.error(fields?.requestId ? `${message} [${fields.requestId}]` : message, error);
@@ -130,8 +162,44 @@ class Application implements AviApp {
   }
 
   async listen(port: number, host?: string): Promise<AddressInfo> {
-    await this.init();
-    return this.#server.listen(port, host);
+    let address: AddressInfo;
+    try {
+      await this.init();
+      this.#step = 'HTTP server';
+      address = await this.#server.listen(port, host);
+    } catch (error) {
+      this.#announce({ step: this.#step, message: describeFailure(error) });
+      throw error;
+    }
+    this.#report.url = addressUrl(address);
+    this.#announce();
+    return address;
+  }
+
+  /** Prints the startup summary; see `startupSummary`. */
+  #announce(failure?: StartupReport['failure']): void {
+    if (!this.#summary) return;
+    const report = this.#report;
+    report.durationMs = performance.now() - this.#createdAt;
+    if (failure) report.failure = failure;
+    if (this.#routes) {
+      report.routes = this.#routes.map(({ method, path, controller }) => ({
+        method,
+        path,
+        controller,
+      }));
+    }
+
+    if (this.#logger.info) {
+      if (!failure) this.#logger.info('Application started', summaryFields(report));
+    } else if (process.stdout.isTTY) {
+      // isTTY can be set on a plain stream (tests do), which has no hasColors.
+      const { hasColors } = process.stdout as { hasColors?: () => boolean };
+      const colors = hasColors?.call(process.stdout) ?? false;
+      process.stdout.write(formatSummary(report, this.#summary === 'routes', colors));
+    } else if (!failure) {
+      console.log(summaryLine(report));
+    }
   }
 
   get<K extends Token>(token: K): TokenType<K> {
@@ -155,10 +223,17 @@ class Application implements AviApp {
       requestTokens: REQUEST_TOKENS,
     });
     const modules = container.modules as AviModule[];
+    const report = this.#report;
+    report.modules = modules.length;
     checkConsumers(container);
+    report.graphValidated = true;
 
+    this.#step = 'Providers';
     await container.init();
+    report.providers = container.describe().reduce((sum, m) => sum + m.providers.length, 0);
+    report.configVariables = countConfig(container, modules);
     try {
+      this.#step = 'Routes';
       const appScope = new Pipeline((token) => container.get(token));
       const appMiddleware = appScope.middleware(this.#middleware);
       const appGuards = appScope.guards(this.#guards);
@@ -209,6 +284,7 @@ class Application implements AviApp {
       this.#router.add(routes);
       this.#routes = Object.freeze(infos);
       if (this.#manifest) {
+        this.#step = 'Manifest';
         const difference = firstDifference(this.#manifest, describeModules(container));
         if (difference) {
           throw new Error(
@@ -252,6 +328,24 @@ class Application implements AviApp {
       }
     };
   }
+}
+
+/** Variables across the app's `defineConfig` tokens, or undefined when it has none. */
+function countConfig(container: Container, modules: readonly AviModule[]): number | undefined {
+  const seen = new Set<unknown>();
+  let total: number | undefined;
+  for (const module of modules) {
+    for (const provider of module.providers) {
+      const token = typeof provider === 'object' ? provider.provide : undefined;
+      if (!isConfigToken(token) || seen.has(token)) continue;
+      seen.add(token);
+      const value: unknown = container.resolve(module, token);
+      total =
+        (total ?? 0) +
+        (typeof value === 'object' && value !== null ? Object.keys(value).length : 0);
+    }
+  }
+  return total;
 }
 
 function tokenLabel(token: Token): string {

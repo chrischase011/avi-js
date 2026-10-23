@@ -16,7 +16,14 @@ pnpm --filter @avijs/example-basic-api start
 ```
 
 ```text
-Listening on http://localhost:3000
+AVI.JS 0.3.0 · Application bootstrap
+
+✓ 1 module loaded
+✓ Dependency graph validated
+✓ 5 routes registered
+✓ HTTP server ready on http://localhost:3000
+
+Startup completed in 3.2 ms
 ```
 
 In another terminal:
