@@ -1,6 +1,6 @@
 import { HttpError, type Context } from '@avijs/http';
 import { Busboy, type BusboyHeaders, type BusboyInstance } from '@fastify/busboy';
-import type { Readable } from 'node:stream';
+import { PassThrough, type Readable } from 'node:stream';
 
 export interface MultipartLimits {
   /** Largest file, in bytes. Default: 10 MiB. */
@@ -95,13 +95,31 @@ export async function* multipart(ctx: Context, limits: MultipartLimits = {}): As
     fail(new HttpError(400, 'Request aborted'));
   };
 
-  busboy.on('file', (name, stream, filename, _encoding, mimeType) => {
+  busboy.on('file', (name, source, filename, _encoding, mimeType) => {
+    // Callers get our own stream, so every failure reaches them as an HttpError (400 or 413)
+    // rather than the parser's plain errors, which would become 500s.
+    const stream = new PassThrough();
     // fail() destroys open streams with the error. A stream the caller has not taken yet has no
     // other listener, and an unhandled stream error would crash the process.
     stream.on('error', ignore);
-    open.add(stream);
-    stream.once('end', () => open.delete(stream));
-    stream.once('limit', () => {
+    source.on('error', (error: unknown) => {
+      stream.destroy(
+        error instanceof HttpError
+          ? error
+          : (state.failure ?? new HttpError(400, 'Malformed multipart body', { cause: error })),
+      );
+    });
+    // If the caller abandons the stream, drain the rest so the parser can move on.
+    stream.once('close', () => {
+      if (!source.readableEnded) source.resume();
+    });
+    source.pipe(stream);
+    open.add(source);
+    source.once('end', () => {
+      open.delete(source);
+      notify();
+    });
+    source.once('limit', () => {
       fail(tooLarge(`File ${name} is larger than ${String(max.fileSize)} bytes`));
     });
     queue.push({ kind: 'file', name, filename, mimeType, stream });
@@ -132,9 +150,19 @@ export async function* multipart(ctx: Context, limits: MultipartLimits = {}): As
     notify();
   });
   ctx.signal.addEventListener('abort', onAbort);
+  // Busboy can read some malformed bodies to the end and then emit neither 'finish' nor 'error'.
+  // Once the body has arrived and every part is done, a parser that has not finished is stuck.
+  const stalled = () =>
+    received && queue.length === 0 && open.size === 0 && busboy.writableFinished;
+  let received = false;
+  req.once('end', () => {
+    received = true;
+    setImmediate(notify);
+  });
   req.pipe(busboy);
 
   let previous: FilePart | undefined;
+  let suspect = false;
   try {
     for (;;) {
       // A file the caller skipped would stall the parser; discard what it did not read.
@@ -148,6 +176,15 @@ export async function* multipart(ctx: Context, limits: MultipartLimits = {}): As
         continue;
       }
       if (state.finished) return;
+      if (stalled()) {
+        // A 'finish' already on its way gets one more turn of the event loop; stalled twice in
+        // a row means the parser is stuck.
+        if (suspect) fail(new HttpError(400, 'Malformed multipart body'));
+        else await new Promise((resolve) => setImmediate(resolve));
+        suspect = true;
+        continue;
+      }
+      suspect = false;
       await new Promise<void>((resolve) => {
         wake = resolve;
       });

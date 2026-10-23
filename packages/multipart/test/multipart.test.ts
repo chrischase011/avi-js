@@ -149,6 +149,32 @@ describe('readForm', () => {
     expect(res.body['message']).toMatch(message);
   });
 
+  // Found by the fuzz test in CI: the parser read these bodies and then went silent.
+  it.each(['--b"\r\n--b--', '--b"', '--bx\r\n\r\n--b--'])(
+    'answers 400 instead of hanging on %j',
+    async (body) => {
+      const { url } = await formServer();
+      const res = await fetch(url, {
+        method: 'POST',
+        body,
+        headers: { 'content-type': 'multipart/form-data; boundary=b' },
+        signal: AbortSignal.timeout(2000),
+      });
+      expect(res.status).toBe(400);
+    },
+  );
+
+  it('answers 400, not 500, when a file part breaks off', async () => {
+    const { url, logger } = await formServer();
+    const body = [
+      '--bContent-Disposition: form-data; name="a"; filename="f"',
+      '',
+      'Content-Disposition: form-data; name="a"',
+    ].join(String.fromCharCode(13, 10));
+    expect((await post(url, body, 'multipart/form-data; boundary=b')).status).toBe(400);
+    expect(logger.error).not.toHaveBeenCalled();
+  });
+
   it('answers 415 for another content type and 400 for a malformed body', async () => {
     const { url } = await formServer();
     expect((await post(url, 'a=1', 'application/x-www-form-urlencoded')).status).toBe(415);
@@ -282,7 +308,8 @@ describe('multipart', () => {
           expect(res.status).toBeLessThan(500);
         },
       ),
-      { numRuns: 60 },
+      // FUZZ_RUNS=5000 pnpm test packages/multipart for a longer search.
+      { numRuns: Number(process.env['FUZZ_RUNS'] ?? 100) },
     );
     expect(logger.error).not.toHaveBeenCalled();
   });

@@ -3,6 +3,13 @@
 All notable changes are listed here. Avi.js follows [Semantic Versioning](https://semver.org); all
 packages share one version.
 
+## Unreleased
+
+### Fixed
+
+- `@avijs/multipart`: some malformed bodies left the request hanging until the server timeout, and
+  a file part that broke off mid-upload answered `500`. Both now answer `400`. Found by fuzzing.
+
 ## 0.2.0 - 2026-10-23
 
 ### Added
