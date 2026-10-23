@@ -58,7 +58,8 @@ packages/
   compiler/     @avijs/compiler: avi-compile check and manifest
   testing/      @avijs/testing: test client
   openapi/      @avijs/openapi: OpenAPI documents
-  security/     @avijs/security: CORS and security headers
+  security/     @avijs/security: CORS, security headers and rate limits
+  multipart/    @avijs/multipart: file uploads
   cli/          @avijs/cli: the avi command and project templates
 examples/       apps built from the published entry points
 benchmarks/     router, HTTP and startup benchmarks

@@ -20,8 +20,10 @@ create a project, then follow the chapters in order or jump to what you need.
 | [9](09-project-structure.md) | Project structure: modular and minimal     | Runnable |
 | [10](10-build-checks.md)     | Build-time checks and manifests            | Runnable |
 | [11](11-openapi.md)          | OpenAPI documents                          | Runnable |
-| [12](12-security.md)         | Security headers and CORS                  | Runnable |
+| [12](12-security.md)         | Security headers, CORS and rate limits     | Runnable |
 | [13](13-from-nestjs.md)      | Avi.js for NestJS developers               | Runnable |
+| [14](14-configuration.md)    | Configuration                              | Runnable |
+| [15](15-file-uploads.md)     | File uploads                               | Runnable |
 
 Throughout the tutorial you build **Greeter**, a small API with a users resource and a greeting
 service, so each chapter adds to the previous one.

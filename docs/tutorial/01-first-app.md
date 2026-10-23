@@ -157,7 +157,7 @@ createAvi({
   shutdownTimeout: 10_000, // ms close() waits for in-flight requests
   requestTimeout: 300_000, // passed to node:http
   headersTimeout: 60_000, // passed to node:http
-  logger: console, // anything with error(message, error)
+  logger: console, // anything with error(message, error); see chapter 7 for JSON logs
 });
 ```
 

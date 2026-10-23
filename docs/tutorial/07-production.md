@@ -48,19 +48,134 @@ Supported return values:
 has started, the status can no longer change: Avi.js logs the error and closes the connection, so
 the client sees a truncated response instead of a silently wrong one.
 
+## Server-sent events
+
+For one-way live updates (progress, notifications, feeds), return `sse()` with a generator. Each
+`yield` sends one event; the browser reads them with `EventSource`:
+
+```ts
+import { route, sse } from '@avijs/core';
+
+route({
+  method: 'GET',
+  path: '/jobs/:id/progress',
+  handler: (ctx) =>
+    sse(ctx, async function* (signal) {
+      for await (const step of jobs.watch(ctx.params.id, { signal })) {
+        yield { event: 'progress', data: { step } };
+      }
+      yield { event: 'done', data: 'finished' };
+    }),
+});
+```
+
+```js
+// In the browser
+const events = new EventSource('/jobs/42/progress');
+events.addEventListener('progress', (e) => console.log(JSON.parse(e.data)));
+```
+
+| Field   | Sent as                                                       |
+| ------- | ------------------------------------------------------------- |
+| `data`  | strings as is, anything else as JSON; line breaks are safe    |
+| `event` | the event name for `addEventListener`                         |
+| `id`    | the id the browser sends back as `Last-Event-ID` on reconnect |
+| `retry` | how long the browser waits before reconnecting, in ms         |
+
+A plain string is shorthand for `{ data }`. Names and ids with line breaks are refused, so data
+cannot inject extra fields.
+
+- **Backpressure.** The generator advances only when the client has read the previous event, so a
+  slow client slows the generator instead of filling memory.
+- **Disconnects.** When the client leaves, `signal` aborts and the generator's `finally` runs. Pass
+  `signal` to anything the generator waits on, so it stops at once instead of on the next event.
+- **Heartbeats.** A comment line every 15 seconds keeps proxies from closing a quiet connection.
+  Change it with `sse(ctx, source, { heartbeat: 30_000 })`, or turn it off with `false`.
+- The response sets `cache-control: no-cache` and `x-accel-buffering: no`, so proxies such as nginx
+  pass events through immediately.
+
+For two-way messages, WebSockets are planned as an experimental package.
+
+## Request ids and logging
+
+Every request gets an id, available as `ctx.id` and sent back in the `x-request-id` header. When the
+client or a gateway already sent an `x-request-id` (up to 128 visible characters), that one is
+reused, so one id follows a request through several services:
+
+```ts
+route({ method: 'GET', path: '/orders', handler: (ctx) => orders.list({ traceId: ctx.id }) });
+```
+
+```ts
+createAvi({
+  requestId: { header: 'x-trace-id' }, // another header
+  // requestId: { trustIncoming: false }, // always generate, for untrusted clients
+  // requestId: false,                    // no header at all
+});
+```
+
+Errors Avi.js logs carry the id, so a `500` a user reports can be found in the logs. The logger
+gets it as a third argument, `{ requestId, method, path }`. The default logger prints
+`Request failed: GET /orders [3f2a…]`.
+
+For log collectors, `jsonLogger()` writes one JSON object per line, and `logRequests()` logs every
+response through it:
+
+```ts
+import { createAvi, jsonLogger, logRequests } from '@avijs/core';
+
+const logger = jsonLogger(); // jsonLogger({ level: 'warn' }) to keep only warnings and errors
+const app = createAvi({
+  logger,
+  onResponse: logRequests(logger, { skip: (info) => info.route === '/health' }),
+});
+```
+
+```json
+{
+  "requestId": "3f2a…",
+  "method": "GET",
+  "path": "/orders",
+  "route": "/orders",
+  "status": 200,
+  "duration": 2.41,
+  "aborted": false,
+  "time": "2026-10-23T08:00:00.000Z",
+  "level": "info",
+  "msg": "GET /orders 200"
+}
+```
+
+`5xx` responses and aborted requests are logged as warnings. Any logger with an `error(message,
+error, fields)` method works; `info` and `warn` are optional. For pino:
+
+```ts
+const app = createAvi({
+  logger: {
+    error: (message, error, fields) => pino.error({ ...fields, err: error }, message),
+    warn: (message, fields) => pino.warn(fields, message),
+    info: (message, fields) => pino.info(fields, message),
+  },
+});
+```
+
 ## A production entry point
 
 ```ts
-import { createAvi } from '@avijs/core';
+import { createAvi, jsonLogger, logRequests } from '@avijs/core';
+
+const logger = jsonLogger();
+const log = logRequests(logger);
 
 const app = createAvi({
   bodyLimit: 256 * 1024,
   shutdownTimeout: 15_000,
   headersTimeout: 10_000,
   requestTimeout: 30_000,
-  logger: { error: (message, error) => console.error(message, error) },
-  onResponse: ({ method, route, status, duration }) => {
-    metrics.observe({ method, route, status }, duration);
+  logger,
+  onResponse: (info) => {
+    log(info);
+    metrics.observe({ method: info.method, route: info.route, status: info.status }, info.duration);
   },
 });
 

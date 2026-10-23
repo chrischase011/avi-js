@@ -58,21 +58,26 @@ route({
 Validation schemas and JSON Schema are different things, so the generator needs a converter:
 
 - Schemas that implement the Standard JSON Schema extension (`~standard.jsonSchema`) are converted
-  automatically.
-- Otherwise pass `toJsonSchema`. For Valibot, `@valibot/to-json-schema` does the work; Zod 4 has
-  `z.toJSONSchema`:
+  automatically. **Zod 4** does, so Zod schemas need no setup.
+- Otherwise pass `toJsonSchema`. For **Valibot**, use `@valibot/to-json-schema`:
 
 ```ts
 import { toJsonSchema } from '@valibot/to-json-schema';
 
 generateOpenApi(app, {
   info: { title: 'Greeter API', version: '1.0.0' },
-  toJsonSchema: (schema) => toJsonSchema(schema as never),
+  // errorMode: 'ignore' skips actions JSON Schema cannot express, such as v.transform, and keeps
+  // the rest, so a generated id param is documented as a string of digits.
+  toJsonSchema: (schema) => toJsonSchema(schema as never, { errorMode: 'ignore' }),
 });
 ```
+
+Path, query and body schemas are documented as their **input** (what the client sends, before
+transforms), response schemas as their **output**. If a converter fails, the error names the route
+and the schema: `Cannot convert the params schema of GET /users/:id to JSON Schema: ...`.
 
 Without a converter, the route is still documented, with an empty schema where the body would be.
 
 ## Next
 
-[Chapter 12: Security headers and CORS](12-security.md).
+[Chapter 12: Security headers, CORS and rate limits](12-security.md).

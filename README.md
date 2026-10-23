@@ -196,8 +196,9 @@ authentication with guards and roles, and Prisma with SQLite.
 | `@avijs/compiler`   | Optional build-time checks and manifests (`avi-compile`)     |
 | `@avijs/testing`    | A test client with provider overrides                        |
 | `@avijs/openapi`    | OpenAPI 3.1 documents from routes and schemas                |
-| `@avijs/security`   | CORS and security headers                                    |
-| `@avijs/cli`        | `avi new`, `avi dev`, `avi check`, `avi manifest`            |
+| `@avijs/security`   | CORS, security headers and rate limits                       |
+| `@avijs/multipart`  | Streaming file uploads with limits                           |
+| `@avijs/cli`        | `avi new`, `avi generate`, `avi dev`, `avi check`            |
 
 ## Compatibility
 

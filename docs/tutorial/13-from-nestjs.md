@@ -54,18 +54,21 @@ export class UsersService {
   ) {}
 }
 
+const findOne = { params: UserId } satisfies RouteSchema;
+const create = { body: CreateUser } satisfies RouteSchema;
+
 @Controller('/users')
 export class UsersController {
   static inject = [UsersService] as const;
   constructor(private readonly users: UsersService) {}
 
-  @Get('/:id', { schema: { params: UserId } })
-  findOne(ctx: Context<{ params: { id: number } }>) {
+  @Get('/:id', { schema: findOne })
+  findOne(ctx: RouteContext<typeof findOne>) {
     return this.users.findOne(ctx.input.params.id);
   }
 
-  @Post('/', { schema: { body: CreateUser } })
-  create(ctx: Context<{ body: CreateUserDto }>) {
+  @Post('/', { schema: create })
+  create(ctx: RouteContext<typeof create>) {
     return reply(this.users.create(ctx.input.body), { status: 201 });
   }
 }
@@ -119,4 +122,4 @@ whichever style suits each part of an app.
 
 ## Next
 
-Back to the [tutorial index](README.md).
+[Chapter 14: Configuration](14-configuration.md), or back to the [tutorial index](README.md).

@@ -22,7 +22,8 @@ Listening on http://localhost:3000
 
 Open http://localhost:3000/users. `npm run dev` recompiles and restarts on every change.
 
-Without a name, `npm create avi@latest` asks for the name and the template. There are two:
+Without a name, `npm create avi@latest` asks for the name, the template and the validation
+library (Valibot by default). There are two templates:
 
 | Template          | Command                                              | For                         |
 | ----------------- | ---------------------------------------------------- | --------------------------- |
@@ -40,6 +41,7 @@ my-api/
 ├── src/
 │   ├── main.ts                    starts the app
 │   ├── app.module.ts              the root module
+│   ├── config.ts                  environment variables, validated at startup
 │   ├── common/
 │   │   └── health.controller.ts   GET /health
 │   └── modules/users/
@@ -47,7 +49,7 @@ my-api/
 │       ├── users.controller.ts    GET /users, GET /users/:id, POST /users
 │       ├── users.service.ts
 │       ├── users.test.ts
-│       └── dto/
+│       └── dto/user.dto.ts        Valibot schemas for input and responses
 ├── package.json
 └── tsconfig.json
 ```

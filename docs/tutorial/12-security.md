@@ -1,9 +1,10 @@
-# 12. Security headers and CORS
+# 12. Security headers, CORS and rate limits
 
 > **Status: Runnable.** Everything on this page works today.
 
-`@avijs/security` adds two things most APIs need: security headers and CORS. Both are `onRequest`
-hooks, which run for every request before routing, including 404s and `OPTIONS` preflights.
+`@avijs/security` adds three things most APIs need: security headers, CORS and rate limits. All are
+`onRequest` hooks, which run for every request before routing, including 404s and `OPTIONS`
+preflights.
 
 ```sh
 npm install @avijs/security
@@ -86,6 +87,77 @@ What happens per request:
   origin with credentials would let every site act as your users.
 - An origin with a path or trailing slash, like `'https://app.example.com/'`, throws. Browsers send
   origins without one, so it would never match.
+
+## Rate limiting
+
+`rateLimit()` caps how many requests each client may send per time window:
+
+```ts
+import { rateLimit } from '@avijs/security';
+
+const app = createAvi({
+  onRequest: [rateLimit({ limit: 100, window: 60_000 })], // 100 requests per minute per client
+});
+```
+
+Over the limit, the client gets `429 Too Many Requests` with a `Retry-After` header. Every response
+also carries `RateLimit-Limit`, `RateLimit-Remaining` and `RateLimit-Reset` (seconds), so
+well-behaved clients can slow down before they hit the limit.
+
+For a stricter limit on one route, such as a login, create a separate limiter and use its `guard`.
+It keeps its own count:
+
+```ts
+const login = rateLimit({ limit: 5, window: 15 * 60_000 });
+
+route({ method: 'POST', path: '/login', guards: [login.guard], handler: signIn });
+```
+
+| Option         | Default           | Meaning                                                          |
+| -------------- | ----------------- | ---------------------------------------------------------------- |
+| `limit`        | required          | Requests allowed per window                                      |
+| `window`       | required          | Window length in ms                                              |
+| `key`          | `(ctx) => ctx.ip` | What to count by, such as an API key or a user id                |
+| `store`        | a memory store    | Where counts live; see below                                     |
+| `onStoreError` | `'allow'`         | If the store fails: let requests through, or `'deny'` with `503` |
+| `logger`       | `console.error`   | Receives store failures                                          |
+
+The built-in store keeps counts in memory, for this process only. It tracks at most 100 000 keys
+and drops the oldest window when full, so a flood of new addresses cannot use up memory. When
+several processes or servers share the load, give them a shared store. A store is one function:
+
+```ts
+import type { RateLimitStore } from '@avijs/security';
+
+// A sketch for Redis 7+ with ioredis: count in a key that expires with the window.
+const redisStore = (redis: Redis): RateLimitStore => ({
+  async increment(key, window) {
+    const [[, count], [, ttl]] = (await redis
+      .multi()
+      .incr(`rl:${key}`)
+      .pexpire(`rl:${key}`, window, 'NX')
+      .pttl(`rl:${key}`)
+      .exec()) as [[null, number], [null, number], [null, number]];
+    return { count, resetAt: Date.now() + ttl };
+  },
+});
+```
+
+## The client's IP address
+
+`ctx.ip` is the address the request came from. Rate limits count by it unless you pass a `key`.
+
+Behind a load balancer or reverse proxy, every request comes from the proxy's address. The proxy
+passes the real client in `X-Forwarded-For`, but any client can send that header too, so Avi.js
+ignores it until you say how many proxies you trust:
+
+```ts
+createAvi({ trustProxy: 1 }); // one proxy in front of the app, such as a load balancer
+```
+
+With `trustProxy: 1`, `ctx.ip` is the address your proxy saw. Set it to the number of proxies you
+actually run, and no higher: one too many lets clients choose their own address, and with it their
+own rate limit.
 
 ## Writing your own hook
 

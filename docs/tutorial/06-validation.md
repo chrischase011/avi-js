@@ -4,7 +4,8 @@
 
 Avi.js validates route input with any library that implements
 [Standard Schema](https://standardschema.dev): Zod (3.24+), Valibot, ArkType, Effect Schema and
-others. There are no adapters to install and no validation library is bundled. The examples below
+others. There are no adapters to install and no validation library is bundled; new projects from
+`npm create avi` use Valibot unless you choose another with `--validator`. The examples below
 use Valibot; swap in your own.
 
 ## Validating a route
@@ -141,26 +142,32 @@ match at runtime, that is a bug: Avi.js logs it and answers `500`. Status and he
 
 ## With decorators
 
-Route decorators take the same `schema`:
+Route decorators take the same `schema`. Declare each schema object once and use it twice: in the
+decorator, which validates with it, and in `RouteContext`, which types `ctx.input` from it:
 
 ```ts
+import { Controller, Get, Post, reply, type RouteContext, type RouteSchema } from '@avijs/core';
+
+const create = { body: CreateUser, response: PublicUser } satisfies RouteSchema;
+const one = { params: UserId } satisfies RouteSchema;
+
 @Controller('/users')
 class UsersController {
-  @Post('/', { schema: { body: CreateUser, response: PublicUser } })
-  create(ctx: Context<{ body: v.InferOutput<typeof CreateUser> }>) {
-    return reply(this.users.create(ctx.input.body), { status: 201 });
+  @Post('/', { schema: create })
+  create(ctx: RouteContext<typeof create>) {
+    return reply(this.users.create(ctx.input.body), { status: 201 }); // body: { name, email }
   }
 
-  @Get('/:id', { schema: { params: UserId } })
-  one(ctx: Context<{ params: { id: number } }, { id: string }>) {
-    return this.users.find(ctx.input.params.id);
+  @Get('/:id', { schema: one })
+  one(ctx: RouteContext<typeof one>) {
+    return this.users.find(ctx.input.params.id); // id: number
   }
 }
 ```
 
-Decorators cannot change a method's parameter types, so annotate `ctx`: the first type argument is
-`ctx.input`, the second `ctx.params`. If the annotation does not match the schema, TypeScript
-reports an error on the decorator.
+Decorators cannot change a method's parameter types, which is why `ctx` needs the annotation. If
+it does not match the decorator's schema, TypeScript reports an error on the decorator. For the
+raw path parameters too, write the context out in full: `Context<InputOf<typeof one>, { id: string }>`.
 
 ## JavaScript
 

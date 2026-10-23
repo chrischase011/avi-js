@@ -21,6 +21,18 @@ the box:
 | `npm run check` | `avi check`: type-checks every `static inject` list         |
 | `npm start`     | runs the compiled app                                       |
 
+The `users` routes validate input with route schemas, using [Valibot](https://valibot.dev) by
+default. Pick another library, or none, with `--validator`:
+
+| Option              | Generated validation                          |
+| ------------------- | --------------------------------------------- |
+| `valibot` (default) | Valibot schemas for params, body and response |
+| `zod`               | The same with [Zod](https://zod.dev)          |
+| `none`              | Handwritten checks and no extra dependency    |
+
+Invalid input gets the standard `400` with every issue listed ([chapter 6](06-validation.md)).
+Response schemas drop fields they don't list, so internal data cannot leak by accident.
+
 The layouts are conventions. Avi.js never scans folders or depends on file names. You register
 what you use, wherever it lives.
 
@@ -169,8 +181,18 @@ with working CRUD routes (`GET`, `POST`, `PATCH`, `DELETE`) backed by an in-memo
 npx avi g resource posts           # or: npx avi g res posts
 ```
 
-Replace the store in the service with your database; the routes stay the same. In a minimal
-project, a resource is a service in `src/services/` and routes in `src/routes/`.
+Replace the store in the service with your database; the routes stay the same.
+
+A resource validates with the library in your `package.json` (Valibot first, then Zod), or the one
+you pass with `--validator`. It writes the schemas to `posts.schemas.ts`, starting with a single
+`title` field: add your fields there. Request bodies lose any field the schema does not list, so a
+client cannot store `"role": "admin"` by sending it. Updates need at least one field.
+
+Without a validation library, the resource uses handwritten checks and stores bodies as sent, and
+the CLI prints a note saying so. Install Valibot or Zod before using it for real data.
+
+In a minimal project, a resource is a schema file in `src/schemas/`, a service in
+`src/services/` and routes in `src/routes/`.
 
 The short kinds `mo`, `co`, `s` and `res` work too. A path like `admin/reports` creates folders; the
 last part is the name. A controller generated next to an existing service injects it.
