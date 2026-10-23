@@ -66,7 +66,9 @@ is safe.
 ## Limits
 
 Limits are on by default and checked while the body arrives. When one is exceeded, reading stops
-at once and the client gets `413` with a message naming the limit.
+at once and the client gets `413` with a message naming the limit. The connection is then closed
+rather than reading the rest, so a client still sending a large file may see the connection end
+instead of the `413`.
 
 | Limit       | Default | Meaning                      |
 | ----------- | ------- | ---------------------------- |

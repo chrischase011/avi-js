@@ -44,10 +44,19 @@ function form(entries: [string, string | Blob, string?][]): FormData {
 }
 
 async function post(url: string, body: FormData | string, contentType?: string) {
+  // The server answers a broken limit at once and closes the connection. Sending the body in one
+  // write means the client has finished before that, so it can read the 413 instead of EPIPE.
+  let payload: ArrayBuffer | string = body as string;
+  let type = contentType;
+  if (body instanceof FormData) {
+    const encoded = new Request(url, { method: 'POST', body });
+    payload = await encoded.arrayBuffer();
+    type = encoded.headers.get('content-type') ?? undefined;
+  }
   const res = await fetch(url, {
     method: 'POST',
-    body,
-    ...(contentType ? { headers: { 'content-type': contentType } } : {}),
+    body: payload,
+    ...(type ? { headers: { 'content-type': type } } : {}),
   });
   return { status: res.status, body: (await res.json()) as Record<string, unknown> };
 }
