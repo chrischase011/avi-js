@@ -8,7 +8,7 @@ import {
   type ServerOptions as NodeServerOptions,
   type ServerResponse,
 } from 'node:http';
-import type { AddressInfo } from 'node:net';
+import type { AddressInfo, Socket } from 'node:net';
 import { performance } from 'node:perf_hooks';
 import { RequestContext, type Context } from './context.js';
 import { HttpError, RequestAbortedError } from './errors.js';
@@ -129,6 +129,9 @@ function safeLogger(logger: Logger): Logger {
   };
 }
 
+// How long close() waits for the first request on connections accepted just before it.
+const FRESH_GRACE = 1_000;
+
 const INCOMING_ID = /^[\x21-\x7e]{1,128}$/;
 
 const NO_PARAMS = Object.freeze(Object.create(null) as Record<string, string>);
@@ -146,6 +149,9 @@ export class HttpServer {
   readonly #onResponse: ((info: ResponseInfo) => unknown) | undefined;
   #server: Server | undefined;
   #closing: Promise<void> | undefined;
+  // Connections whose first request has not arrived yet.
+  readonly #fresh = new Set<Socket>();
+  #onFreshServed: (() => void) | undefined;
 
   constructor(router: Router, options: ServerOptions = {}) {
     this.#router = router;
@@ -164,6 +170,21 @@ export class HttpServer {
     }
   }
 
+  /** Resolves once every connection has sent its first request (or closed), or after `ms`. */
+  #freshServed(ms: number): Promise<void> {
+    if (this.#fresh.size === 0) return Promise.resolve();
+    return new Promise((resolve) => {
+      const done = () => {
+        clearTimeout(timer);
+        this.#onFreshServed = undefined;
+        resolve();
+      };
+      const timer = setTimeout(done, ms);
+      timer.unref();
+      this.#onFreshServed = done;
+    });
+  }
+
   get listening(): boolean {
     return this.#server?.listening ?? false;
   }
@@ -172,7 +193,16 @@ export class HttpServer {
     if (this.#server) return Promise.reject(new Error('Server is already listening'));
 
     const server = createServer(this.#nodeOptions, (req, res) => {
+      this.#fresh.delete(req.socket);
+      if (this.#fresh.size === 0) this.#onFreshServed?.();
       this.#handle(req, res);
+    });
+    server.on('connection', (socket: Socket) => {
+      this.#fresh.add(socket);
+      socket.once('close', () => {
+        this.#fresh.delete(socket);
+        if (this.#fresh.size === 0) this.#onFreshServed?.();
+      });
     });
     this.#server = server;
 
@@ -203,14 +233,20 @@ export class HttpServer {
       }, this.#shutdownTimeout);
       force.unref();
 
-      server.close((error) => {
-        clearTimeout(force);
-        this.#server = undefined;
-        this.#closing = undefined;
-        if (error) reject(error);
-        else resolve();
+      // Refuse new connections at once. In a cluster, Node hands them to another worker.
+      server.maxConnections = 0;
+      // Closing the server also closes connections whose request has not arrived yet (Node 26),
+      // so give those a moment to send it; they are answered with `connection: close`.
+      void this.#freshServed(Math.min(FRESH_GRACE, this.#shutdownTimeout)).then(() => {
+        server.close((error) => {
+          clearTimeout(force);
+          this.#server = undefined;
+          this.#closing = undefined;
+          if (error) reject(error);
+          else resolve();
+        });
+        server.closeIdleConnections();
       });
-      server.closeIdleConnections();
     });
     return this.#closing;
   }

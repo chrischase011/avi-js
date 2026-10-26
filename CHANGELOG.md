@@ -3,6 +3,18 @@
 All notable changes are listed here. Avi.js follows [Semantic Versioning](https://semver.org); all
 packages share one version.
 
+## 0.5.3 - 2026-10-26
+
+### Fixed
+
+- Shutdown no longer resets connections accepted just before it. On Node 26, closing an HTTP server
+  also closes connections whose request has not arrived yet, so during a rolling restart a
+  connection handed to a stopping worker could be reset (`ECONNRESET`). `close()` now refuses new
+  connections first (in a cluster, Node hands them to another worker), gives connections that are
+  already open up to a second to send their request, answers it with `connection: close`, and then
+  closes as before. Under load on Node 26, a rolling-restart run went from 7 resets in 21 473
+  requests to none in 18 416.
+
 ## 0.5.2 - 2026-10-26
 
 Fixes from the security review of everything added since 0.2.0. Upgrade recommended.

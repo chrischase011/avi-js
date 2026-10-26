@@ -1,4 +1,5 @@
 import { request as httpRequest } from 'node:http';
+import { connect } from 'node:net';
 import { afterEach, describe, expect, it } from 'vitest';
 import { HttpError, HttpServer, Router, reply, type RouteDefinition } from '../src/index.js';
 import { deferred, startServer, type TestServer } from './helpers.js';
@@ -486,6 +487,32 @@ describe('lifecycle', () => {
     const begin = Date.now();
     await server.close();
     expect(Date.now() - begin).toBeLessThan(1000);
+  });
+
+  it('still answers a connection that was opened just before close()', async () => {
+    // In a cluster, a worker can be handed a connection just as it stops; its request may not
+    // have arrived yet, and closing it as idle would reset it.
+    const { port, server } = await start([get('/', () => 'ok')], { shutdownTimeout: 60_000 });
+    const socket = connect(port, '127.0.0.1');
+    await new Promise((resolve) => socket.once('connect', resolve));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    const closing = server.close();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    const answer = new Promise<string>((resolve, reject) => {
+      let text = '';
+      socket.setEncoding('utf8');
+      socket.on('data', (chunk: string) => (text += chunk));
+      socket.on('end', () => {
+        resolve(text);
+      });
+      socket.on('error', reject);
+    });
+    socket.write('GET / HTTP/1.1\r\nHost: x\r\n\r\n');
+    const text = await answer;
+    expect(text).toMatch(/^HTTP\/1\.1 200 /);
+    expect(text.toLowerCase()).toContain('connection: close');
+    await closing;
   });
 
   it('forces connections closed after shutdownTimeout', async () => {

@@ -100,11 +100,11 @@ Open, documented: `accept` applies to file parts; a part without a file name or 
 
 ## Workers
 
-| Control                                                                                  | Tests                                                                                                                 |
-| ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| No request lost during a rolling restart or shutdown (**fixed in 0.5.1**)                | `workers/cluster.test.ts` › "restarts workers one at a time without dropping requests"                                |
-| Messages that are not ours are ignored (**fixed in 0.5.2**)                              | `workers/cluster.test.ts` › "ignores IPC messages that are not its own"                                               |
-| Crash loops and replacements that cannot start end with exit code 1 (**fixed in 0.5.2**) | `workers/cluster.test.ts` › "stops after too many crashes…", "stops with exit code 1 when replacements cannot start…" |
+| Control                                                                                                 | Tests                                                                                                                                                                            |
+| ------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| No request lost during a rolling restart or shutdown (**fixed in 0.5.1**, and for Node 26 in **0.5.3**) | `workers/cluster.test.ts` › "restarts workers one at a time without dropping requests"; `http/server.test.ts` › "still answers a connection that was opened just before close()" |
+| Messages that are not ours are ignored (**fixed in 0.5.2**)                                             | `workers/cluster.test.ts` › "ignores IPC messages that are not its own"                                                                                                          |
+| Crash loops and replacements that cannot start end with exit code 1 (**fixed in 0.5.2**)                | `workers/cluster.test.ts` › "stops after too many crashes…", "stops with exit code 1 when replacements cannot start…"                                                            |
 
 ## Dependencies
 
