@@ -4,3 +4,7 @@ export { main } from './cli.js';
 export { serializeManifest, writeManifest } from './manifest.js';
 export { generateClient } from './client.js';
 export type { ClientRoute, GenerateClientOptions, GeneratedClient } from './client.js';
+export { watchProject } from './watch.js';
+export type { ProjectWatcher, WatchProjectOptions } from './watch.js';
+export { buildProject } from './build.js';
+export type { BuildProjectOptions } from './build.js';

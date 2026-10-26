@@ -1,6 +1,7 @@
 // Generates each template, compiles it, runs its tests and starts it, against the local packages.
+import { existsSync } from 'node:fs';
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdir, mkdtemp, readFile, realpath, rm, symlink } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -144,6 +145,66 @@ describe.each(TEMPLATES.flatMap((t) => VALIDATORS.map((v) => [t, v] as const)))(
       expect(result.status).toBe(0);
     }, 60_000);
 
+    it('builds with avi build, dropping compiled files whose source is gone', async () => {
+      const stale = path.join(project, 'dist/modules/old/old.test.js');
+      await mkdir(path.dirname(stale), { recursive: true });
+      await writeFile(stale, 'throw new Error("stale");');
+      expect(await main(['build', '--project', path.join(project, 'tsconfig.json')])).toBe(0);
+      expect(existsSync(stale)).toBe(false);
+      expect(existsSync(path.join(project, 'dist/main.js'))).toBe(true);
+    }, 60_000);
+
+    it('types a Vite frontend through dist/api.gen.d.ts', async () => {
+      // Vite's react-ts settings: server source would fail them (parameter properties, Node types).
+      const web = path.join(project, 'web');
+      await mkdir(path.join(web, 'src'), { recursive: true });
+      await mkdir(path.join(web, 'node_modules/@avijs'), { recursive: true });
+      await symlink(
+        await realpath(path.join(root, 'packages/client')),
+        path.join(web, 'node_modules/@avijs/client'),
+        'junction',
+      );
+      const tsconfig = {
+        compilerOptions: {
+          target: 'es2023',
+          lib: ['ES2023', 'DOM'],
+          module: 'esnext',
+          moduleResolution: 'bundler',
+          types: [],
+          skipLibCheck: true,
+          verbatimModuleSyntax: true,
+          moduleDetection: 'force',
+          noEmit: true,
+          strict: true,
+          noUnusedLocals: true,
+          erasableSyntaxOnly: true,
+        },
+        include: ['src'],
+      };
+      await writeFile(path.join(web, 'tsconfig.json'), JSON.stringify(tsconfig));
+      await writeFile(
+        path.join(web, 'src/api.ts'),
+        [
+          "import { createClient } from '@avijs/client';",
+          "import type { Api } from '../../dist/api.gen.js';",
+          "const api = createClient<Api>({ baseUrl: 'http://localhost:3000' });",
+          'export async function name(): Promise<string> {',
+          "  const user = await api.get('/users/:id', { params: { id: 1 } });",
+          '  return user.name;',
+          '}',
+          ...(validator === 'none'
+            ? []
+            : [
+                '// @ts-expect-error a user needs a name',
+                "void api.post('/users', { body: {} });",
+              ]),
+        ].join('\n'),
+      );
+      const result = run([tsc, '-p', 'web/tsconfig.json'], project);
+      expect(result.stdout + result.stderr).toBe('');
+      expect(result.status).toBe(0);
+    }, 60_000);
+
     it('passes its own tests', () => {
       const result = run(['--test', 'dist/**/*.test.js'], project);
       expect(result.status, result.stdout + result.stderr).toBe(0);
@@ -214,9 +275,27 @@ describe('avi', () => {
     }
     const lines = log.mock.calls.map((call) => String(call[0]));
     log.mockRestore();
-    expect(lines).toHaveLength(3);
-    expect(lines[1]).toContain('--watch');
-    expect(lines[2]).toBe('node --watch --watch-preserve-output dist/main.js');
+    expect(lines).toEqual([
+      'watch tsconfig.json',
+      'node --watch --watch-preserve-output dist/main.js',
+    ]);
+  });
+
+  it('keeps the client file in step with --dry-run in a generated project', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    await main(['new', 'dev-client', '--dir', workdir]);
+    const cwd = process.cwd();
+    process.chdir(path.join(workdir, 'dev-client'));
+    try {
+      expect(await main(['dev', '--dry-run'])).toBe(0);
+      expect(await main(['dev', '--dry-run', '--no-client'])).toBe(0);
+    } finally {
+      process.chdir(cwd);
+    }
+    const lines = log.mock.calls.map((call) => String(call[0]));
+    log.mockRestore();
+    expect(lines).toContain('watch tsconfig.json, updating src/api.gen.ts when routes change');
+    expect(lines.at(-2)).toBe('watch tsconfig.json');
   });
 
   it('prints usage', async () => {
@@ -227,7 +306,7 @@ describe('avi', () => {
   });
 });
 
-const CLIENT_NOTE = 'Run `avi client` to add the new routes to src/api.gen.ts.';
+const CLIENT_NOTE = '`avi dev` adds the new routes to src/api.gen.ts; otherwise run `avi client`.';
 
 describe('avi generate', () => {
   async function project(

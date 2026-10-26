@@ -49,6 +49,11 @@ export interface TestClient<A = never> {
    * Same shape as `@avijs/client`, but a status never throws.
    */
   readonly api: TestApi<A>;
+  /**
+   * The same client, sending these headers on every request, such as a user's token. Headers
+   * passed to a call still win. Calls from either client reach the same app.
+   */
+  withHeaders(headers: Record<string, string>): TestClient<A>;
   /** Closes the app, which also disposes its providers. */
   close(): Promise<void>;
 }
@@ -88,10 +93,13 @@ export async function createTestClient<A extends ApiShape<A> = never>(
     ? target
     : createAvi({ startupSummary: false, ...options }).register(target);
   const { port } = await app.listen(0, '127.0.0.1');
-  const url = `http://127.0.0.1:${String(port)}`;
+  return client<A>(app, `http://127.0.0.1:${String(port)}`, new Headers());
+}
 
+function client<A>(app: AviApp, url: string, defaults: Headers): TestClient<A> {
   const request = async (method: string, path: string, init: TestRequest = {}) => {
-    const headers = new Headers(init.headers);
+    const headers = new Headers(defaults);
+    for (const [name, value] of Object.entries(init.headers ?? {})) headers.set(name, value);
     let body: string | Uint8Array | FormData | URLSearchParams | Blob | undefined;
     if (init.body !== undefined) {
       if (isRawBody(init.body)) {
@@ -131,6 +139,11 @@ export async function createTestClient<A extends ApiShape<A> = never>(
     patch: (path, body, init) => request('PATCH', path, { ...init, body }),
     delete: (path, init) => request('DELETE', path, init),
     api: Object.freeze(api) as unknown as TestApi<A>,
+    withHeaders: (extra) => {
+      const headers = new Headers(defaults);
+      for (const [name, value] of Object.entries(extra)) headers.set(name, value);
+      return client<A>(app, url, headers);
+    },
     close: () => app.close(),
   };
 }

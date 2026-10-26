@@ -41,6 +41,22 @@ The client has `get`, `post`, `put`, `patch`, `delete` and a general `request(me
 Each response has `status`, `headers`, `text`, and `body`: parsed JSON for JSON responses, the text
 otherwise. `client.close()` stops the app and disposes its providers.
 
+### Signed-in requests
+
+`client.withHeaders(headers)` gives a client for the same app that sends those headers on every
+request; headers passed to a call still win. One per user keeps tests short:
+
+```ts
+const shiela = client.withHeaders({ authorization: `Bearer ${await signIn('shiela')}` });
+const grace = client.withHeaders({ authorization: `Bearer ${await signIn('grace')}` });
+
+assert.equal((await shiela.post('/teams', { name: 'Launch' })).status, 201);
+assert.equal((await grace.get('/teams/1')).status, 404); // not a member
+```
+
+It keeps the `Api` type of a [typed client](15-typed-client.md#typed-tests), so
+`shiela.api.post(...)` works too. Close only the original client.
+
 ## Replacing providers
 
 Pass `overrides` to swap a provider anywhere in the module graph, however deeply it is imported:

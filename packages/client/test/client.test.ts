@@ -237,3 +237,172 @@ describe('client types', () => {
     expect(check).toBeTypeOf('function');
   });
 });
+
+describe('query types', () => {
+  const Filters = v.object({
+    limit: v.optional(v.pipe(v.string(), v.transform(Number))),
+    status: v.optional(v.picklist(['todo', 'done'])),
+    tags: v.optional(v.array(v.string())),
+  });
+  const tasks = defineController({
+    prefix: '/tasks',
+    routes: [
+      route({
+        method: 'GET',
+        path: '/',
+        schema: { query: Filters },
+        handler: (ctx) => ctx.input.query,
+      }),
+    ],
+  });
+  interface TasksApi {
+    'GET /tasks': RouteEndpoint<'/tasks', typeof tasks, 0>;
+  }
+
+  it('takes numbers and booleans where the schema takes any string, and keeps literals strict', async () => {
+    const server = createAvi({ startupSummary: false }).register({ controllers: [tasks] });
+    const { port } = await server.listen(0, '127.0.0.1');
+    try {
+      const api = createClient<TasksApi>({ baseUrl: `http://127.0.0.1:${String(port)}` });
+      expect(await api.get('/tasks', { query: { limit: 100, tags: ['a', 2, true] } })).toEqual({
+        limit: 100,
+        tags: ['a', '2', 'true'],
+      });
+      expect(await api.get('/tasks', { query: { limit: '5', status: 'done' } })).toEqual({
+        limit: 5,
+        status: 'done',
+      });
+      // @ts-expect-error status is one of the listed values
+      await api.get('/tasks', { query: { status: 'later' } }).catch(() => undefined);
+      // @ts-expect-error an object is not a query value
+      await api.get('/tasks', { query: { limit: {} } }).catch(() => undefined);
+    } finally {
+      await server.close();
+    }
+  });
+});
+
+describe('events', () => {
+  const feed = defineController({
+    prefix: '/feed',
+    routes: [
+      route({
+        method: 'GET',
+        path: '/:room',
+        handler: (ctx) => {
+          if (ctx.headers.authorization !== 'Bearer t') throw new HttpError(401, 'Sign in first');
+          return sse(ctx, function* () {
+            yield 'hello';
+            yield { event: 'task', id: '7', data: { room: ctx.params.room } };
+            yield 'two\nlines';
+          });
+        },
+      }),
+    ],
+  });
+  interface FeedApi {
+    'GET /feed/:room': RouteEndpoint<'/feed/:room', typeof feed, 0>;
+  }
+
+  // Serves `chunks` as a stream through the client's fetch option.
+  const streaming = (chunks: string[], onCancel?: () => void) =>
+    createClient<FeedApi>({
+      baseUrl: 'http://test',
+      fetch: () => {
+        const encoder = new TextEncoder();
+        let i = 0;
+        const body = new ReadableStream<Uint8Array>({
+          pull(controller) {
+            const chunk = chunks[i++];
+            if (chunk === undefined) controller.close();
+            else controller.enqueue(encoder.encode(chunk));
+          },
+          cancel: onCancel,
+        });
+        return Promise.resolve(
+          new Response(body, { headers: { 'content-type': 'text/event-stream' } }),
+        );
+      },
+    });
+
+  it('reads an sse() stream with the client headers', async () => {
+    const server = createAvi({ startupSummary: false }).register({ controllers: [feed] });
+    const { port } = await server.listen(0, '127.0.0.1');
+    try {
+      const api = createClient<FeedApi>({
+        baseUrl: `http://127.0.0.1:${String(port)}`,
+        headers: { authorization: 'Bearer t' },
+      });
+      const received = [];
+      for await (const message of api.events('/feed/:room', { params: { room: 'a' } })) {
+        received.push(message);
+      }
+      expect(received).toEqual([
+        { event: 'message', data: 'hello' },
+        { event: 'task', id: '7', data: '{"room":"a"}' },
+        { event: 'message', id: '7', data: 'two\nlines' },
+      ]);
+
+      const anonymous = createClient<FeedApi>({ baseUrl: `http://127.0.0.1:${String(port)}` });
+      const failure = await anonymous
+        .events('/feed/:room', { params: { room: 'a' } })
+        [Symbol.asyncIterator]()
+        .next()
+        .catch((e: unknown) => e);
+      expect((failure as AviClientError).status).toBe(401);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('parses the format across chunk boundaries and line endings', async () => {
+    const api = streaming([
+      ': a comment\r',
+      '\ndata:no space\r\n\r',
+      '\nevent: x\ndata\ndata:  two spaces\n\n',
+      'id: 1\0x\ndata: id with a null is ignored\n\n',
+      'data: never finished',
+    ]);
+    const received = [];
+    for await (const message of api.events('/feed/:room', { params: { room: 'a' } })) {
+      received.push(message);
+    }
+    expect(received).toEqual([
+      { event: 'message', data: 'no space' },
+      { event: 'x', data: '\n two spaces' },
+      { event: 'message', data: 'id with a null is ignored' },
+    ]);
+  });
+
+  it('cancels the stream when the loop stops, and ends quietly on abort', async () => {
+    const cancel = vi.fn();
+    const api = streaming(['data: 1\n\n', 'data: 2\n\n'], cancel);
+    for await (const message of api.events('/feed/:room', { params: { room: 'a' } })) {
+      expect(message.data).toBe('1');
+      break;
+    }
+    expect(cancel).toHaveBeenCalled();
+
+    const controller = new AbortController();
+    const seen: string[] = [];
+    const endless = createClient<FeedApi>({
+      baseUrl: 'http://test',
+      fetch: (_url, init) =>
+        new Promise((_resolve, reject) => {
+          init.signal?.addEventListener('abort', () => {
+            reject(new DOMException('aborted', 'AbortError'));
+          });
+        }),
+    });
+    setTimeout(() => {
+      controller.abort();
+    }, 10);
+    for await (const message of endless.events('/feed/:room', {
+      params: { room: 'a' },
+      signal: controller.signal,
+    })) {
+      seen.push(message.data);
+    }
+    expect(seen).toEqual([]);
+  });
+});

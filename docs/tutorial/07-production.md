@@ -75,6 +75,10 @@ const events = new EventSource('/jobs/42/progress');
 events.addEventListener('progress', (e) => console.log(JSON.parse(e.data)));
 ```
 
+`EventSource` cannot send headers, so a stream behind token auth needs the
+[typed client](15-typed-client.md#live-events)'s `api.events(...)`, which reads the stream with
+`fetch`.
+
 | Field   | Sent as                                                       |
 | ------- | ------------------------------------------------------------- |
 | `data`  | strings as is, anything else as JSON; line breaks are safe    |
@@ -93,6 +97,34 @@ cannot inject extra fields.
   Change it with `sse(ctx, source, { heartbeat: 30_000 })`, or turn it off with `false`.
 - The response sets `cache-control: no-cache` and `x-accel-buffering: no`, so proxies such as nginx
   pass events through immediately.
+- **More than one process.** Events published in memory (an `EventEmitter`, as below) reach only
+  clients connected to the same process. Under [`cluster()`](16-workers.md), or with several
+  containers, a change made through one worker never reaches a browser connected to another. It
+  works in development, with one process, and breaks in production. Publish through something
+  every process can hear, such as Redis pub/sub or Postgres `LISTEN`/`NOTIFY`.
+
+A live feed per item fits `node:events`: `on()` with the request's `signal` stops listening when
+the client leaves.
+
+```ts
+import { EventEmitter, on } from 'node:events';
+
+const changes = new EventEmitter(); // one process only, see above
+changes.setMaxListeners(0); // one listener per open stream
+
+// Wherever a task changes: changes.emit(`project:${task.projectId}`, { type: 'updated', taskId });
+
+route({
+  method: 'GET',
+  path: '/projects/:id/events',
+  handler: (ctx) =>
+    sse(ctx, async function* (signal) {
+      for await (const [change] of on(changes, `project:${ctx.params.id}`, { signal })) {
+        yield { event: 'change', data: change };
+      }
+    }),
+});
+```
 
 For two-way messages, WebSockets are planned as an experimental package.
 

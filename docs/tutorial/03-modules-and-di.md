@@ -101,8 +101,21 @@ providers: [
 ];
 ```
 
-Annotate factory parameters yourself: inside a `providers` array TypeScript cannot infer them from
-`inject`.
+Inside a `providers` array TypeScript cannot infer a factory's parameters from `inject`, so a
+factory written as above is not checked against it. Wrap it in `defineFactory` and it is: the
+parameters are typed from `inject` in order, and the result must fit `provide`.
+
+```ts
+import { defineFactory } from '@avijs/core';
+
+defineFactory({
+  provide: Db,
+  inject: [DbConfig, Logger],
+  useFactory: (config, logger) => connect(config.url, logger), // config: DbConfig, logger: Logger
+});
+```
+
+Tokens in the wrong order, or a factory returning something other than a `Db`, fail to compile.
 
 | Scope                 | Behavior                                                                 |
 | --------------------- | ------------------------------------------------------------------------ |
@@ -154,15 +167,15 @@ request-scoped resource to a stream.
 Singleton factories can be `async`. Avi.js awaits them before the server starts:
 
 ```ts
-{
+defineFactory({
   provide: Db,
-  useFactory: async (config: DbConfig) => {
+  inject: [DbConfig],
+  useFactory: async (config) => {
     const db = new DbClient(config.url);
     await db.connect();
     return db;
   },
-  inject: [DbConfig],
-}
+});
 ```
 
 Transient and request-scoped factories must stay synchronous; an async one fails when it is first

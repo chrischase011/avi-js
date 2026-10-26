@@ -1,6 +1,6 @@
 {
   "name": "@avijs/client",
-  "version": "0.5.3",
+  "version": "0.6.0",
   "description": "A typed fetch client for Avi.js APIs. No dependencies; runs anywhere fetch does.",
   "keywords": [
     "avi",

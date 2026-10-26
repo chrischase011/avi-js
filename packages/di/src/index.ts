@@ -6,7 +6,15 @@ export type {
   ProviderDescription,
   RequestScope,
 } from './container.js';
-export type { ClassProvider, FactoryProvider, Provider, Scope, ValueProvider } from './provider.js';
+export { defineFactory } from './provider.js';
+export type {
+  ClassProvider,
+  FactoryProvider,
+  Provider,
+  Scope,
+  TypedFactoryProvider,
+  ValueProvider,
+} from './provider.js';
 export { createToken } from './token.js';
 export type {
   Class,

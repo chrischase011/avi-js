@@ -139,7 +139,7 @@ export async function generate(args: readonly string[]): Promise<number> {
     return 1;
   }
   if ((kind === 'controller' || kind === 'resource') && existsSync(path.join(src, 'api.gen.ts'))) {
-    plan.notes.push('Run `avi client` to add the new routes to src/api.gen.ts.');
+    plan.notes.push('`avi dev` adds the new routes to src/api.gen.ts; otherwise run `avi client`.');
   }
   await plan.apply(root, values['dry-run']);
   return 0;

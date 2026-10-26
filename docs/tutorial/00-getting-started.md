@@ -64,13 +64,13 @@ my-api/
 └── tsconfig.json
 ```
 
-| Script          | What it does                                        |
-| --------------- | --------------------------------------------------- |
-| `npm run dev`   | Compile, then recompile and restart on every change |
-| `npm test`      | Compile and run the tests with `node --test`        |
-| `npm run build` | Compile to `dist/`                                  |
-| `npm start`     | Run the compiled app                                |
-| `npm run check` | Check every `static inject` list against its class  |
+| Script          | What it does                                                                        |
+| --------------- | ----------------------------------------------------------------------------------- |
+| `npm run dev`   | Compile, then recompile and restart on every change; keeps `src/api.gen.ts` current |
+| `npm test`      | Compile and run the tests with `node --test`                                        |
+| `npm run build` | `avi build`: update `src/api.gen.ts`, empty `dist/`, compile into it                |
+| `npm start`     | Run the compiled app                                                                |
+| `npm run check` | Check every `static inject` list against its class                                  |
 
 ## Add a feature
 

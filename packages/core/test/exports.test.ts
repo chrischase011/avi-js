@@ -34,6 +34,7 @@ describe('@avijs/core', () => {
       'createToken',
       'defineConfig',
       'defineController',
+      'defineFactory',
       'defineModule',
       'describeApp',
       'jsonLogger',

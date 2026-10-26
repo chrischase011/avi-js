@@ -10,7 +10,7 @@ at startup when something is missing or wrong.
 
 ```ts
 // src/config.ts
-import { defineConfig } from '@avijs/core';
+import { defineConfig, type TokenType } from '@avijs/core';
 import * as v from 'valibot';
 
 const env = v.object({
@@ -20,13 +20,15 @@ const env = v.object({
 });
 
 export const Config = defineConfig(env, { envFile: '.env' });
+export type Config = TokenType<typeof Config>; // the validated values
 ```
 
 Any Standard Schema library works; with Zod the same is `z.object({ PORT: z.coerce.number() ... })`.
 The type of the config is the schema's output: here `{ PORT: number; DATABASE_URL: string; LOG_LEVEL:
 'info' | 'warn' | 'error' }`.
 
-Projects created with `npm create avi` already have a `src/config.ts` with `PORT`.
+Projects created with `npm create avi` already have a `src/config.ts` with `PORT`. The `Config`
+type next to the token names the values, so `config: Config` reads like any other dependency.
 
 ## Using it
 
@@ -37,7 +39,7 @@ other dependency:
 @Injectable()
 export class Database {
   static inject = [Config] as const;
-  constructor(private readonly config: TokenType<typeof Config>) {}
+  constructor(private readonly config: Config) {}
 
   connect() {
     return createPool(this.config.DATABASE_URL);
@@ -45,6 +47,31 @@ export class Database {
 }
 
 @Module({ imports: [Config.module], providers: [Database], exports: [Database] })
+export class DatabaseModule {}
+```
+
+A database client is usually built by a factory instead. `defineFactory` types its parameters from
+`inject` ([chapter 3](03-modules-and-di.md#provider-forms)):
+
+```ts
+export const Db = createToken<PrismaClient>('Db');
+
+@Module({
+  imports: [Config.module],
+  providers: [
+    defineFactory({
+      provide: Db,
+      inject: [Config],
+      useFactory: async (config) => {
+        const db = new PrismaClient({ adapter: new PrismaLibSql({ url: config.DATABASE_URL }) });
+        await db.$connect();
+        return db;
+      },
+      dispose: (db) => db.$disconnect(),
+    }),
+  ],
+  exports: [Db],
+})
 export class DatabaseModule {}
 ```
 

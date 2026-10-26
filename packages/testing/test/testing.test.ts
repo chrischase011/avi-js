@@ -27,6 +27,11 @@ const users = defineController({
       }),
     }),
     route({ method: 'GET', path: '/text', handler: () => 'plain text' }),
+    route({
+      method: 'GET',
+      path: '/whoami',
+      handler: (ctx) => ({ auth: ctx.headers.authorization, lang: ctx.headers['accept-language'] }),
+    }),
     route({ method: 'DELETE', path: '/:id', handler: () => undefined }),
   ],
 });
@@ -94,5 +99,19 @@ describe('createTestClient', () => {
     const test = await createTestClient({ providers: [Resource] });
     await test.close();
     expect(events).toEqual(['disposed']);
+  });
+});
+
+describe('withHeaders', () => {
+  it('sends default headers that a call can override, without changing the original', async () => {
+    client = await createTestClient(AppModule);
+    const shiela = client.withHeaders({ Authorization: 'Bearer shiela', 'accept-language': 'en' });
+    const grace = shiela.withHeaders({ authorization: 'Bearer grace' });
+
+    expect((await shiela.get('/users/whoami')).body).toEqual({ auth: 'Bearer shiela', lang: 'en' });
+    expect((await grace.get('/users/whoami')).body).toEqual({ auth: 'Bearer grace', lang: 'en' });
+    const override = await shiela.get('/users/whoami', { headers: { authorization: 'Bearer x' } });
+    expect(override.body).toEqual({ auth: 'Bearer x', lang: 'en' });
+    expect((await client.get('/users/whoami')).body).not.toHaveProperty('auth');
   });
 });

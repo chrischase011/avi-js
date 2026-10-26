@@ -3,6 +3,58 @@
 All notable changes are listed here. Avi.js follows [Semantic Versioning](https://semver.org); all
 packages share one version.
 
+## 0.6.0 - 2026-10-26
+
+### Added
+
+- `avi dev` keeps `src/api.gen.ts` in step with the routes: add, change or remove a route, save,
+  and the file is updated before the app restarts, so a frontend's types follow without running
+  `avi client`. It writes the file only when routes changed. `--client <file>` picks another file,
+  `--no-client` turns it off; projects without `src/api.gen.ts` are not affected.
+- `avi client --watch` does the same without compiling, for projects that build another way.
+- `defineFactory({ provide, inject, useFactory })`: a factory provider typed from its `inject`
+  list. In a plain `providers` array the parameters were unchecked, so tokens in the wrong order
+  compiled and failed at startup. Chapter 3 and chapter 13 (config in a factory) show it.
+- New projects' `src/config.ts` also exports `type Config`, the validated values, so constructors
+  take `config: Config` instead of `TokenType<typeof Config>`.
+- `@avijs/client`: `api.events(path, options)` reads a server-sent event stream as an async
+  iterable, over `fetch`, so the client's headers (a token) are sent, which `EventSource` cannot
+  do. Breaking the loop cancels the stream; aborting `signal` ends it quietly.
+- `avi build`: see below.
+- `@avijs/testing`: `client.withHeaders(headers)`, a client for the same app that sends those
+  headers on every request, such as a signed-in user's token. Typed calls keep their `Api`.
+- `@avijs/compiler`: `watchProject()` and `buildProject()`, behind `avi dev`, `avi client --watch`
+  and `avi build`.
+
+### Changed
+
+- `@avijs/client`: where a query schema takes any string, the client also takes numbers and
+  booleans (`query: { limit: 100 }`), since query values are sent as text. Literal values such as
+  `'todo' | 'done'` stay exact.
+- `avi dev` compiles in its own process instead of running `tsc --watch`. With type errors at
+  startup it keeps watching and starts the app after the first clean build, instead of exiting.
+- New projects build with `avi build` (`build` and `test` scripts): it updates `api.gen.ts`, empties
+  `dist/` and compiles, in one TypeScript pass. `tsc` never removes output, so after deleting a
+  module `npm test` still ran its compiled tests. It only empties an `outDir` inside the project
+  that holds no sources.
+- New projects emit declarations (`"declaration": true`), so a React or Vite frontend can import
+  `Api` from `dist/api.gen.d.ts`. Importing `src/api.gen.ts` made the frontend's compiler check
+  the server's code under Vite's settings, which fails. Chapter 15 shows the setup.
+
+### Fixed
+
+- `cluster()` with the default logger printed its fields object after the ready line
+  (`… ready in 493 ms { workers: 2, … }`). Only a logger you pass gets the structured entry.
+
+- `generateOpenApi`: `toJsonSchema` may return any object, so `@valibot/to-json-schema` fits
+  without a cast, as chapter 11 shows it. The documented setup did not compile before.
+
+### Docs
+
+- Chapter 12: the rate-limit memory store drops the least recently used key, not the oldest.
+- Chapters 7 and 16: in-memory events for `sse()` reach only one process, so they break under
+  `cluster()`; chapter 7 adds a per-item live feed with `node:events`.
+
 ## 0.5.3 - 2026-10-26
 
 ### Fixed

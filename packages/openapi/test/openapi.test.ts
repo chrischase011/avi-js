@@ -254,9 +254,8 @@ describe('generateOpenApi with schema libraries', () => {
     ).rejects.toThrow(
       'Cannot convert the params schema of POST /users/:id to JSON Schema: The "transform" action cannot be converted to JSON Schema.',
     );
-    const lenient = await document(
-      schemas,
-      (schema) => valibotToJsonSchema(schema as never, { errorMode: 'ignore' }) as JsonSchema,
+    const lenient = await document(schemas, (schema) =>
+      valibotToJsonSchema(schema as never, { errorMode: 'ignore' }),
     );
     expect(lenient?.parameters).toEqual([
       { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
@@ -274,7 +273,8 @@ describe('generateOpenApi with schema libraries', () => {
     });
     const operation = await document(
       schemas,
-      (schema) => valibotToJsonSchema(schema as never) as JsonSchema,
+      // As chapter 11 shows it: Valibot's own JsonSchema type fits without a cast.
+      (schema) => valibotToJsonSchema(schema as never, { errorMode: 'ignore' }),
     );
     expect(operation).toMatchObject(expected);
   });

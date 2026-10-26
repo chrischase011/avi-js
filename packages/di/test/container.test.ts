@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Container, createToken, type ModuleDefinition } from '../src/index.js';
+import { Container, createToken, defineFactory, type ModuleDefinition } from '../src/index.js';
 
 const mod = (name: string, def: Omit<ModuleDefinition, 'name'> = {}): ModuleDefinition => ({
   name,
@@ -33,6 +33,7 @@ const Config = createToken<{ url: string }>('Config');
 describe('providers', () => {
   it('resolves class, value and factory providers', async () => {
     const Url = createToken<string>('Url');
+    const Replica = createToken<string>('Replica');
     const c = await start(
       mod('App', {
         providers: [
@@ -40,11 +41,17 @@ describe('providers', () => {
           Repo,
           { provide: Config, useValue: { url: 'db://local' } },
           { provide: Url, useFactory: (config: { url: string }) => config.url, inject: [Config] },
+          defineFactory({
+            provide: Replica,
+            inject: [Config],
+            useFactory: (c) => `${c.url}/replica`,
+          }),
         ],
       }),
     );
     expect((c.get(Repo) as Repo).db).toBe(c.get(Db));
     expect(c.get(Url)).toBe('db://local');
+    expect(c.get(Replica)).toBe('db://local/replica');
   });
 
   it('shares singletons and creates transients per injection', async () => {

@@ -1,4 +1,5 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -6,11 +7,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import ts from 'typescript';
 import { readProgram } from '../src/check.js';
 import {
+  buildProject,
   checkInjectLists,
   generateClient,
   main,
   serializeManifest,
+  watchProject,
   writeManifest,
+  type ProjectWatcher,
 } from '../src/index.js';
 import { createAvi, describeApp, type AviApp, type ModuleRef } from '@avijs/core';
 
@@ -261,5 +265,136 @@ describe('generateClient with unusual route paths', () => {
       ].sort(),
     );
     expect(result.diagnostics.map((d) => d.code)).toContain('AVI107');
+  });
+});
+
+describe('watchProject', { timeout: 60_000 }, () => {
+  let dir: string | undefined;
+  let watcher: ProjectWatcher | undefined;
+  afterEach(async () => {
+    watcher?.close();
+    vi.restoreAllMocks();
+    if (dir) await rm(dir, { recursive: true, force: true });
+  });
+
+  it('updates the client when a route is added, and only then', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    // Inside fixtures/ so @avijs/core and valibot still resolve.
+    dir = await mkdtemp(path.join(fixtures, '.watch-'));
+    await cp(path.join(fixtures, 'client'), dir, { recursive: true });
+    const out = path.join(dir, 'src/api.gen.ts');
+    const controller = path.join(dir, 'src/users/users.controller.ts');
+
+    const builds: (() => void)[] = [];
+    const nextBuild = () => new Promise<void>((resolve) => builds.push(resolve));
+    const first = nextBuild();
+    watcher = watchProject({
+      project: path.join(dir, 'tsconfig.json'),
+      emit: false,
+      client: { out },
+      onBuild: () => builds.shift()?.(),
+    });
+    await first;
+    // The copied file is current: nothing is written.
+    expect(log).not.toHaveBeenCalledWith(expect.stringContaining('updated'));
+
+    const rebuilt = nextBuild();
+    const settled = rebuilt.then(nextBuild);
+    const source = await readFile(controller, 'utf8');
+    await writeFile(
+      controller,
+      source.replace(
+        "  @Get('/:id')",
+        "  @Get('/me')\n  me() {\n    return { id: 1 };\n  }\n\n  @Get('/:id')",
+      ),
+    );
+    await rebuilt;
+    expect(log).toHaveBeenCalledWith(`${out} updated: 8 routes`);
+    expect(await readFile(out, 'utf8')).toContain("'GET /users/me'");
+
+    // Writing the file triggers one more build, which finds it current: no loop.
+    await settled;
+    const updates = log.mock.calls.filter((call) => String(call[0]).includes('updated'));
+    expect(updates).toHaveLength(1);
+  });
+
+  it('removes a deleted route without reporting the stale file as a type error', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    dir = await mkdtemp(path.join(fixtures, '.watch-'));
+    await cp(path.join(fixtures, 'client'), dir, { recursive: true });
+    const out = path.join(dir, 'src/api.gen.ts');
+    const controller = path.join(dir, 'src/users/users.controller.ts');
+
+    const errors: number[] = [];
+    let built: (() => void) | undefined;
+    const nextBuild = () => new Promise<void>((resolve) => (built = resolve));
+    const first = nextBuild();
+    watcher = watchProject({
+      project: path.join(dir, 'tsconfig.json'),
+      client: { out },
+      onBuild: (count) => {
+        errors.push(count);
+        built?.();
+      },
+    });
+    await first;
+
+    const rebuilt = nextBuild();
+    const source = await readFile(controller, 'utf8');
+    // POST /users/import; the fixture's consumer.ts does not call it.
+    await writeFile(
+      controller,
+      source.replace(/\n\n {2}\/\/ The schema is there[\s\S]*?\n {2}\}\n/, '\n'),
+    );
+    await rebuilt;
+    expect(log).toHaveBeenCalledWith(`${out} updated: 6 routes`);
+    expect(await readFile(out, 'utf8')).not.toContain('importMany');
+    expect(errors).toEqual([0, 0]);
+  });
+});
+
+describe('buildProject', () => {
+  let dir: string | undefined;
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    if (dir) await rm(dir, { recursive: true, force: true });
+  });
+
+  const project = async (outDir: string, source: string, exclude?: string[]) => {
+    dir = await mkdtemp(path.join(tmpdir(), 'avi-build-'));
+    await mkdir(path.join(dir, 'src'));
+    await writeFile(path.join(dir, 'src/a.ts'), source);
+    const compilerOptions = { outDir, rootDir: 'src', types: [], skipLibCheck: true };
+    const tsconfig = { compilerOptions, include: ['src'], ...(exclude ? { exclude } : {}) };
+    await writeFile(path.join(dir, 'tsconfig.json'), JSON.stringify(tsconfig));
+    return path.join(dir, 'tsconfig.json');
+  };
+
+  it('empties the output folder, so deleted sources do not linger', async () => {
+    const config = await project('dist', 'export const a = 1;');
+    const stale = path.join(path.dirname(config), 'dist/old.test.js');
+    await mkdir(path.dirname(stale));
+    await writeFile(stale, 'throw new Error("stale")');
+
+    expect(buildProject({ project: config })).toBe(0);
+    expect(existsSync(stale)).toBe(false);
+    expect(existsSync(path.join(path.dirname(config), 'dist/a.js'))).toBe(true);
+  });
+
+  it('never empties an output folder that is the project or holds its sources', async () => {
+    // With exclude set, tsc no longer leaves the output folder out of the sources.
+    const config = await project('.', 'export const a = 1;', []);
+    const keep = path.join(path.dirname(config), 'keep.txt');
+    await writeFile(keep, 'mine');
+    expect(buildProject({ project: config })).toBe(0);
+    expect(existsSync(keep)).toBe(true);
+  });
+
+  it('reports type errors and counts them', async () => {
+    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    const config = await project('dist', "export const a: number = 'x';");
+    expect(buildProject({ project: config })).toBe(1);
+    expect(String(write.mock.calls[0]?.[0])).toContain('TS2322');
   });
 });

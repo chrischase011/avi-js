@@ -11,6 +11,10 @@ export interface Diagnostic {
   readonly message: string;
 }
 
+export function formatDiagnostic(d: Diagnostic): string {
+  return `${d.file}:${String(d.line)}:${String(d.column)} ${d.severity} ${d.code}: ${d.message}`;
+}
+
 /**
  * Type-checks every `static inject` list in a TypeScript project against its class constructor.
  * Decorated classes get this from the compiler already; this covers undecorated ones too.
@@ -34,8 +38,7 @@ export function checkInjectLists(project: string): Diagnostic[] {
   );
 }
 
-/** The project's program, and its own files (absolute paths). */
-export function readProgram(project: string): { program: ts.Program; roots: Set<string> } {
+export function readConfig(project: string): ts.ParsedCommandLine {
   const config = ts.getParsedCommandLineOfConfigFile(path.resolve(project), undefined, {
     ...ts.sys,
     onUnRecoverableConfigFileDiagnostic: (diagnostic) => {
@@ -43,7 +46,12 @@ export function readProgram(project: string): { program: ts.Program; roots: Set<
     },
   });
   if (!config) throw new Error(`Cannot read ${project}`);
+  return config;
+}
 
+/** The project's program, and its own files (absolute paths). */
+export function readProgram(project: string): { program: ts.Program; roots: Set<string> } {
+  const config = readConfig(project);
   const program = ts.createProgram({ rootNames: config.fileNames, options: config.options });
   return { program, roots: new Set(config.fileNames.map((file) => path.resolve(file))) };
 }

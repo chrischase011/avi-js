@@ -1,17 +1,19 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
-import { checkInjectLists, type Diagnostic } from './check.js';
-import { generateClient } from './client.js';
+import { checkInjectLists, formatDiagnostic as format } from './check.js';
+import { generateClient, sameContent } from './client.js';
 import { writeManifest } from './manifest.js';
+import { watchProject } from './watch.js';
 
 const USAGE = `Usage:
   avi-compile check [--project tsconfig.json]
       Type-check every static inject list against its constructor.
   avi-compile manifest <entry.js> [--export AppModule] [--out avi.manifest.json]
       Describe the app's modules, providers and routes without starting it.
-  avi-compile client [--project tsconfig.json] [--out src/api.gen.ts] [--root file.ts#AppModule] [--check]
-      Generate the Api type for @avijs/client. --check fails if the file is out of date.`;
+  avi-compile client [--project tsconfig.json] [--out src/api.gen.ts] [--root file.ts#AppModule] [--check | --watch]
+      Generate the Api type for @avijs/client. --check fails if the file is out of date;
+      --watch updates it whenever routes change.`;
 
 export async function main(argv: readonly string[]): Promise<number> {
   const [command, ...rest] = argv;
@@ -24,6 +26,7 @@ export async function main(argv: readonly string[]): Promise<number> {
       out: { type: 'string' },
       root: { type: 'string' },
       check: { type: 'boolean', default: false },
+      watch: { type: 'boolean', default: false },
     },
   });
 
@@ -37,6 +40,9 @@ export async function main(argv: readonly string[]): Promise<number> {
     return errors > 0 ? 1 : 0;
   }
 
+  if (command === 'client' && values.watch) {
+    return watchClient(values.project, values.out ?? 'src/api.gen.ts', values.root);
+  }
   if (command === 'client') {
     return client(values.project, values.out ?? 'src/api.gen.ts', values.root, values.check);
   }
@@ -74,8 +80,7 @@ async function client(
   const routes = `${String(result.routes.length)} routes`;
   if (check) {
     const current = await readFile(out, 'utf8').catch(() => undefined);
-    // Formatters may rewrap the file; only the content counts.
-    const same = current !== undefined && squash(current) === squash(result.source);
+    const same = current !== undefined && sameContent(current, result.source);
     console.log(
       same ? `${out} is up to date (${routes})` : `${out} is out of date: run avi client`,
     );
@@ -87,8 +92,15 @@ async function client(
   return 0;
 }
 
-const squash = (text: string) => text.replace(/[\s,;]+/g, '');
-
-function format(d: Diagnostic): string {
-  return `${d.file}:${String(d.line)}:${String(d.column)} ${d.severity} ${d.code}: ${d.message}`;
+function watchClient(project: string, out: string, root: string | undefined): Promise<number> {
+  const watcher = watchProject({ project, emit: false, client: { out, root } });
+  console.log(`Watching for route changes; ${out} updates on save`);
+  return new Promise((resolve) => {
+    const stop = () => {
+      watcher.close();
+      resolve(0);
+    };
+    process.once('SIGINT', stop);
+    process.once('SIGTERM', stop);
+  });
 }

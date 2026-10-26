@@ -66,7 +66,10 @@ const handle = await cluster(
     shutdownTimeout: 5_000,
     maxRestarts: Number(process.env.MAX_RESTARTS ?? 5),
     restartWindow: 10_000,
-    logger: { error: (m) => console.error(m), warn: (m) => console.error(m) },
+    // NO_LOGGER: the default logger, as most apps use it.
+    logger: process.env.NO_LOGGER
+      ? undefined
+      : { error: (m) => console.error(m), warn: (m) => console.error(m) },
   },
 );
 

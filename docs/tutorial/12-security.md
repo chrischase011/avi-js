@@ -127,7 +127,7 @@ route({ method: 'POST', path: '/login', guards: [login.guard], handler: signIn }
 | `logger`       | `console.error`   | Receives store failures                                          |
 
 The built-in store keeps counts in memory, for this process only. It tracks at most 100 000 keys
-and drops the oldest window when full, so a flood of new addresses cannot use up memory. When
+and drops the least recently used one when full, so a flood of new addresses cannot use up memory. When
 several processes or servers share the load, give them a shared store. A store is one function:
 
 ```ts

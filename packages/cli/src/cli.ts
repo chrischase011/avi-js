@@ -1,5 +1,5 @@
-import { main as compile } from '@avijs/compiler';
-import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
+import { buildProject, main as compile, watchProject } from '@avijs/compiler';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdir, readdir, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -20,15 +20,19 @@ const USAGE = `Usage:
       a folder of packed @avijs tarballs (pnpm pack) to install instead of the registry.
       --avi-version defaults to this CLI's version.
 ${GENERATE_USAGE}
-  avi dev [--project tsconfig.json] [--entry dist/main.js]
-      Compile, then recompile and restart on every change.
+  avi dev [--project tsconfig.json] [--entry dist/main.js] [--client src/api.gen.ts | --no-client]
+      Compile, then recompile and restart on every change. Keeps src/api.gen.ts (when the
+      project has one) in step with the routes.
+  avi build [--project tsconfig.json] [--client src/api.gen.ts | --no-client]
+      Update src/api.gen.ts, empty the output folder, and compile, so files deleted from
+      src do not linger in dist.
   avi check [--project tsconfig.json]
       Type-check every static inject list.
   avi manifest <entry.js> [--export AppModule] [--out avi.manifest.json]
       Describe the app's modules, providers and routes.
-  avi client [--out src/api.gen.ts] [--project tsconfig.json] [--root file.ts#AppModule] [--check]
+  avi client [--out src/api.gen.ts] [--project tsconfig.json] [--root file.ts#AppModule] [--check | --watch]
       Generate the typed Api for @avijs/client from the app's routes. --check fails when the
-      file is out of date, for CI.`;
+      file is out of date, for CI; --watch updates it on every change.`;
 
 export async function main(argv: readonly string[]): Promise<number> {
   const [command, ...rest] = argv;
@@ -40,6 +44,8 @@ export async function main(argv: readonly string[]): Promise<number> {
       return generate(rest);
     case 'dev':
       return dev(rest);
+    case 'build':
+      return build(rest);
     case 'check':
     case 'manifest':
     case 'client':
@@ -113,51 +119,73 @@ async function dev(args: readonly string[]): Promise<number> {
     options: {
       project: { type: 'string', default: 'tsconfig.json' },
       entry: { type: 'string', default: 'dist/main.js' },
+      client: { type: 'string' },
+      'no-client': { type: 'boolean', default: false },
       'dry-run': { type: 'boolean', default: false },
     },
   });
 
-  let tsc: string;
-  try {
-    tsc = createRequire(path.resolve('package.json')).resolve('typescript/bin/tsc');
-  } catch {
-    console.error('avi dev needs TypeScript installed in this project: npm install -D typescript');
-    return 1;
-  }
-
-  const build = [tsc, '-p', values.project];
-  const watchBuild = [tsc, '-p', values.project, '--watch', '--preserveWatchOutput'];
-  const watchRun = ['--watch', '--watch-preserve-output', values.entry];
+  const client = clientFile(values.project, values.client, values['no-client']);
+  const run = ['--watch', '--watch-preserve-output', values.entry];
   if (values['dry-run']) {
-    for (const command of [build, watchBuild, watchRun]) {
-      console.log(['node', ...command].join(' '));
-    }
+    console.log(
+      `watch ${values.project}${client ? `, updating ${client} when routes change` : ''}`,
+    );
+    console.log(['node', ...run].join(' '));
     return 0;
   }
 
-  const first = spawnSync(process.execPath, build, { stdio: 'inherit' });
-  if (first.status !== 0) return first.status ?? 1;
-
-  const children: ChildProcess[] = [
-    spawn(process.execPath, watchBuild, { stdio: 'inherit' }),
-    spawn(process.execPath, watchRun, { stdio: 'inherit' }),
-  ];
   return new Promise((resolve) => {
-    const stop = () => {
-      for (const child of children) child.kill();
-      resolve(0);
+    let app: ChildProcess | undefined;
+    // The app starts after the first clean build; node --watch restarts it from then on.
+    const watcher = watchProject({
+      project: values.project,
+      ...(client ? { client: { out: client } } : {}),
+      onBuild: (errors) => {
+        if (errors > 0 || app) return;
+        app = spawn(process.execPath, run, { stdio: 'inherit' });
+        app.once('exit', (code) => {
+          if (code !== null && code !== 0) stop(code);
+        });
+      },
+    });
+    const stop = (code: number) => {
+      watcher.close();
+      app?.kill();
+      resolve(code);
     };
-    process.once('SIGINT', stop);
-    process.once('SIGTERM', stop);
-    for (const child of children) {
-      child.once('exit', (code) => {
-        if (code !== null && code !== 0) {
-          for (const other of children) other.kill();
-          resolve(code);
-        }
-      });
-    }
+    process.once('SIGINT', () => {
+      stop(0);
+    });
+    process.once('SIGTERM', () => {
+      stop(0);
+    });
   });
+}
+
+function build(args: readonly string[]): number {
+  const { values } = parseArgs({
+    args: [...args],
+    options: {
+      project: { type: 'string', default: 'tsconfig.json' },
+      client: { type: 'string' },
+      'no-client': { type: 'boolean', default: false },
+    },
+  });
+  const client = clientFile(values.project, values.client, values['no-client']);
+  const errors = buildProject({
+    project: values.project,
+    ...(client ? { client: { out: client } } : {}),
+  });
+  return errors > 0 ? 1 : 0;
+}
+
+/** The client file to keep current: --client, else the project's src/api.gen.ts if it has one. */
+function clientFile(project: string, client: string | undefined, off: boolean): string | undefined {
+  if (off) return undefined;
+  if (client) return client;
+  const file = path.posix.join(path.dirname(project).replaceAll('\\', '/'), 'src/api.gen.ts');
+  return existsSync(file) ? file : undefined;
 }
 
 /** Maps each packed @avi tarball in `dir` to a `file:` spec relative to the new project. */

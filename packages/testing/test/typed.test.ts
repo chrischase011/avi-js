@@ -56,3 +56,11 @@ it('types client.api calls by the generated Api', async () => {
   // The untyped calls still work.
   expect((await client.get('/notes/1')).ok).toBe(true);
 });
+
+it('keeps the Api type through withHeaders', async () => {
+  client = await createTestClient<Api>({ controllers: [notes] });
+  const signedIn = client.withHeaders({ authorization: 'Bearer t' });
+  expectTypeOf(signedIn).toEqualTypeOf<TestClient<Api>>();
+  const found = await signedIn.api.get('/notes/:id', { params: { id: 1 } });
+  expect(found.ok).toBe(true);
+});

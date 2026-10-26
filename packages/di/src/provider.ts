@@ -1,4 +1,4 @@
-import { isToken, tokenName, type Constructor, type Token } from './token.js';
+import { isToken, tokenName, type Constructor, type ResolveTokens, type Token } from './token.js';
 
 /**
  * `singleton`: one instance per app. `transient`: a new one per injection. `request`: one per
@@ -28,6 +28,25 @@ export interface FactoryProvider<T = unknown> {
    * so typed callbacks fit `Provider[]`.
    */
   dispose?(value: T): unknown;
+}
+
+/** A factory provider whose parameters are typed from `inject`. */
+export interface TypedFactoryProvider<T, K extends readonly Token[]> {
+  provide: Token<T>;
+  inject?: K;
+  useFactory: (...deps: ResolveTokens<K>) => T | Promise<T>;
+  scope?: Scope;
+  dispose?(value: T): unknown;
+}
+
+/**
+ * A factory provider checked against its `inject` list: parameters are inferred in order, and the
+ * result must fit `provide`. Inside a plain `providers` array TypeScript cannot do this.
+ */
+export function defineFactory<T, const K extends readonly Token[] = []>(
+  provider: TypedFactoryProvider<T, K>,
+): FactoryProvider<T> {
+  return provider as unknown as FactoryProvider<T>;
 }
 
 export type Provider<T = unknown> =

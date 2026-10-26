@@ -33,8 +33,20 @@ type ParamsOption<P> = [keyof P] extends [never]
 type QueryOption<Q> = [Q] extends [undefined]
   ? { query?: Query }
   : object extends Q
-    ? { query?: Q }
-    : { query: Q };
+    ? { query?: LooseQuery<Q> }
+    : { query: LooseQuery<Q> };
+
+// Query values are sent as text, so where the schema takes any string, a number or boolean is fine.
+type LooseQuery<Q> = { readonly [K in keyof Q]: Loose<Q[K]> };
+type Loose<T> = T extends string
+  ? string extends T
+    ? string | number | boolean
+    : T extends `${number}`
+      ? T | number
+      : T
+  : T extends readonly (infer U)[]
+    ? readonly Loose<U>[]
+    : T;
 type BodyOption<B> = [B] extends [undefined]
   ? { body?: unknown }
   : undefined extends B
@@ -65,7 +77,27 @@ type RawCall<A, M extends Method> = <P extends PathsOf<A, M>>(
   ...args: RequestArgs<EndpointAt<A, M, P>>
 ) => Promise<Response>;
 
+/** One server-sent event. `data` is the text sent; objects from `sse()` arrive as JSON text. */
+export interface SseMessage {
+  /** The event's name, `message` when the server gave none. */
+  readonly event: string;
+  readonly data: string;
+  /** The last id the server sent, if any. */
+  readonly id?: string;
+}
+
+type EventsCall<A> = <P extends PathsOf<A, 'GET'>>(
+  path: P,
+  ...args: RequestArgs<EndpointAt<A, 'GET', P>>
+) => AsyncIterable<SseMessage>;
+
 export interface Client<A> {
+  /**
+   * Reads a server-sent event stream with `fetch`, so headers such as a token are sent, which
+   * `EventSource` cannot do. Ends when the server closes the stream, the loop breaks, or `signal`
+   * aborts; it does not reconnect.
+   */
+  readonly events: EventsCall<A>;
   readonly get: Call<A, 'GET'>;
   readonly post: Call<A, 'POST'>;
   readonly put: Call<A, 'PUT'>;
@@ -158,10 +190,73 @@ export function createClient<A extends ApiShape<A>>(options: ClientOptions): Cli
     };
   const raw = (method: Method) => (path: string, init?: Options) => send(method, path, init);
 
+  const events = (path: string, init: Options = {}): AsyncIterable<SseMessage> => ({
+    async *[Symbol.asyncIterator]() {
+      const headers = new Headers(init.headers as HeadersArg);
+      if (!headers.has('accept')) headers.set('accept', 'text/event-stream');
+      try {
+        const response = await send('GET', path, { ...init, headers });
+        if (!response.ok) {
+          throw new AviClientError('GET', path, response, await readBody(response, 'GET'));
+        }
+        if (response.body) yield* readEvents(response.body);
+      } catch (error) {
+        // Aborting is how a caller stops listening, not a failure.
+        if (!init.signal?.aborted) throw error;
+      }
+    },
+  });
+
   const methods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'] as const;
   const calls = Object.fromEntries(methods.map((m) => [m.toLowerCase(), call(m)]));
   const raws = Object.fromEntries(methods.map((m) => [m.toLowerCase(), raw(m)]));
-  return Object.freeze({ ...calls, raw: Object.freeze(raws) }) as unknown as Client<A>;
+  return Object.freeze({ ...calls, events, raw: Object.freeze(raws) }) as unknown as Client<A>;
+}
+
+/** Parses an event stream as the HTML spec describes; `retry` is ignored since nothing reconnects. */
+async function* readEvents(body: ReadableStream<Uint8Array>): AsyncGenerator<SseMessage> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let data: string[] = [];
+  let event = '';
+  let id: string | undefined;
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      buffer += done ? decoder.decode() : decoder.decode(value, { stream: true });
+      // A chunk ending in \r may be half of a \r\n; at the end of the stream it is a line break.
+      const end = !done && buffer.endsWith('\r') ? buffer.length - 1 : buffer.length;
+      const lines = buffer.slice(0, end).split(/\r\n|\r|\n/);
+      buffer = (lines.pop() ?? '') + buffer.slice(end);
+      for (const line of lines) {
+        if (line === '') {
+          if (data.length > 0) {
+            yield {
+              event: event || 'message',
+              data: data.join('\n'),
+              ...(id === undefined ? {} : { id }),
+            };
+          }
+          data = [];
+          event = '';
+          continue;
+        }
+        if (line.startsWith(':')) continue;
+        const colon = line.indexOf(':');
+        const field = colon === -1 ? line : line.slice(0, colon);
+        let text = colon === -1 ? '' : line.slice(colon + 1);
+        if (text.startsWith(' ')) text = text.slice(1);
+        if (field === 'data') data.push(text);
+        else if (field === 'event') event = text;
+        else if (field === 'id' && !text.includes('\0')) id = text;
+      }
+      // What is left is an event the stream cut off; the format drops it.
+      if (done) return;
+    }
+  } finally {
+    await reader.cancel().catch(() => undefined);
+  }
 }
 
 interface Options {

@@ -80,7 +80,7 @@ export type {
   SseOptions,
   SseSource,
 } from '@avijs/http';
-export { createToken } from '@avijs/di';
+export { createToken, defineFactory } from '@avijs/di';
 export type {
   Class,
   ClassProvider,
@@ -92,6 +92,7 @@ export type {
   Scope,
   Token,
   TokenType,
+  TypedFactoryProvider,
   ValueProvider,
 } from '@avijs/di';
 export type { Endpoint, Jsonify, MethodEndpoint, ResponseBody, RouteEndpoint } from './endpoint.js';

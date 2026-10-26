@@ -4,10 +4,12 @@ import * as api from '../src/index.js';
 
 it('exposes only the reviewed runtime exports', () => {
   expect(Object.keys(api).sort()).toEqual([
+    'buildProject',
     'checkInjectLists',
     'generateClient',
     'main',
     'serializeManifest',
+    'watchProject',
     'writeManifest',
   ]);
 });

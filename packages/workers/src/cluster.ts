@@ -302,8 +302,12 @@ async function runPrimary(
 
   const ms = performance.now() - began;
   const message = `Avi.js ${version} cluster: ${String(count)} workers${address ? ` on ${address}` : ''}, ready in ${String(Math.round(ms))} ms`;
-  if (logger.info) logger.info(message, { workers: count, url: address, durationMs: ms });
-  else console.log(message);
+  // A structured entry for a logger the app passed; console has info() too, but prints the fields.
+  if (options.logger?.info) {
+    options.logger.info(message, { workers: count, url: address, durationMs: ms });
+  } else {
+    console.log(message);
+  }
   return handle;
 }
 

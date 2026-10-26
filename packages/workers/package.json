@@ -1,6 +1,6 @@
 {
   "name": "@avijs/workers",
-  "version": "0.5.3",
+  "version": "0.6.0",
   "description": "Run an Avi.js app on every CPU core, and background workers with the app's providers.",
   "keywords": [
     "avi",

@@ -122,6 +122,13 @@ describe('cluster', { timeout: 60_000 }, () => {
     expect(app.out.filter((l) => l.includes('cluster:'))).toHaveLength(1);
   });
 
+  it('prints a plain summary line with the default logger', async () => {
+    const app = start({ NO_LOGGER: '1' });
+    const [, line] = await app.line(/^(.*cluster: 2 workers.*)$/);
+    // console has info(), but the fields are for structured loggers, not the terminal.
+    expect(line).toMatch(/cluster: 2 workers on http:\/\/\S+, ready in \d+ ms$/);
+  });
+
   it('replaces a worker that crashes', async () => {
     const app = start();
     const url = await ready(app);

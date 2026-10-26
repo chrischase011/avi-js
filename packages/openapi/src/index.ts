@@ -7,9 +7,10 @@ export interface OpenApiOptions {
   servers?: readonly { url: string; description?: string }[];
   /**
    * Converts a route schema to JSON Schema. Without it, schemas that implement Standard JSON
-   * Schema (`~standard.jsonSchema`) are converted; other schemas are left undocumented.
+   * Schema (`~standard.jsonSchema`) are converted; other schemas are left undocumented. Any object
+   * is accepted, so converters with their own JSON Schema types fit without a cast.
    */
-  toJsonSchema?: (schema: StandardSchemaV1, io: 'input' | 'output') => JsonSchema | undefined;
+  toJsonSchema?: (schema: StandardSchemaV1, io: 'input' | 'output') => object | undefined;
 }
 
 export interface OpenApiDocument {
@@ -74,7 +75,7 @@ export function generateOpenApi(app: AviApp, options: OpenApiOptions): OpenApiDo
     const schema = route.schema?.[part];
     if (!schema) return undefined;
     try {
-      return toJson(schema, part === 'response' ? 'output' : 'input');
+      return toJson(schema, part === 'response' ? 'output' : 'input') as JsonSchema | undefined;
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
       throw new Error(
