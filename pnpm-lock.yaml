@@ -296,6 +296,15 @@ importers:
         specifier: workspace:*
         version: link:../../packages/core
 
+  examples/workers-api:
+    dependencies:
+      '@avijs/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@avijs/workers':
+        specifier: workspace:*
+        version: link:../../packages/workers
+
   packages/cli:
     dependencies:
       '@avijs/compiler':
@@ -419,6 +428,12 @@ importers:
       valibot:
         specifier: 1.5.0
         version: 1.5.0(typescript@6.0.3)
+
+  packages/workers:
+    dependencies:
+      '@avijs/core':
+        specifier: workspace:*
+        version: link:../core
 
   web:
     devDependencies:

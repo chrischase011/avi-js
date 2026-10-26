@@ -1,0 +1,50 @@
+{
+  "name": "@avijs/workers",
+  "version": "0.5.0",
+  "description": "Run an Avi.js app on every CPU core, and background workers with the app's providers.",
+  "keywords": [
+    "avi",
+    "avi.js",
+    "cluster",
+    "workers",
+    "background-jobs"
+  ],
+  "license": "MIT",
+  "author": "Christopher Robin Chase",
+  "homepage": "https://chrischase011.github.io/avi-js/",
+  "bugs": {
+    "url": "https://github.com/chrischase011/avi-js/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chrischase011/avi-js.git",
+    "directory": "packages/workers"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "@avijs/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@avijs/core": "workspace:*"
+  }
+}

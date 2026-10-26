@@ -21,3 +21,6 @@ web/src/.vitepress/cache/
 
 # Local benchmark runs
 benchmarks/results/
+
+# Runtime data of the workers example
+examples/workers-api/data/

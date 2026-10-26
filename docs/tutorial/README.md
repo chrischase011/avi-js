@@ -24,6 +24,7 @@ create a project, then follow the chapters in order or jump to what you need.
 | [13](13-configuration.md)     | Configuration                              | Runnable |
 | [14](14-file-uploads.md)      | File uploads                               | Runnable |
 | [15](15-typed-client.md)      | Typed client                               | Runnable |
+| [16](16-workers.md)           | Workers and multiple cores                 | Runnable |
 | [Appendix](99-from-nestjs.md) | Avi.js for NestJS developers               | Runnable |
 
 Throughout the tutorial you build **Greeter**, a small API with a users resource and a greeting

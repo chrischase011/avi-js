@@ -3,6 +3,26 @@
 All notable changes are listed here. Avi.js follows [Semantic Versioning](https://semver.org); all
 packages share one version.
 
+## 0.5.0 - 2026-10-26
+
+### Added
+
+- **`@avijs/workers`**, a new package:
+  - `cluster(start, { workers })` runs the app in one worker process per CPU core on one port. The
+    primary only manages workers: it replaces crashed ones, stops after a crash loop, closes
+    workers gracefully on `SIGINT`/`SIGTERM`, and restarts them one at a time on `SIGHUP` or
+    `handle.restart()`. With one worker or `NODE_ENV=development` it runs in the same process.
+  - `runWorker(AppModule, (app, signal) => ...)` runs background work with the app's providers
+    and no HTTP server: `signal` aborts on shutdown, providers close afterwards, and the exit code
+    says whether startup or the work failed.
+- Docs: chapter 16, Workers and multiple cores. Example: `workers-api`, a clustered API with a
+  background worker.
+
+### Changed
+
+- The startup summary stays quiet in cluster workers other than the first, so a cluster prints one
+  block instead of one per worker.
+
 ## 0.4.0 - 2026-10-23
 
 ### Added

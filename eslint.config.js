@@ -9,6 +9,7 @@ export default defineConfig(
     '**/coverage/',
     'docs/',
     'packages/compiler/test/fixtures/',
+    'packages/workers/test/fixtures/',
     // Standalone app with its own npm install; CI does not install its dependencies.
     'examples/prisma-api/',
   ]),

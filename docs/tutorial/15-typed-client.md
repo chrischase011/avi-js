@@ -144,5 +144,4 @@ import from the server package. For a frontend in its own repository, generate t
 
 ## Next
 
-Coming from NestJS? See [Avi.js for NestJS developers](99-from-nestjs.md), or go back to the
-[tutorial index](README.md).
+[Chapter 16: Workers and multiple cores](16-workers.md).

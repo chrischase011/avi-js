@@ -11,12 +11,14 @@
     { "path": "./packages/security/tsconfig.build.json" },
     { "path": "./packages/multipart/tsconfig.build.json" },
     { "path": "./packages/client/tsconfig.build.json" },
+    { "path": "./packages/workers/tsconfig.build.json" },
     { "path": "./packages/cli/tsconfig.build.json" },
     { "path": "./packages/create-avi/tsconfig.build.json" },
     { "path": "./examples/basic-api/tsconfig.build.json" },
     { "path": "./examples/modular-api/tsconfig.build.json" },
     { "path": "./examples/crud-api/tsconfig.build.json" },
     { "path": "./examples/auth-api/tsconfig.build.json" },
+    { "path": "./examples/workers-api/tsconfig.build.json" },
     { "path": "./benchmarks/tsconfig.build.json" }
   ]
 }

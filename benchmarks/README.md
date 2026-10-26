@@ -324,7 +324,9 @@ change is kept because it removes an allocation and simplifies the code.
   0.1.0.
 - Percent-decoding uses `decodeURIComponent` per encoded segment.
 - Serializing responses: `JSON.stringify` is most of the work on list endpoints (about 19.5 µs of
-  21 µs for 50 users in one process). A serializer compiled from the route's `response` schema is
-  the next candidate.
+  21 µs for 50 users in one process). A serializer compiled from a schema does not help on Node
+  24: measured against `fast-json-stringify` 6.4.0 on the same data, `JSON.stringify` was 1.2 to
+  1.7 times faster for the 50-user list and about as fast for one user; the compiled serializer
+  only won on a one-field object, by 60 to 150 ns.
 - The interleaved run above showed `node:http` ahead of Avi.js on `echo` by about 4 µs of CPU per
   request; worth a profile on a quiet machine.

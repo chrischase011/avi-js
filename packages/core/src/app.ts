@@ -12,6 +12,7 @@ import {
   type ServerOptions,
 } from '@avijs/http';
 import { withValidation, type RouteSchema } from '@avijs/validation';
+import cluster from 'node:cluster';
 import { createRequire } from 'node:module';
 import type { AddressInfo } from 'node:net';
 import { performance } from 'node:perf_hooks';
@@ -65,7 +66,8 @@ export interface AviOptions extends ServerOptions {
   /**
    * What `listen()` reports once the app is up: modules, providers, config, routes and the
    * startup time. `'routes'` also lists every route; `false` reports nothing. Default: on,
-   * except when `NODE_ENV` is `test`. A logger with `info` receives it as one structured entry.
+   * except when `NODE_ENV` is `test` and in cluster workers other than the first. A logger with
+   * `info` receives it as one structured entry.
    */
   startupSummary?: boolean | 'routes';
 }
@@ -139,7 +141,10 @@ class Application implements AviApp {
     this.#guards = checkRefs(options.guards, 'canActivate', 'App guards');
     this.#manifest = options.manifest;
     this.#overrides = options.overrides ?? [];
-    const summary = options.startupSummary ?? process.env['NODE_ENV'] !== 'test';
+    // In a cluster only the first worker reports, so the terminal shows one summary.
+    const quiet =
+      process.env['NODE_ENV'] === 'test' || (cluster.isWorker && cluster.worker?.id !== 1);
+    const summary = options.startupSummary ?? !quiet;
     this.#summary = summary === 'routes' ? 'routes' : summary ? 'basic' : false;
     this.#logger = options.logger ?? {
       error(message, error, fields) {

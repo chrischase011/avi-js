@@ -178,6 +178,7 @@ assert.equal(typeof core.createAvi, 'function');
 assert.equal(typeof require('@avijs/testing').createTestClient, 'function');
 assert.equal(typeof require('@avijs/multipart').readForm, 'function');
 assert.equal(typeof require('@avijs/client').createClient, 'function');
+assert.equal(typeof require('@avijs/workers').cluster, 'function');
 console.log('require(esm) ok');
 `,
 );
