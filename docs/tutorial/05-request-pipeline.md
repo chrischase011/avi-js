@@ -16,7 +16,7 @@ Middleware and guards can be attached at four levels. They always run in this or
 **app → module → controller → route**.
 
 ```ts
-const app = createAvi({ middleware: [requestId], guards: [] }); // app
+const app = createAvi({ middleware: [apiVersion], guards: [] }); // app
 
 defineModule({ middleware: [audit], controllers: [users] }); // module: its own controllers
 
@@ -40,13 +40,16 @@ handler's result:
 ```ts
 import type { Middleware } from '@avijs/core';
 
-const requestId: Middleware = async (ctx, next) => {
-  ctx.setHeader('x-request-id', crypto.randomUUID());
+const apiVersion: Middleware = async (ctx, next) => {
+  ctx.setHeader('x-api-version', '1');
   return next();
 };
 
 const envelope: Middleware = async (_ctx, next) => ({ data: await next() });
 ```
+
+Request ids are built in: every response already has `x-request-id`, matching `ctx.id` in the logs
+([chapter 7](07-production.md#request-ids-and-logging)).
 
 - **Return without calling `next()`** to answer early. Guards and the handler never run.
 - **Calling `next()` twice** is a bug and fails the request with a 500.

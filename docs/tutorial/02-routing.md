@@ -116,7 +116,11 @@ The app refuses to start (`init()` and `listen()` reject) when:
   `/users/:userId/posts`. Pick one name per position.
 - a parameter name is not a valid identifier, or repeats within one path
 - `*` is not the whole last segment
-- a path has an empty segment or malformed percent-encoding
+- a path has malformed percent-encoding
+
+Repeated slashes where you define a route are collapsed: a route written as `/a//b`, or a prefix
+ending in `/` joined to a path starting with one, is registered as `/a/b`. Requests are matched as
+sent, so a request to `/a//b` still gets `404`.
 
 ## Groups
 

@@ -95,8 +95,8 @@ export function rateLimit(options: RateLimitOptions): RateLimiter {
 
 export interface MemoryStoreOptions {
   /**
-   * Most keys tracked at once. When full, the oldest window is dropped, so a flood of new clients
-   * cannot use unbounded memory. Default: 100 000.
+   * Most keys tracked at once. When full, the least recently used key is dropped, so a flood of
+   * new clients cannot use unbounded memory. Default: 100 000.
    */
   maxKeys?: number;
 }

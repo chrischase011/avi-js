@@ -22,4 +22,5 @@ export type {
   RequestIdOptions,
   ResponseInfo,
   ServerOptions,
+  UpgradeHandler,
 } from './server.js';

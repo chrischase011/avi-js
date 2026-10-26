@@ -141,7 +141,12 @@ class CurrentUser {
 }
 
 // or as a factory, which may return a plain value
-{ provide: TenantId, useFactory: (ctx: Context) => ctx.headers['x-tenant'], inject: [REQUEST], scope: 'request' }
+defineFactory({
+  provide: TenantId,
+  inject: [REQUEST],
+  scope: 'request',
+  useFactory: (ctx) => ctx.headers['x-tenant'],
+});
 ```
 
 Likewise, `APP` injects the app itself, for providers that read its routes; `OpenApiModule` uses
@@ -197,7 +202,11 @@ class Db {
 }
 
 // or, for a factory
-{ provide: Cache, useFactory: () => createCache(), dispose: (cache: Cache) => cache.quit() }
+defineFactory({
+  provide: Cache,
+  useFactory: () => createCache(),
+  dispose: (cache) => cache.quit(),
+});
 ```
 
 Avi.js only disposes what it created: `useValue` values and transients are left alone.

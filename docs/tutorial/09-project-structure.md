@@ -43,8 +43,12 @@ Functional and explicit. Good for small services, prototypes and people new to A
 
 ```text
 src/
-├── main.ts
+├── main.ts            starts the app
+├── app.ts             createApp(), shared by main.ts and the tests
+├── config.ts          with a validator
+├── api.gen.ts         the typed Api for @avijs/client
 ├── routes/
+│   ├── health.ts
 │   └── users.ts
 └── services/
     └── users.ts
@@ -74,15 +78,27 @@ export const usersRoutes = defineController({
 ```
 
 ```ts
-// src/main.ts
+// src/app.ts
 import { createAvi } from '@avijs/core';
 import { usersRoutes } from './routes/users.js';
 import { UsersService } from './services/users.js';
 
-const app = createAvi();
-app.register({ providers: [UsersService], controllers: [usersRoutes] });
+export function createApp() {
+  return createAvi().register({ providers: [UsersService], controllers: [usersRoutes] });
+}
+```
+
+```ts
+// src/main.ts
+import { createApp } from './app.js';
+
+const app = createApp();
 await app.listen(3000);
 ```
+
+The generated `main.ts` also takes the port from `PORT` (through the config, with a validator) and
+closes the app on `SIGINT` and `SIGTERM`.
+`avi generate` looks for `src/app.ts` (or `src/app.module.ts`) to register what it creates.
 
 ## Modular template
 

@@ -276,7 +276,10 @@ interface Options {
   readonly signal?: AbortSignal;
 }
 
-/** Fills `:name` and `*` segments of a route pattern, encoding each value. */
+/**
+ * Fills `:name` and `*` segments of a route pattern, encoding each value. Internal: for
+ * `@avijs/testing`, not part of the stable API.
+ */
 export function fillPath(
   pattern: string,
   params: Readonly<Record<string, string | number>> = {},
@@ -307,6 +310,7 @@ export function fillPath(
     .join('/');
 }
 
+/** Builds `?a=1&b=2` from a query object. Internal: for `@avijs/testing`, not stable API. */
 export function queryString(query: Query | undefined): string {
   if (!query) return '';
   const params = new URLSearchParams();

@@ -71,7 +71,7 @@ await app.listen(3000);
 
 | Decorator                                                                | On     | Does                                                                    |
 | ------------------------------------------------------------------------ | ------ | ----------------------------------------------------------------------- |
-| `@Controller(prefix?)`                                                   | class  | Makes the class a controller. One instance per app.                     |
+| `@Controller(prefix?)`                                                   | class  | Makes the class a controller. One per app, or per request (see ch. 3).  |
 | `@Get(path?)`, `@Post`, `@Put`, `@Patch`, `@Delete`, `@Head`, `@Options` | method | Registers the method as a handler. It receives `ctx`, `this` is bound.  |
 | `@Injectable({ scope? })`                                                | class  | Optional. Sets the scope and checks `static inject` at compile time.    |
 | `@Module({ ... })`                                                       | class  | Same options as `defineModule`. The class name becomes the module name. |

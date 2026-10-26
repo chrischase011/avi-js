@@ -17,7 +17,7 @@ npm run dev
 ```
 
 ```text
-AVI.JS 0.3.0 · Application bootstrap
+AVI.JS 1.0.0 · Application bootstrap
 
 ✓ 3 modules loaded
 ✓ Dependency graph validated
@@ -51,7 +51,8 @@ my-api/
 ├── src/
 │   ├── main.ts                    starts the app
 │   ├── app.module.ts              the root module
-│   ├── config.ts                  environment variables, validated at startup
+│   ├── config.ts                  environment variables, validated at startup (with a validator)
+│   ├── api.gen.ts                 the typed Api for @avijs/client, kept current by avi dev
 │   ├── common/
 │   │   └── health.controller.ts   GET /health
 │   └── modules/users/
@@ -140,8 +141,8 @@ const app = createAvi().register({
 await app.listen(3000);
 ```
 
-Avi.js is ESM. Use `"type": "module"` and `"module": "NodeNext"` in `tsconfig.json`, and leave
-`experimentalDecorators` off: Avi.js uses standard decorators.
+Avi.js is ESM. Use `"type": "module"` in `package.json` and `"module": "NodeNext"` in
+`tsconfig.json`, and leave `experimentalDecorators` off: Avi.js uses standard decorators.
 
 ## Next
 

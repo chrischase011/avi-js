@@ -61,8 +61,8 @@ export interface AviOptions extends Omit<ServerOptions, 'onRequest'> {
   /** Checked first, for every route. */
   guards?: readonly GuardRef[];
   /**
-   * A manifest from `describeApp()` or `avi-compile manifest`. `init()` fails if the app no longer
-   * matches it, so a stale build artifact cannot ship unnoticed.
+   * Experimental. A manifest from `describeApp()` or `avi-compile manifest`. `init()` fails if the
+   * app no longer matches it, so a stale build artifact cannot ship unnoticed.
    */
   manifest?: AppDescription;
   /**

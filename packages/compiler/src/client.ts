@@ -198,7 +198,7 @@ class Generator {
       node,
       'warning',
       'AVI104',
-      `Cannot read module ${node.getText()} statically; its routes are left out`,
+      `Cannot read module ${brief(node)} statically; its routes are left out`,
     );
     return undefined;
   }
@@ -547,4 +547,11 @@ const ESCAPES: Record<string, string> = {
 function joinPath(prefix: string, routePath: string): string {
   const joined = `${prefix}/${routePath}`.replace(/\/{2,}/g, '/');
   return joined.length > 1 && joined.endsWith('/') ? joined.slice(0, -1) : joined;
+}
+
+/** A call as `name(...)`, anything else on one line, for messages. */
+function brief(node: ts.Node): string {
+  if (ts.isCallExpression(node)) return `${node.expression.getText()}(...)`;
+  const text = node.getText().replace(/\s+/g, ' ');
+  return text.length > 60 ? `${text.slice(0, 57)}...` : text;
 }

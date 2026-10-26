@@ -145,7 +145,9 @@ async function dev(args: readonly string[]): Promise<number> {
       ...(client ? { client: { out: client } } : {}),
       onBuild: (errors) => {
         if (errors > 0 || app) return;
-        app = spawn(process.execPath, run, { stdio: 'inherit' });
+        // development unless set: cluster() then runs in one process, which node --watch restarts.
+        const env = { ...process.env, NODE_ENV: process.env['NODE_ENV'] ?? 'development' };
+        app = spawn(process.execPath, run, { stdio: 'inherit', env });
         app.once('exit', (code) => {
           if (code !== null && code !== 0) stop(code);
         });

@@ -24,7 +24,7 @@ client receives, and stops reading if the client disconnects:
 
 ```ts
 import { createReadStream } from 'node:fs';
-import { reply } from '@avijs/core';
+import { reply, route } from '@avijs/core';
 
 route({
   method: 'GET',
@@ -126,7 +126,36 @@ route({
 });
 ```
 
-For two-way messages, WebSockets are planned as an experimental package.
+## WebSockets
+
+For two-way messages, hand upgrade requests to a WebSocket library with `onUpgrade` (from
+1.0.0-rc.1). With [`ws`](https://github.com/websockets/ws):
+
+```ts
+import { createAvi } from '@avijs/core';
+import { WebSocketServer } from 'ws';
+
+const wss = new WebSocketServer({ noServer: true });
+wss.on('connection', (socket) => {
+  socket.on('message', (data) => socket.send(`echo: ${String(data)}`));
+});
+
+const app = createAvi({
+  onUpgrade: (req, socket, head, signal) => {
+    wss.handleUpgrade(req, socket, head, (ws) => {
+      // signal aborts when the app shuts down: say goodbye so clients reconnect elsewhere.
+      signal.addEventListener('abort', () => ws.close(1001, 'Server shutting down'));
+      wss.emit('connection', ws, req);
+    });
+  },
+}).register(AppModule);
+```
+
+Check `req.url` and authenticate in `onUpgrade`, before `handleUpgrade`: `onRequest` hooks, guards
+and middleware do not run for upgrades. Connections still open after `shutdownTimeout` are
+destroyed, and requests to upgrade during shutdown get `503`. Under `cluster()`, each connection
+lives on one worker, like [server-sent events](#server-sent-events). A built-in, dependency-injected
+WebSocket package is planned for 1.x.
 
 ## Request ids and logging
 
@@ -204,7 +233,7 @@ const app = createAvi({
 When the server is up, `listen()` reports what Avi.js checked on the way:
 
 ```text
-AVI.JS 0.3.0 · Application bootstrap
+AVI.JS 1.0.0 · Application bootstrap
 
 ✓ 3 modules loaded
 ✓ Dependency graph validated
@@ -235,7 +264,7 @@ Where it goes depends on where the output goes:
 | Situation                    | Output                                                     |
 | ---------------------------- | ---------------------------------------------------------- |
 | A terminal                   | The block above, in color (plain with `NO_COLOR`)          |
-| Logs, containers, CI         | One line: `Avi.js 0.3.0 started in 5.3 ms: 3 modules, ...` |
+| Logs, containers, CI         | One line: `Avi.js 1.0.0 started in 5.3 ms: 3 modules, ...` |
 | A logger with `info`         | One structured entry, `Application started`, with counts   |
 | `NODE_ENV=test`, test client | Nothing                                                    |
 
@@ -244,7 +273,7 @@ createAvi({ startupSummary: 'routes' }); // also list every route with its contr
 createAvi({ startupSummary: false }); // nothing at all
 ```
 
-It runs once, after startup, and costs about 25 microseconds; requests never touch it.
+It runs once, after startup; requests never touch it.
 
 ## A production entry point
 

@@ -3,6 +3,39 @@
 All notable changes are listed here. Avi.js follows [Semantic Versioning](https://semver.org); all
 packages share one version.
 
+## 1.0.0-rc.1 - 2026-10-26
+
+The first release candidate for 1.0. From here, the stable API only gets fixes until 1.0.0; see
+the new chapter 17 for what 1.x promises.
+
+### Added
+
+- `onUpgrade(req, socket, head, signal)`: hands upgrade requests, such as WebSockets, to a library
+  like `ws`. `signal` aborts when shutdown starts, so connections can close politely; any still
+  open after `shutdownTimeout` are destroyed, and upgrades during shutdown get `503`. Chapter 7
+  shows WebSockets with `ws`.
+
+### Changed
+
+- `avi dev` runs the app with `NODE_ENV=development` unless you set it, so `cluster()` stays in one
+  process during development, as chapter 16 says. It used to start a worker per core.
+
+### Docs
+
+- A pass over every chapter against the final API: examples use `defineFactory` and `ctx.need`,
+  the pipeline example no longer overwrites the built-in request id, chapter 9 shows the minimal
+  template as generated, chapter 2 says repeated slashes in route definitions are collapsed, and
+  several imports, file trees and version banners are corrected.
+- Chapter 17, Stability and versions: what semver covers in 1.x, what is experimental or internal,
+  deprecations, supported Node.js and TypeScript versions, release channels.
+- Chapter 10 marks manifests as experimental.
+- Chapter 12 explains that rate limits use fixed windows, and the burst that allows.
+
+### Fixed
+
+- `avi client` names a module it cannot read as `forRoot(...)` on one line, instead of quoting the
+  whole call across several lines.
+
 ## 0.7.0 - 2026-10-26
 
 ### Added

@@ -1,6 +1,6 @@
 {
   "name": "@avijs/di",
-  "version": "0.7.0",
+  "version": "1.0.0-rc.1",
   "description": "Explicit, reflection-free dependency injection for Avi.js.",
   "keywords": [
     "avi",

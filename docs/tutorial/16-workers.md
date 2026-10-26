@@ -56,8 +56,8 @@ const handle = await cluster(start, {
 await handle.restart(); // e.g. after a deploy
 ```
 
-With `workers: 1`, or `NODE_ENV=development`, the function runs in the same process, so `avi dev`,
-debuggers and tests work as before.
+With `workers: 1`, or `NODE_ENV=development`, the function runs in the same process, so debuggers
+and tests work as before. `avi dev` sets `NODE_ENV=development` unless you set it (from 1.0.0-rc.1).
 
 ### State is per worker
 
@@ -126,5 +126,4 @@ await runWorker(AppModule, async (app) => {
 
 ## Next
 
-Coming from NestJS? See [Avi.js for NestJS developers](99-from-nestjs.md), or go back to the
-[tutorial index](README.md).
+[Chapter 17: Stability and versions](17-stability.md).

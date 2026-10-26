@@ -14,7 +14,7 @@ Give the route a `schema` with any of `params`, `query` and `body`. Wrap it in `
 TypeScript infers the types:
 
 ```ts
-import { defineController, route } from '@avijs/core';
+import { defineController, reply, route } from '@avijs/core';
 import * as v from 'valibot';
 
 const CreateUser = v.object({
@@ -138,7 +138,7 @@ route({
   method: 'GET',
   path: '/me',
   schema: { response: PublicUser },
-  handler: (ctx) => service.findWithSecrets(ctx.state.user!.id), // passwordHash is dropped
+  handler: (ctx) => service.findWithSecrets(ctx.need('user').id), // passwordHash is dropped
 });
 ```
 

@@ -131,6 +131,12 @@ Over the limit, the client gets `429 Too Many Requests` with a `Retry-After` hea
 also carries `RateLimit-Limit`, `RateLimit-Remaining` and `RateLimit-Reset` (seconds), so
 well-behaved clients can slow down before they hit the limit.
 
+The count uses **fixed windows**: a client's window starts with its first request, and the count
+starts over when the window ends. That is cheap and easy to share through a store, but a client
+can send `limit` requests at the end of one window and `limit` more at the start of the next: up to
+twice the limit in a short burst. Pick `limit` with that in mind, or keep windows short for strict
+cases such as logins.
+
 For a stricter limit on one route, such as a login, create a separate limiter and use its `guard`.
 It keeps its own count:
 
@@ -209,8 +215,9 @@ const maintenance: RequestHook = () => {
 const app = createAvi({ onRequest: [maintenance] });
 ```
 
-Hooks run in order, before routing. They can't use dependency injection; for per-route logic with
-providers, use middleware and guards ([Chapter 5](05-request-pipeline.md)).
+Hooks run in order, before routing. A hook that needs providers comes from `defineHook`
+([above](#settings-from-the-config)); for per-route logic, use middleware and guards
+([Chapter 5](05-request-pipeline.md)).
 
 ## Next
 

@@ -10,6 +10,7 @@ import {
 } from 'node:http';
 import type { AddressInfo, Socket } from 'node:net';
 import { performance } from 'node:perf_hooks';
+import type { Duplex } from 'node:stream';
 import { RequestContext, type Context } from './context.js';
 import { HttpError, RequestAbortedError } from './errors.js';
 import type { HttpMethod } from './methods.js';
@@ -101,7 +102,21 @@ export interface ServerOptions {
   onRequest?: readonly RequestHook[];
   /** Called after every response. Errors are logged, never sent. */
   onResponse?: (info: ResponseInfo) => unknown;
+  /**
+   * Takes over requests that ask to upgrade the connection, such as WebSockets; `ws`'s
+   * `handleUpgrade` fits. The socket is the handler's from then on. `signal` aborts when shutdown
+   * starts, so connections can be closed politely; any still open after `shutdownTimeout` are
+   * destroyed.
+   */
+  onUpgrade?: UpgradeHandler;
 }
+
+export type UpgradeHandler = (
+  req: IncomingMessage,
+  socket: Duplex,
+  head: Buffer,
+  signal: AbortSignal,
+) => unknown;
 
 const PASSED_THROUGH = [
   'requestTimeout',
@@ -147,6 +162,10 @@ export class HttpServer {
   readonly #requestId: { header: string; trust: boolean } | undefined;
   readonly #trustProxy: number;
   readonly #onResponse: ((info: ResponseInfo) => unknown) | undefined;
+  readonly #onUpgrade: UpgradeHandler | undefined;
+  // Upgraded connections, which server.close() waits for but no longer manages.
+  readonly #upgraded = new Set<Duplex>();
+  #shutdown = new AbortController();
   #server: Server | undefined;
   #closing: Promise<void> | undefined;
   // Connections whose first request has not arrived yet.
@@ -160,6 +179,7 @@ export class HttpServer {
     this.#logger = safeLogger(options.logger ?? consoleLogger);
     this.#errorHandler = optionalFunction('errorHandler', options.errorHandler);
     this.#onResponse = optionalFunction('onResponse', options.onResponse);
+    this.#onUpgrade = optionalFunction('onUpgrade', options.onUpgrade);
     this.#hooks = hookList(options.onRequest);
     this.#requestId = requestIdOptions(options.requestId);
     this.#trustProxy = nonNegative('trustProxy', options.trustProxy ?? 0);
@@ -204,6 +224,12 @@ export class HttpServer {
         if (this.#fresh.size === 0) this.#onFreshServed?.();
       });
     });
+    const onUpgrade = this.#onUpgrade;
+    if (onUpgrade) {
+      server.on('upgrade', (req: IncomingMessage, socket: Duplex, head: Buffer) => {
+        this.#upgradeRequest(onUpgrade, req, socket, head);
+      });
+    }
     this.#server = server;
 
     return new Promise((resolve, reject) => {
@@ -230,8 +256,11 @@ export class HttpServer {
     this.#closing ??= new Promise<void>((resolve, reject) => {
       const force = setTimeout(() => {
         server.closeAllConnections();
+        for (const socket of this.#upgraded) socket.destroy();
       }, this.#shutdownTimeout);
       force.unref();
+      // Upgraded connections are the handler's to close; tell it to.
+      this.#shutdown.abort();
 
       // Refuse new connections at once. In a cluster, Node hands them to another worker.
       server.maxConnections = 0;
@@ -242,6 +271,7 @@ export class HttpServer {
           clearTimeout(force);
           this.#server = undefined;
           this.#closing = undefined;
+          this.#shutdown = new AbortController();
           if (error) reject(error);
           else resolve();
         });
@@ -249,6 +279,34 @@ export class HttpServer {
       });
     });
     return this.#closing;
+  }
+
+  #upgradeRequest(
+    handler: UpgradeHandler,
+    req: IncomingMessage,
+    socket: Duplex,
+    head: Buffer,
+  ): void {
+    this.#fresh.delete(req.socket);
+    if (this.#fresh.size === 0) this.#onFreshServed?.();
+    if (this.#closing) {
+      socket.end(
+        'HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\nContent-Length: 0\r\n\r\n',
+      );
+      return;
+    }
+    this.#upgraded.add(socket);
+    socket.once('close', () => this.#upgraded.delete(socket));
+    const failed = (error: unknown) => {
+      this.#logger.error(`Upgrade handler failed: ${req.method ?? ''} ${req.url ?? ''}`, error);
+      socket.destroy();
+    };
+    try {
+      const result = handler(req, socket, head, this.#shutdown.signal);
+      if (result instanceof Promise) result.catch(failed);
+    } catch (error) {
+      failed(error);
+    }
   }
 
   #handle(req: IncomingMessage, res: ServerResponse): void {

@@ -16,7 +16,7 @@ pnpm --filter @avijs/example-basic-api start
 ```
 
 ```text
-AVI.JS 0.3.0 · Application bootstrap
+AVI.JS 1.0.0 · Application bootstrap
 
 ✓ 1 module loaded
 ✓ Dependency graph validated

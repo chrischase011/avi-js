@@ -124,7 +124,7 @@ describe('startup summary', () => {
     expect(lines).toHaveLength(1);
     expect(lines[0]).toMatch(
       new RegExp(
-        `^Avi\\.js \\d+\\.\\d+\\.\\d+ started in [\\d.]+ ms: ${String(description.modules.length)} modules, ${String(providers)} providers, 2 routes, config validated \\(2 variables\\), listening on http://127\\.0\\.0\\.1:\\d+$`,
+        `^Avi\\.js \\d+\\.\\d+\\.\\d+(-[\\w.]+)? started in [\\d.]+ ms: ${String(description.modules.length)} modules, ${String(providers)} providers, 2 routes, config validated \\(2 variables\\), listening on http://127\\.0\\.0\\.1:\\d+$`,
       ),
     );
   });

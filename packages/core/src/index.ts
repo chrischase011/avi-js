@@ -79,6 +79,7 @@ export type {
   ServerSentEvent,
   SseOptions,
   SseSource,
+  UpgradeHandler,
 } from '@avijs/http';
 export { createToken, defineFactory } from '@avijs/di';
 export { defineHook } from './hooks.js';

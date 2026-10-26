@@ -354,9 +354,13 @@ describe('multipart', () => {
     await new Promise((resolve) => setTimeout(resolve, 50));
     req.destroy();
 
-    await vi.waitFor(() => {
-      expect(outcome).toBeDefined();
-    });
+    // Generous: under a full parallel test run the abort can take over a second to land.
+    await vi.waitFor(
+      () => {
+        expect(outcome).toBeDefined();
+      },
+      { timeout: 5_000 },
+    );
     expect(outcome).not.toBe('finished');
   });
 

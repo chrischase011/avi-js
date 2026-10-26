@@ -35,6 +35,9 @@ parameters may be left out.
 
 ## Manifests
 
+> _Experimental:_ manifests (`describeApp`, the `manifest` option and `avi manifest`) may change
+> in a 1.x minor release. See [chapter 17](17-stability.md).
+
 A manifest is a JSON description of your app: modules, providers, exports and routes. It is built
 **without creating any provider**, so nothing connects to a database at build time.
 

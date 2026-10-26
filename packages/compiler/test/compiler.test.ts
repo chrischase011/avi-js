@@ -398,3 +398,37 @@ describe('buildProject', () => {
     expect(String(write.mock.calls[0]?.[0])).toContain('TS2322');
   });
 });
+
+describe('generateClient with a module built at runtime', () => {
+  let dir: string | undefined;
+  afterEach(async () => {
+    if (dir) await rm(dir, { recursive: true, force: true });
+  });
+
+  it('names the call briefly, on one line', async () => {
+    dir = await mkdtemp(path.join(fixtures, '.dynamic-'));
+    await cp(path.join(fixtures, 'client/tsconfig.json'), path.join(dir, 'tsconfig.json'));
+    await mkdir(path.join(dir, 'src'));
+    await writeFile(
+      path.join(dir, 'src/main.ts'),
+      [
+        "import { createAvi, defineModule } from '@avijs/core';",
+        'const make = (options: { name: string }) => defineModule({ name: options.name });',
+        'createAvi().register({',
+        '  imports: [',
+        '    make({',
+        "      name: 'Dynamic',",
+        '    }),',
+        '  ],',
+        '});',
+      ].join('\n'),
+    );
+    const result = generateClient({
+      project: path.join(dir, 'tsconfig.json'),
+      out: path.join(dir, 'src/api.gen.ts'),
+    });
+    expect(result.diagnostics.map((d) => [d.code, d.message])).toEqual([
+      ['AVI104', 'Cannot read module make(...) statically; its routes are left out'],
+    ]);
+  });
+});

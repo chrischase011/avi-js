@@ -27,8 +27,9 @@ Any Standard Schema library works; with Zod the same is `z.object({ PORT: z.coer
 The type of the config is the schema's output: here `{ PORT: number; DATABASE_URL: string; LOG_LEVEL:
 'info' | 'warn' | 'error' }`.
 
-Projects created with `npm create avi` already have a `src/config.ts` with `PORT`. The `Config`
-type next to the token names the values, so `config: Config` reads like any other dependency.
+Projects created with `npm create avi` and a validator already have a `src/config.ts` with `PORT`.
+The `Config` type next to the token names the values, so `config: Config` reads like any other
+dependency.
 
 ## Using it
 

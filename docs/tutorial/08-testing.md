@@ -74,7 +74,7 @@ from working. Overrides use the normal provider forms, so `useClass` and `useFac
 `createTestClient` also accepts any `createAvi` option, or an app you built yourself:
 
 ```ts
-client = await createTestClient(createAvi({ middleware: [requestId] }).register(AppModule));
+client = await createTestClient(createAvi({ middleware: [apiVersion] }).register(AppModule));
 ```
 
 ## Testing providers directly

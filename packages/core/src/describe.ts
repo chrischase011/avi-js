@@ -40,8 +40,8 @@ export interface AppDescription {
 }
 
 /**
- * Describes the module graph and routes of `roots` without creating any provider. Throws the
- * same graph errors as `init()`, so it doubles as a build-time check.
+ * Experimental. Describes the module graph and routes of `roots` without creating any provider.
+ * Throws the same graph errors as `init()`, so it doubles as a build-time check.
  */
 export function describeApp(...roots: (ModuleRef | ModuleOptions)[]): AppDescription {
   const modules = roots.map((root) => toModule(root) ?? defineModule(root as ModuleOptions));
