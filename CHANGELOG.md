@@ -3,6 +3,19 @@
 All notable changes are listed here. Avi.js follows [Semantic Versioning](https://semver.org); all
 packages share one version.
 
+## 0.5.1 - 2026-10-26
+
+### Fixed
+
+- **Security:** `@avijs/client` and the typed test client refuse a path parameter of `.` or `..`
+  (or a wildcard containing such a segment) with a `TypeError`. URLs resolve these segments, even
+  percent-encoded, so `api.get('/users/:id/posts', { params: { id: '..' } })` used to request
+  `/posts`: a value from user input could reach a different route with the same credentials.
+- `@avijs/workers`: a rolling restart or shutdown could leave a request hanging. On Linux and
+  macOS the primary hands connections to workers, and one handed over just as a worker closed was
+  lost when it exited. Workers now tell the primary they have closed and wait until it stops
+  routing to them. The tests force this handoff mode on every OS.
+
 ## 0.5.0 - 2026-10-26
 
 ### Added

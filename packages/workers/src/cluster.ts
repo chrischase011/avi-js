@@ -37,7 +37,8 @@ type Start = () => Promise<AviApp | undefined> | AviApp | undefined;
 type Message =
   | { readonly avi: 'ready' }
   | { readonly avi: 'failed'; readonly error: string }
-  | { readonly avi: 'shutdown' };
+  | { readonly avi: 'shutdown' }
+  | { readonly avi: 'closed' };
 
 const MARK = 'AVI_CLUSTER_WORKER';
 
@@ -92,13 +93,20 @@ async function runAsWorker(start: Start, logger: WorkerLogger): Promise<ClusterH
         logger.error(`Worker ${String(process.pid)} failed to close`, error);
       }
       closed.resolve();
-      process.exit(0);
+      if (!process.connected) process.exit(0);
+      // Until the primary has seen the server close, it may still hand this worker connections,
+      // which must be sent back rather than lost. It disconnects the worker once that is over.
+      send({ avi: 'closed' });
     })());
   process.on('message', (message: Message) => {
     if (message.avi === 'shutdown') void close();
   });
-  // The primary is gone: nobody will tell this worker to stop.
-  process.once('disconnect', () => void close());
+  process.once('disconnect', () => {
+    // Exit as soon as nothing else keeps the process alive, or after a second regardless.
+    setTimeout(() => process.exit(0), 1_000).unref();
+    // The primary is gone without asking: nobody else will stop this worker.
+    void close();
+  });
   send({ avi: 'ready' });
 
   return {
@@ -178,6 +186,9 @@ async function runPrimary(
           resolve(worker);
         } else if (message.avi === 'failed') {
           reject(new Error(message.error));
+        } else if (message.avi === 'closed') {
+          // Node stops routing to the worker, then lets it hand back connections in flight.
+          worker.disconnect();
         }
       });
       worker.once('exit', (code, signal) => {

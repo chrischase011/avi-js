@@ -16,7 +16,7 @@ import {
 } from '@avijs/core';
 import * as v from 'valibot';
 import { afterAll, beforeAll, describe, expect, expectTypeOf, it, vi } from 'vitest';
-import { AviClientError, createClient } from '../src/index.js';
+import { AviClientError, createClient, fillPath } from '../src/index.js';
 
 const CreateUser = v.object({ name: v.pipe(v.string(), v.minLength(1)) });
 const ListQuery = v.object({ page: v.optional(v.pipe(v.string(), v.transform(Number))) });
@@ -134,6 +134,22 @@ describe('createClient', () => {
     await expect(api.get('/users/:id', { params: {} as { id: string } })).rejects.toThrow(
       'Missing path parameter "id" for /users/:id',
     );
+  });
+
+  it('never lets a param value change which route is called', async () => {
+    // URLs resolve `.` and `..` segments, even encoded as %2E, so /users/../posts would be /posts.
+    for (const id of ['..', '.']) {
+      expect(() => fillPath('/users/:id/posts', { id })).toThrow(
+        `Path parameter "id" cannot be "." or "..": ${id}`,
+      );
+    }
+    expect(() => fillPath('/files/*', { '*': 'a/../b' })).toThrow('cannot be "." or ".."');
+    // Dots inside a segment are ordinary characters.
+    expect(fillPath('/users/:id/posts', { id: '...' })).toBe('/users/.../posts');
+    expect(fillPath('/files/*', { '*': 'a/.b/c..d' })).toBe('/files/a/.b/c..d');
+
+    const api = createClient<Api>({ baseUrl });
+    await expect(api.get('/users/:id', { params: { id: '..' } })).rejects.toThrow(TypeError);
   });
 
   it('returns streams as the Response, and raw calls never throw', async () => {

@@ -100,6 +100,10 @@ Every method (`get`, `post`, `put`, `patch`, `delete`, `head`, `options`) takes 
 as written on the server and an options object with `params`, `query`, `body`, `headers` and
 `signal`. Objects are sent as JSON; `FormData`, strings and bytes as they are.
 
+Path parameters are percent-encoded, so a value cannot add segments to the path. A value of `.`
+or `..` throws a `TypeError`: URLs resolve those segments, so `/users/../posts` would call
+`/posts` instead.
+
 A status outside 2xx throws an `AviClientError`:
 
 ```ts

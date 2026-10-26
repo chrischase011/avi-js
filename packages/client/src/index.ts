@@ -183,9 +183,12 @@ export function fillPath(
         throw new TypeError(`Missing path parameter "${name}" for ${pattern}`);
       const text = String(value);
       // A wildcard may span segments; encode each one.
-      return segment === '*'
-        ? text.split('/').map(encodeURIComponent).join('/')
-        : encodeURIComponent(text);
+      const parts = segment === '*' ? text.split('/') : [text];
+      if (parts.some((part) => part === '.' || part === '..')) {
+        // URLs resolve these (even encoded as %2E), so the request would reach another route.
+        throw new TypeError(`Path parameter "${name}" cannot be "." or "..": ${text}`);
+      }
+      return parts.map(encodeURIComponent).join('/');
     })
     .join('/');
 }

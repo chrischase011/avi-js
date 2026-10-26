@@ -35,7 +35,8 @@ afterEach(() => {
 
 function start(env: Record<string, string> = {}): App {
   const child = spawn(process.execPath, [fixture], {
-    env: { ...process.env, NODE_ENV: 'production', ...env },
+    // Round-robin is the default except on Windows; force it so every OS tests the handoff path.
+    env: { ...process.env, NODE_ENV: 'production', NODE_CLUSTER_SCHED_POLICY: 'rr', ...env },
   });
   const out: string[] = [];
   const err: string[] = [];
@@ -81,14 +82,17 @@ function start(env: Record<string, string> = {}): App {
 /** GET on a fresh connection, so the OS or primary can pick any worker. */
 function fetchText(url: string): Promise<{ status: number; body: string }> {
   return new Promise((resolve, reject) => {
-    get(url, { agent: false }, (res) => {
+    const req = get(url, { agent: false }, (res) => {
       let body = '';
       res.setEncoding('utf8');
       res.on('data', (chunk: string) => (body += chunk));
       res.on('end', () => {
         resolve({ status: res.statusCode ?? 0, body });
       });
-    }).on('error', reject);
+    });
+    // A request no worker answers must fail the test, not hang it.
+    req.setTimeout(5_000, () => req.destroy(new Error(`No answer from ${url} within 5 s`)));
+    req.on('error', reject);
   });
 }
 
