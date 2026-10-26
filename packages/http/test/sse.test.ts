@@ -130,6 +130,25 @@ describe('sse', () => {
     );
   });
 
+  it('names the problem when data cannot be sent, or retry is too large', async () => {
+    for (const [event, message] of [
+      [{ data: Symbol('x') }, 'SSE data must be a string or JSON-serializable'],
+      [{ data: 'x', retry: 1e21 }, 'SSE retry must be a non-negative integer'],
+    ] as const) {
+      const server = await serve(function* () {
+        yield event;
+      });
+      await expect(readAll(`${server.url}/events`)).rejects.toThrow();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(server.logger.error).toHaveBeenCalledWith(
+        'Response stream failed: GET /events',
+        expect.objectContaining({ message: expect.stringContaining(message) as unknown }),
+        expect.anything(),
+      );
+      await current?.server.close();
+    }
+  });
+
   it('validates the heartbeat option', () => {
     const ctx = {} as Parameters<typeof sse>[0];
     expect(() => sse(ctx, () => [], { heartbeat: 0 })).toThrow(RangeError);

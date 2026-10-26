@@ -12,7 +12,8 @@ const env = { ...process.env, OUTBOX_DIR: dir, NODE_ENV: 'production' };
 const here = path.dirname(fileURLToPath(import.meta.url));
 
 const api = spawn(process.execPath, [path.join(here, 'main.js')], {
-  env: { ...env, WORKERS: '2', PORT: '0' },
+  // Round-robin everywhere, so both workers get requests even on Windows under load.
+  env: { ...env, WORKERS: '2', PORT: '0', NODE_CLUSTER_SCHED_POLICY: 'rr' },
 });
 let out = '';
 const base = await new Promise<string>((resolve, reject) => {

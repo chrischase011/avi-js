@@ -88,6 +88,10 @@ What happens per request:
 - An origin with a path or trailing slash, like `'https://app.example.com/'`, throws. Browsers send
   origins without one, so it would never match.
 
+What it cannot catch: a function or regular expression that matches too much. With
+`credentials: true`, `origin: /example\.com/` also allows `https://example.com.attacker.net`.
+Anchor expressions (`/^https:\/\/([a-z]+\.)?example\.com$/`) or list the origins.
+
 ## Rate limiting
 
 `rateLimit()` caps how many requests each client may send per time window:
@@ -157,7 +161,16 @@ createAvi({ trustProxy: 1 }); // one proxy in front of the app, such as a load b
 
 With `trustProxy: 1`, `ctx.ip` is the address your proxy saw. Set it to the number of proxies you
 actually run, and no higher: one too many lets clients choose their own address, and with it their
-own rate limit.
+own rate limit. A port the proxy adds (`1.2.3.4:5555`) is dropped, and an entry that is not an IP
+address falls back to the socket address.
+
+Two limits of counting by address:
+
+- An IPv6 client usually controls a whole `/64` block and can rotate addresses within it. Where
+  that matters, pass a `key` that counts by prefix, or limit at your proxy.
+- The memory store keeps the 100 000 most recently used keys. A key that is still being used stays,
+  but with a `key` the client chooses (an API key header, say), a flood of new keys can push out
+  idle ones. Count by something the client cannot invent, or use a shared store with expiry.
 
 ## Writing your own hook
 

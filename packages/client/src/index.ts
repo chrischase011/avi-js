@@ -125,6 +125,10 @@ export class AviClientError extends Error {
  */
 export function createClient<A extends ApiShape<A>>(options: ClientOptions): Client<A> {
   const base = String(options.baseUrl).replace(/\/+$/, '');
+  // Paths are appended to it, so they would land in the query or the fragment.
+  if (/[?#]/.test(base)) {
+    throw new TypeError(`createClient: baseUrl cannot have a query or fragment: ${base}`);
+  }
 
   const send = async (method: Method, path: string, init: Options = {}): Promise<Response> => {
     const defaults =
@@ -178,15 +182,21 @@ export function fillPath(
     .map((segment) => {
       if (segment !== '*' && !segment.startsWith(':')) return segment;
       const name = segment === '*' ? '*' : segment.slice(1);
-      const value = params[name];
+      const value = Object.hasOwn(params, name) ? params[name] : undefined;
       if (value === undefined)
         throw new TypeError(`Missing path parameter "${name}" for ${pattern}`);
       const text = String(value);
+      // A whole empty wildcard is the route's own path, the same as on the server.
+      if (segment === '*' && text === '') return '';
       // A wildcard may span segments; encode each one.
       const parts = segment === '*' ? text.split('/') : [text];
-      if (parts.some((part) => part === '.' || part === '..')) {
+      for (const part of parts) {
         // URLs resolve these (even encoded as %2E), so the request would reach another route.
-        throw new TypeError(`Path parameter "${name}" cannot be "." or "..": ${text}`);
+        if (part === '.' || part === '..') {
+          throw new TypeError(`Path parameter "${name}" cannot be "." or "..": ${text}`);
+        }
+        // /users/ is the route /users, and a leading // starts another host.
+        if (part === '') throw new TypeError(`Path parameter "${name}" cannot be empty: ${text}`);
       }
       return parts.map(encodeURIComponent).join('/');
     })

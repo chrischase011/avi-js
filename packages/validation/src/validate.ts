@@ -42,6 +42,7 @@ export function withValidation(schema: RouteSchema, handler: Handler): Handler {
 async function validateInput(schema: RouteSchema, ctx: Context): Promise<object> {
   const input: Record<string, unknown> = {};
   const issues: ValidationIssue[] = [];
+  let truncated = false;
 
   for (const part of PARTS) {
     const partSchema = schema[part];
@@ -49,12 +50,24 @@ async function validateInput(schema: RouteSchema, ctx: Context): Promise<object>
     const raw =
       part === 'params' ? ctx.params : part === 'query' ? queryObject(ctx.query) : await ctx.json();
     const result = await partSchema['~standard'].validate(raw);
-    if (result.issues) issues.push(...result.issues.map((issue) => toIssue(part, issue)));
-    else input[part] = result.value;
+    if (!result.issues) {
+      input[part] = result.value;
+      continue;
+    }
+    // A loop, not push(...issues): a body can produce more issues than a call takes arguments.
+    for (const issue of result.issues) {
+      if (issues.length === MAX_ISSUES) {
+        truncated = true;
+        break;
+      }
+      issues.push(toIssue(part, issue));
+    }
   }
 
   if (issues.length > 0) {
-    throw new HttpError(400, 'Validation failed', { details: { issues } });
+    throw new HttpError(400, 'Validation failed', {
+      details: truncated ? { issues, truncated } : { issues },
+    });
   }
   return Object.freeze(input);
 }
@@ -84,12 +97,22 @@ export function queryObject(query: URLSearchParams): Record<string, string | str
   return out;
 }
 
+// A 400 stays small whatever the body: issues, their messages and their paths come from the
+// request, and schema libraries may quote the input in messages.
+const MAX_ISSUES = 50;
+const MAX_MESSAGE = 300;
+const MAX_PATH = 32;
+const MAX_KEY = 100;
+
+const clip = (text: string, max: number) => (text.length > max ? `${text.slice(0, max)}…` : text);
+
 function toIssue(part: ValidationIssue['in'], issue: StandardSchemaIssue): ValidationIssue {
-  const path = (issue.path ?? []).map((segment) => {
+  const path = (issue.path ?? []).slice(0, MAX_PATH).map((segment) => {
     const key = typeof segment === 'object' ? segment.key : segment;
-    return typeof key === 'symbol' ? String(key) : key;
+    if (typeof key === 'number') return key;
+    return clip(typeof key === 'symbol' ? String(key) : key, MAX_KEY);
   });
-  return { in: part, path, message: issue.message };
+  return { in: part, path, message: clip(issue.message, MAX_MESSAGE) };
 }
 
 function isStandardSchema(value: unknown): value is StandardSchemaV1 {

@@ -113,6 +113,33 @@ describe('withValidation', () => {
     expect(logger.error).not.toHaveBeenCalled();
   });
 
+  it('bounds what a 400 sends back, however many issues the body causes', async () => {
+    const url = await serve(
+      'POST',
+      '/numbers',
+      {
+        body: v.array(
+          v.pipe(
+            v.number(),
+            v.check(() => false, 'x'.repeat(1000)),
+          ),
+          // A schema message as long as the input it may quote.
+        ),
+      },
+      () => 'never',
+    );
+    // ~150 000 invalid items fit under the 1 MiB body limit.
+    const res = await fetch(`${url}/numbers`, post(Array.from({ length: 150_000 }, () => 1)));
+    expect(res.status).toBe(400);
+    const { details } = (await res.json()) as {
+      details: { issues: { message: string }[]; truncated?: boolean };
+    };
+    expect(details.issues).toHaveLength(50);
+    expect(details.truncated).toBe(true);
+    expect(details.issues[0]?.message.length).toBeLessThanOrEqual(301);
+    expect(logger.error).not.toHaveBeenCalled();
+  });
+
   it('keeps the JSON body rules', async () => {
     const url = await serve('POST', '/', { body: v.object({}) }, () => 'ok');
     expect((await fetch(url, { method: 'POST', body: '{}' })).status).toBe(415);

@@ -75,7 +75,7 @@ export function logRequests(
 }
 
 function serializeError(error: unknown, depth = 0): unknown {
-  if (!(error instanceof Error)) return String(error);
+  if (!(error instanceof Error)) return text(error);
   const result: Record<string, unknown> = {
     name: error.name,
     message: error.message,
@@ -85,6 +85,15 @@ function serializeError(error: unknown, depth = 0): unknown {
     result['cause'] = serializeError(error.cause, depth + 1);
   }
   return result;
+}
+
+// Anything can be thrown, including objects without a prototype, which String() cannot convert.
+function text(value: unknown): string {
+  try {
+    return String(value);
+  } catch {
+    return '[unprintable value]';
+  }
 }
 
 // Fields come from application code; a field that cannot be serialized must not lose the entry.

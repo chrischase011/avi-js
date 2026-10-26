@@ -3,7 +3,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   HttpError,
   compose,
+  jsonLogger,
   reply,
+  type Context,
   type ResponseInfo,
   type RouteDefinition,
   type ServerOptions,
@@ -81,6 +83,64 @@ describe('ctx.state and ctx.setHeader', () => {
     expect(res.status).toBe(429);
     expect(res.headers.get('x-request-id')).toBe('abc');
     expect(res.headers.get('retry-after')).toBe('30');
+  });
+
+  it('sends errors as JSON even when the handler had set a body type or caching', async () => {
+    const page = (ctx: Context) => {
+      ctx.setHeader('content-type', 'text/html; charset=utf-8');
+      ctx.setHeader('content-encoding', 'gzip');
+      ctx.setHeader('cache-control', 'public, max-age=3600');
+      ctx.setHeader('etag', '"v1"');
+      ctx.setHeader('x-request-id', 'abc');
+      ctx.setHeader('content-security-policy', "default-src 'none'");
+      // A message built from user input must not be served as HTML.
+      throw new HttpError(404, `No page <img src=x onerror=alert(1)>`);
+    };
+    for (const errorHandler of [undefined, (error: unknown) => ({ handled: String(error) })]) {
+      const { url } = await start([get('/', page)], errorHandler ? { errorHandler } : {});
+      const res = await fetch(url);
+      expect(res.headers.get('content-type')).toBe('application/json; charset=utf-8');
+      for (const name of ['content-encoding', 'cache-control', 'etag']) {
+        expect(res.headers.get(name)).toBeNull();
+      }
+      expect(res.headers.get('x-request-id')).toBe('abc');
+      // Security headers stay, even though their names start with content-.
+      expect(res.headers.get('content-security-policy')).toBe("default-src 'none'");
+      expect(await res.json()).toBeTypeOf('object');
+      await current?.server.close();
+    }
+  });
+
+  it('answers 500 whatever is thrown and whatever the logger does', async () => {
+    const lines: string[] = [];
+    const loggers = [
+      jsonLogger({ write: (line) => lines.push(line) }),
+      {
+        error: () => {
+          throw new Error('logger down');
+        },
+      },
+    ];
+    const odd = Object.create(null) as object;
+    for (const logger of loggers) {
+      const { url } = await start(
+        [
+          get('/sync', () => {
+            // eslint-disable-next-line @typescript-eslint/only-throw-error -- what apps can throw
+            throw odd;
+          }),
+          get('/async', () => Promise.reject(new Error('x', { cause: odd }))),
+        ],
+        { logger },
+      );
+      for (const path of ['/sync', '/async']) {
+        const res = await fetch(`${url}${path}`, { signal: AbortSignal.timeout(2000) });
+        expect(res.status).toBe(500);
+      }
+      await current?.server.close();
+    }
+    expect(lines).toHaveLength(2);
+    expect(lines.join('')).toContain('[unprintable value]');
   });
 
   it('rejects invalid headers where they are set', async () => {

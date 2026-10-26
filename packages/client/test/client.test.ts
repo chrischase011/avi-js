@@ -152,6 +152,32 @@ describe('createClient', () => {
     await expect(api.get('/users/:id', { params: { id: '..' } })).rejects.toThrow(TypeError);
   });
 
+  it('refuses a baseUrl the path would be appended to the query of', () => {
+    for (const bad of ['https://api.example/v1?key=k', 'https://api.example/#x']) {
+      expect(() => createClient<Api>({ baseUrl: bad })).toThrow('cannot have a query or fragment');
+    }
+  });
+
+  it('refuses empty values, which would call the parent route or another host', async () => {
+    // /users/ is the same route as /users: deleting "" would delete the collection.
+    expect(() => fillPath('/users/:id', { id: '' })).toThrow('Path parameter "id" cannot be empty');
+    // Empty wildcard parts could start the path with // (another host, for a relative baseUrl).
+    for (const rest of ['/evil.example/x', 'a//b', 'a/']) {
+      expect(() => fillPath('/files/*', { '*': rest })).toThrow('cannot be empty');
+    }
+    expect(fillPath('/files/*', { '*': '' })).toBe('/files/');
+    // Names of Object.prototype are not values.
+    expect(() => fillPath('/u/:constructor', {})).toThrow('Missing path parameter "constructor"');
+
+    const relative = createClient<Api>({
+      baseUrl: '',
+      fetch: () => Promise.reject(new Error('sent')),
+    });
+    await expect(relative.get('/files/*', { params: { '*': 'evil.example' } })).rejects.toThrow(
+      'sent',
+    );
+  });
+
   it('returns streams as the Response, and raw calls never throw', async () => {
     const api = createClient<Api>({ baseUrl });
     const events = await api.get('/users/events');

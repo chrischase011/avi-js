@@ -114,9 +114,17 @@ createAvi({
 });
 ```
 
+An incoming id is whatever the client sent, within those limits: a client can reuse another
+request's id, and an id like `<b>x</b>` is valid. Use `trustIncoming: false` when only your own
+gateway should set ids, and escape `ctx.id` like any other input if you put it in HTML.
+
 Errors Avi.js logs carry the id, so a `500` a user reports can be found in the logs. The logger
 gets it as a third argument, `{ requestId, method, path }`. The default logger prints
-`Request failed: GET /orders [3f2a…]`.
+`Request failed: GET /orders [3f2a…]`, followed by the error as `console.error` shows it, with all
+its properties. Errors from HTTP clients can carry the request they made, `Authorization` header
+included, so in production use `jsonLogger()` (name, message, stack and cause only) or your own
+logger. Request bodies, query strings and headers are never logged; paths are, so keep tokens out
+of URLs (`/reset/:token`) or out of your logs.
 
 For log collectors, `jsonLogger()` writes one JSON object per line, and `logRequests()` logs every
 response through it:

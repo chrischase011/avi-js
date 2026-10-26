@@ -103,13 +103,20 @@ function format(input: ServerSentEvent | string): string {
   if (event.event !== undefined) out += `event: ${singleLine('event', event.event)}\n`;
   if (event.id !== undefined) out += `id: ${singleLine('id', event.id)}\n`;
   if (event.retry !== undefined) {
-    if (!Number.isInteger(event.retry) || event.retry < 0) {
+    // Safe integers only: larger ones print as 1e+21, which clients ignore.
+    if (!Number.isSafeInteger(event.retry) || event.retry < 0) {
       throw new RangeError(`SSE retry must be a non-negative integer, got ${String(event.retry)}`);
     }
     out += `retry: ${String(event.retry)}\n`;
   }
   if (event.data !== undefined) {
-    const text = typeof event.data === 'string' ? event.data : JSON.stringify(event.data);
+    const text =
+      typeof event.data === 'string'
+        ? event.data
+        : (JSON.stringify(event.data) as string | undefined);
+    if (text === undefined) {
+      throw new TypeError('SSE data must be a string or JSON-serializable');
+    }
     for (const line of text.split(/\r\n|\r|\n/)) out += `data: ${line}\n`;
   }
   return `${out}\n`;

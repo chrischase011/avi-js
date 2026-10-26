@@ -112,6 +112,12 @@ The handler does not run. To use another format, read `error.details` in your
 own errors too: `new HttpError(409, 'Email taken', { details: { field: 'email' } })`. Details are
 only sent for 4xx errors.
 
+A `400` stays small however much the body gets wrong: at most 50 issues (then `"truncated": true`),
+messages up to 300 characters, and paths up to 32 keys. The messages come from your schema library,
+and some quote the value they received (Valibot does, Zod does not), so a mistyped token comes back
+to the client that sent it. The response is JSON, so the quote is never run as HTML; to keep values
+out entirely, set your own messages in the schema or rewrite `details` in an `errorHandler`.
+
 ## Where validation runs
 
 ```text

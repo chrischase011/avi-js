@@ -62,6 +62,39 @@ describe('defineConfig', () => {
     }
   });
 
+  it('keeps values out of errors even after a transform, or when the schema throws', async () => {
+    const secret = 'sk_live_SuperSecret';
+    const schemas = {
+      changed: v.object({ KEY: v.pipe(v.string(), v.toLowerCase(), v.regex(/^pk_/)) }),
+      trimmed: v.object({ KEY: v.pipe(v.string(), v.trim(), v.regex(/^pk_/)) }),
+      parsed: v.object({ KEY: v.pipe(v.string(), v.transform(JSON.parse)) }),
+      whole: v.pipe(
+        v.object({ KEY: v.string() }),
+        v.check(
+          (env) => env.KEY.startsWith('pk_'),
+          (issue) => `bad ${JSON.stringify(issue.input)}`,
+        ),
+      ),
+    };
+    for (const [name, schema] of Object.entries(schemas)) {
+      const Config = defineConfig(schema as v.GenericSchema, { env: { KEY: ` ${secret} ` } });
+      const error: unknown = await Config.load().catch((e: unknown) => e);
+      expect(error, name).toBeInstanceOf(ConfigError);
+      // Nothing reachable from the error may hold the value, including its causes.
+      const text = JSON.stringify(error, Object.getOwnPropertyNames(error)) + String(error);
+      expect(text.toLowerCase(), name).not.toContain('supersecret');
+      expect((error as Error).cause, name).toBeUndefined();
+    }
+  });
+
+  it('does not redact digits out of messages for short values', async () => {
+    const Config = defineConfig(
+      v.object({ PORT: v.pipe(v.string(), v.transform(Number), v.minValue(1024)) }),
+      { env: { PORT: '1' } },
+    );
+    await expect(Config.load()).rejects.toThrow(/>=1024/);
+  });
+
   it('reports missing variables by name', async () => {
     const Config = defineConfig(schema, { env: {} });
     await expect(Config.load()).rejects.toThrow(/DATABASE_URL: /);

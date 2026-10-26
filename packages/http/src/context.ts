@@ -7,6 +7,7 @@ import {
   type ServerResponse,
 } from 'node:http';
 import { randomUUID } from 'node:crypto';
+import { isIP } from 'node:net';
 import { HttpError, RequestAbortedError } from './errors.js';
 import type { HttpMethod } from './methods.js';
 import type { Params } from './router.js';
@@ -174,7 +175,17 @@ function clientIp(req: IncomingMessage, trustProxy: number): string {
     .map((address) => address.trim())
     .filter(Boolean);
   const chain = [socket, ...hops.reverse()];
-  return chain[Math.min(trustProxy, chain.length - 1)] ?? socket;
+  const hop = chain[Math.min(trustProxy, chain.length - 1)] ?? socket;
+  return hop === socket ? socket : (addressOf(hop) ?? socket);
+}
+
+/** The address in a forwarded entry, without a port; undefined if it is not an IP address. */
+function addressOf(entry: string): string | undefined {
+  // Some proxies add the port: 1.2.3.4:5555 or [2001:db8::1]:443.
+  const bracketed = /^\[([^\]]+)\](?::\d+)?$/.exec(entry);
+  const withPort = /^[\d.]+:\d+$/.test(entry);
+  const address = bracketed?.[1] ?? (withPort ? entry.slice(0, entry.lastIndexOf(':')) : entry);
+  return isIP(address) ? address : undefined;
 }
 
 function isJson(contentType: string | undefined): boolean {

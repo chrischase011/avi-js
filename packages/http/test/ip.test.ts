@@ -36,6 +36,16 @@ describe('ctx.ip', () => {
     expect(await ipFor({ trustProxy: 1 })).toMatch(LOCAL);
   });
 
+  it('drops ports and falls back to the socket for anything that is not an address', async () => {
+    // Some proxies add the port, which would give every connection its own rate-limit key.
+    expect(await ipFor({ trustProxy: 1 }, '1.2.3.4:5555')).toBe('1.2.3.4');
+    expect(await ipFor({ trustProxy: 1 }, '[2001:db8::1]:443')).toBe('2001:db8::1');
+    expect(await ipFor({ trustProxy: 1 }, '2001:db8::1')).toBe('2001:db8::1');
+    for (const junk of ['garbage<>', 'unknown', '1.2.3.4.5', '999.1.1.1']) {
+      expect(await ipFor({ trustProxy: 1 }, junk), junk).toMatch(LOCAL);
+    }
+  });
+
   it('rejects an invalid trustProxy', async () => {
     await expect(startServer([], { trustProxy: -1 })).rejects.toThrow('trustProxy');
   });

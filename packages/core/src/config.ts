@@ -68,7 +68,15 @@ export function defineConfig<S extends StandardSchemaV1>(
       if (value !== undefined) env[key] = value;
     }
 
-    const result = await schema['~standard'].validate(env);
+    const result = await Promise.resolve()
+      .then(() => schema['~standard'].validate(env))
+      .catch(() => {
+        // A throwing transform's message may quote the value: not kept, not even as cause.
+        throw new ConfigError(
+          [{ key: '(config)', message: 'the schema threw while reading the variables' }],
+          name,
+        );
+      });
     if (!result.issues) return result.value;
     throw new ConfigError(
       result.issues.map((issue) => {
@@ -101,7 +109,10 @@ async function readEnvFile(path: string, required: boolean): Promise<Record<stri
   return parseEnv(text) as Record<string, string>;
 }
 
-// Some libraries quote the received value in their messages; config values can be secrets.
+// Libraries quote the received value in messages, often after a transform changed it, and config
+// values can be secrets. Every quoted text goes, and the raw value wherever it still appears.
 function redact(message: string, value: string | undefined): string {
-  return value ? message.replaceAll(value, '[redacted]') : message;
+  const unquoted = message.replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g, '"[redacted]"');
+  // Very short values would match inside other words and numbers.
+  return value && value.length >= 4 ? unquoted.replaceAll(value, '[redacted]') : unquoted;
 }

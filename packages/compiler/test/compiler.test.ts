@@ -235,3 +235,31 @@ describe('avi-compile client', { timeout: 60_000 }, () => {
     expect(log).toHaveBeenLastCalledWith(`${out} is out of date: run avi client`);
   });
 });
+
+describe('generateClient with unusual route paths', () => {
+  it('escapes paths into valid string literals and skips non-HTTP methods', () => {
+    const dir = path.join(fixtures, 'client-quotes');
+    const result = generateClient({
+      project: path.join(dir, 'tsconfig.json'),
+      out: path.join(dir, 'src/api.gen.ts'),
+    });
+    const file = ts.createSourceFile('api.gen.ts', result.source, ts.ScriptTarget.ES2023, true);
+    // Only one top-level export: the Api interface. Nothing a path contains can add code.
+    const statements = file.statements.filter((s) => !ts.isImportDeclaration(s));
+    expect(statements).toHaveLength(1);
+    const api = statements[0];
+    expect(api && ts.isInterfaceDeclaration(api) && api.name.text).toBe('Api');
+    const keys = (api as ts.InterfaceDeclaration).members.map((m) =>
+      m.name && ts.isStringLiteral(m.name) ? m.name.text : '',
+    );
+    expect(keys.sort()).toEqual(
+      [
+        "GET /people/o'neil",
+        'GET /people/a\b',
+        "GET /x'; } export const pwned = 1; interface Z { 'q",
+        'GET /line\nbreak',
+      ].sort(),
+    );
+    expect(result.diagnostics.map((d) => d.code)).toContain('AVI107');
+  });
+});

@@ -179,6 +179,24 @@ describe('cluster', { timeout: 60_000 }, () => {
     expect([...after].some((pid) => before.has(pid))).toBe(false);
   });
 
+  it('ignores IPC messages that are not its own', async () => {
+    const app = start();
+    const url = await ready(app);
+    expect((await fetchText(`${url}/odd-message`)).body).toBe('sent');
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    app.send('count');
+    expect((await app.line(/COUNT (\d+)/))[1]).toBe('2');
+    expect(app.err.join('\n')).not.toMatch(/TypeError|exited unexpectedly/);
+  });
+
+  it('stops with exit code 1 when replacements cannot start, instead of running empty', async () => {
+    const app = start({ FAIL_REPLACEMENTS: '1' });
+    const url = await ready(app);
+    for (let i = 0; i < 2; i++) await fetchText(`${url}/crash`).catch(() => undefined);
+    await app.line(/no workers left|keep crashing/i);
+    expect(await app.exit).toBe(1);
+  });
+
   it('fails to start with the worker error and its cause', async () => {
     const app = start({ FAIL_START: '1' });
     await app.line(/cluster failed to start: Failed to create Database\s*$/);

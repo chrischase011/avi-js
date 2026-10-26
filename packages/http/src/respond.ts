@@ -37,7 +37,12 @@ export function sendValue(res: ServerResponse, value: unknown, options: SendOpti
     status ??= body.status;
     if (options.headers) setHeaders(res, options.headers);
     if (headers) setHeaders(res, headers);
-    for (const [name, headerValue] of body.headers) res.setHeader(name, headerValue);
+    for (const [name, headerValue] of body.headers) {
+      // Iterating Headers yields set-cookie once per cookie; setHeader would keep only the last.
+      if (name !== 'set-cookie') res.setHeader(name, headerValue);
+    }
+    const cookies = body.headers.getSetCookie();
+    if (cookies.length > 0) res.setHeader('set-cookie', cookies);
     if (body.body) {
       sendStream(res, Readable.fromWeb(body.body), status, options);
     } else {
@@ -99,13 +104,39 @@ export function sendError(
   }
 
   try {
-    if (extra) setHeaders(res, extra);
+    if (extra) setHeaders(res, errorHeaders(extra));
     if (error instanceof HttpError && error.headers) setHeaders(res, error.headers);
   } catch {
     clearHeaders(res);
   }
 
   finish(res, status, stringifyError(body), JSON_TYPE, close || status === 413);
+}
+
+// Headers that describe the body a handler meant to send. An error sends a different body, so
+// keeping them would, for example, serve a JSON error as HTML or let a cache store it.
+// Listed one by one: other content-* headers, such as content-security-policy, must stay.
+const BODY_HEADERS = new Set([
+  'content-type',
+  'content-length',
+  'content-encoding',
+  'content-language',
+  'content-range',
+  'content-location',
+  'content-disposition',
+  'etag',
+  'last-modified',
+  'cache-control',
+  'expires',
+]);
+
+/** The handler's headers without those that describe its body, for an error response. */
+export function errorHeaders(headers: OutgoingHttpHeaders): OutgoingHttpHeaders {
+  const kept: OutgoingHttpHeaders = {};
+  for (const [name, value] of Object.entries(headers)) {
+    if (!BODY_HEADERS.has(name.toLowerCase())) kept[name] = value;
+  }
+  return kept;
 }
 
 // Details come from user code and may not serialize; the response must still go out.

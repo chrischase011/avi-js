@@ -42,6 +42,14 @@ type Message =
 
 const MARK = 'AVI_CLUSTER_WORKER';
 
+function isMessage(value: unknown): value is Message {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as { avi?: unknown }).avi === 'string'
+  );
+}
+
 /**
  * Runs `start` in one worker process per CPU core, all sharing the port the app listens on. The
  * primary process only manages workers: it never calls `start`, so it opens no connections.
@@ -98,8 +106,8 @@ async function runAsWorker(start: Start, logger: WorkerLogger): Promise<ClusterH
       // which must be sent back rather than lost. It disconnects the worker once that is over.
       send({ avi: 'closed' });
     })());
-  process.on('message', (message: Message) => {
-    if (message.avi === 'shutdown') void close();
+  process.on('message', (message: unknown) => {
+    if (isMessage(message) && message.avi === 'shutdown') void close();
   });
   process.once('disconnect', () => {
     // Exit as soon as nothing else keeps the process alive, or after a second regardless.
@@ -180,7 +188,9 @@ async function runPrimary(
       const worker = nodeCluster.fork({ [MARK]: '1' });
       running.add(worker);
       let ready = false;
-      worker.on('message', (message: Message) => {
+      worker.on('message', (message: unknown) => {
+        // The app's own code may use process.send too; only our messages count.
+        if (!isMessage(message)) return;
         if (message.avi === 'ready') {
           ready = true;
           resolve(worker);
@@ -198,15 +208,14 @@ async function runPrimary(
           return;
         }
         if (stopping || leaving.delete(worker)) return;
-        replace(code, signal);
+        replace(signal || `code ${String(code)}`);
       });
     });
 
-  const replace = (code: number, signal: string) => {
+  const replace = (why: string) => {
     const now = performance.now();
     exits.push(now);
     while (exits.length > 0 && (exits[0] ?? now) < now - restartWindow) exits.shift();
-    const why = signal || `code ${String(code)}`;
     if (exits.length > maxRestarts) {
       logger.error(
         `Workers keep crashing (${String(exits.length)} exits in ${String(restartWindow)} ms, last ${why}); stopping`,
@@ -218,6 +227,8 @@ async function runPrimary(
     logger.warn?.(`A worker exited unexpectedly (${why}); starting a new one`);
     fork().catch((error: unknown) => {
       logger.error('A replacement worker failed to start', error);
+      // It counts as a crash, so a replacement that never starts ends in the crash-loop stop.
+      replace('a replacement failed to start');
     });
   };
 
@@ -236,7 +247,10 @@ async function runPrimary(
               clearTimeout(timer);
               resolve();
             });
-            worker.send({ avi: 'shutdown' } satisfies Message);
+            // A worker already on its way out cannot be told; the timer or its exit ends this.
+            if (worker.isConnected()) {
+              worker.send({ avi: 'shutdown' } satisfies Message, () => undefined);
+            }
           }),
       ),
     );

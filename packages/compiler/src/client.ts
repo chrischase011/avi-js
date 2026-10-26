@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { HTTP_METHODS } from '@avijs/core';
 import ts from 'typescript';
 import { readProgram, unwrap, type Diagnostic } from './check.js';
 
@@ -140,7 +141,7 @@ class Generator {
       .sort((a, b) => a.file.localeCompare(b.file) || a.alias.localeCompare(b.alias))
       .map(({ name, file, alias }) => {
         const named = name === alias ? name : `${name} as ${alias}`;
-        return `import type { ${named} } from '${this.#specifier(file)}';`;
+        return `import type { ${named} } from ${quote(this.#specifier(file))};`;
       });
 
     const lines = [
@@ -149,7 +150,7 @@ class Generator {
       ...imports,
       '',
       'export interface Api {',
-      ...routes.map((r) => `  '${r.method} ${r.path}': ${r.type};`),
+      ...routes.map((r) => `  ${quote(`${r.method} ${r.path}`)}: ${r.type};`),
       '}',
       '',
     ];
@@ -254,7 +255,7 @@ class Generator {
         this.#add(
           method.toUpperCase(),
           full,
-          `MethodEndpoint<'${full}', ${alias}['${member.name.text}']>`,
+          `MethodEndpoint<${quote(full)}, ${alias}['${member.name.text}']>`,
           call,
         );
       }
@@ -298,7 +299,7 @@ class Generator {
       this.#add(
         method,
         full,
-        `RouteEndpoint<'${full}', typeof ${alias}, ${String(index)}>`,
+        `RouteEndpoint<${quote(full)}, typeof ${alias}, ${String(index)}>`,
         element,
       );
     });
@@ -346,6 +347,10 @@ class Generator {
   }
 
   #add(method: string, full: string, type: string, at: ts.Node): void {
+    if (!(HTTP_METHODS as readonly string[]).includes(method)) {
+      this.#report(at.getSourceFile(), at, 'warning', 'AVI107', `${method} is not an HTTP method`);
+      return;
+    }
     const key = `${method} ${full}`;
     if (this.#routes.has(key)) {
       this.#report(at.getSourceFile(), at, 'warning', 'AVI106', `Duplicate route ${key}`);
@@ -511,6 +516,20 @@ class Generator {
     });
   }
 }
+
+/** A single-quoted TypeScript string literal for any text, so paths cannot break the file. */
+function quote(text: string): string {
+  return `'${text.replace(/[\\'\n\r\u2028\u2029]/g, (c) => ESCAPES[c] ?? c)}'`;
+}
+
+const ESCAPES: Record<string, string> = {
+  '\\': '\\\\',
+  "'": "\\'",
+  '\n': '\\n',
+  '\r': '\\r',
+  '\u2028': '\\u2028',
+  '\u2029': '\\u2029',
+};
 
 // Same as `joinPath` in @avijs/core.
 function joinPath(prefix: string, routePath: string): string {

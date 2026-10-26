@@ -13,7 +13,14 @@ import { performance } from 'node:perf_hooks';
 import { RequestContext, type Context } from './context.js';
 import { HttpError, RequestAbortedError } from './errors.js';
 import type { HttpMethod } from './methods.js';
-import { clearHeaders, sendError, sendOptions, sendValue, statusOf } from './respond.js';
+import {
+  clearHeaders,
+  errorHeaders,
+  sendError,
+  sendOptions,
+  sendValue,
+  statusOf,
+} from './respond.js';
 import type { Handler, RouteMatch, Router } from './router.js';
 
 /** Context added to log entries, such as the request id. */
@@ -109,6 +116,19 @@ const consoleLogger: Logger = {
   },
 };
 
+// A logger is application code; one that throws loses a log line, not a request or the process.
+function safeLogger(logger: Logger): Logger {
+  return {
+    error(message, error, fields) {
+      try {
+        logger.error(message, error, fields);
+      } catch {
+        // Nothing is left to report the failure to.
+      }
+    },
+  };
+}
+
 const INCOMING_ID = /^[\x21-\x7e]{1,128}$/;
 
 const NO_PARAMS = Object.freeze(Object.create(null) as Record<string, string>);
@@ -131,7 +151,7 @@ export class HttpServer {
     this.#router = router;
     this.#bodyLimit = nonNegative('bodyLimit', options.bodyLimit ?? 1024 * 1024);
     this.#shutdownTimeout = nonNegative('shutdownTimeout', options.shutdownTimeout ?? 10_000);
-    this.#logger = options.logger ?? consoleLogger;
+    this.#logger = safeLogger(options.logger ?? consoleLogger);
     this.#errorHandler = optionalFunction('errorHandler', options.errorHandler);
     this.#onResponse = optionalFunction('onResponse', options.onResponse);
     this.#hooks = hookList(options.onRequest);
@@ -365,7 +385,7 @@ export class HttpServer {
 
   #sendHandled(ctx: RequestContext, res: ServerResponse, error: unknown, value: unknown): void {
     if (res.destroyed) return;
-    const headers: OutgoingHttpHeaders = { ...ctx.responseHeaders };
+    const headers: OutgoingHttpHeaders = errorHeaders(ctx.responseHeaders ?? {});
     if (error instanceof HttpError) Object.assign(headers, error.headers);
     try {
       clearHeaders(res);

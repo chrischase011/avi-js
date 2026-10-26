@@ -6,6 +6,13 @@ import { createInterface } from 'node:readline';
 
 const handle = await cluster(
   async () => {
+    // FAIL_REPLACEMENTS: workers started after the first ones fail, so replacements cannot start.
+    if (
+      process.env.FAIL_REPLACEMENTS &&
+      (nodeCluster.worker?.id ?? 0) > Number(process.env.WORKERS ?? 2)
+    ) {
+      throw new Error('replacement cannot start');
+    }
     if (process.env.FAIL_START) {
       throw new Error('Failed to create Database', { cause: new Error('database unreachable') });
     }
@@ -29,6 +36,16 @@ const handle = await cluster(
               method: 'GET',
               path: '/slow',
               handler: () => new Promise((resolve) => setTimeout(() => resolve('done'), 700)),
+            },
+            {
+              method: 'GET',
+              path: '/odd-message',
+              handler: () => {
+                // App code sending something that is not one of our messages.
+                process.send?.(null);
+                process.send?.('hello');
+                return 'sent';
+              },
             },
             {
               method: 'GET',

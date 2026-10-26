@@ -100,7 +100,9 @@ for await (const part of multipart(ctx, { accept: ['image/*'] })) {
 415 File avatar has type text/html; expected image/png, image/jpeg, application/pdf
 ```
 
-Matching ignores case and parameters such as `; charset=utf-8`. Text fields are not affected.
+Matching ignores case and parameters such as `; charset=utf-8`. Text fields are not affected, and
+a part sent without a file name or a type arrives as a text field, so `fieldSize` (100 KiB), not
+`accept`, limits it.
 `accept` checks the type the client claims; for files you will serve back, also check their
 first bytes (a PNG starts with `89 50 4E 47`).
 

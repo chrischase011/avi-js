@@ -90,6 +90,18 @@ describe('streamed responses', () => {
     expect(await empty.text()).toBe('');
   });
 
+  it('keeps every Set-Cookie of a web Response', async () => {
+    const { url } = await start([
+      get('/', () => {
+        const headers = new Headers();
+        headers.append('set-cookie', 'session=a; HttpOnly');
+        headers.append('set-cookie', 'csrf=b');
+        return new Response('ok', { headers });
+      }),
+    ]);
+    expect((await fetch(url)).headers.getSetCookie()).toEqual(['session=a; HttpOnly', 'csrf=b']);
+  });
+
   it('sends no body for HEAD and stops the source', async () => {
     let destroyed = false;
     const { url } = await start([

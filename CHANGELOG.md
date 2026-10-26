@@ -3,6 +3,47 @@
 All notable changes are listed here. Avi.js follows [Semantic Versioning](https://semver.org); all
 packages share one version.
 
+## 0.5.2 - 2026-10-26
+
+Fixes from the security review of everything added since 0.2.0. Upgrade recommended.
+
+### Fixed
+
+- **Security:** error responses no longer keep a handler's `content-type`, `content-encoding`,
+  caching or other body headers. After `ctx.setHeader('content-type', 'text/html')`, an
+  `HttpError` message built from user input was served as HTML (reflected XSS). Errors are now
+  always JSON; other headers, such as request ids and `content-security-policy`, stay.
+- **Security:** `defineConfig` errors could still contain a secret when the schema changed the
+  value before the failing check (`trim`, `toLowerCase`, a JSON transform) or when a transform threw.
+  Quoted text in messages is now redacted, and a throwing schema reports no original error.
+- **Security:** `@avijs/client` refuses empty path parameters, which reached the parent route
+  (`DELETE /users/` is `DELETE /users`), and empty wildcard segments, which with a relative
+  `baseUrl` could send the request to another host. A `baseUrl` with a query or fragment is refused.
+- Validation errors are bounded: at most 50 issues (`truncated: true` beyond), messages up to 300
+  characters, paths up to 32 keys. A body producing ~150 000 issues used to overflow the stack and
+  answer `500`.
+- The rate-limit memory store keeps keys in least-recently-used order, so a flood of new keys
+  cannot reset a counter that is still in use.
+- `ctx.ip` drops a port from forwarded addresses and falls back to the socket address for entries
+  that are not IP addresses.
+- A thrown value that cannot be converted to a string, or a logger that throws, no longer crashes
+  the process or leaves the request without a response.
+- A web `Response` with several `Set-Cookie` headers sends all of them, not only the last.
+- `sse()` names the problem when event data cannot be serialized, and refuses a `retry` that is
+  not a safe integer.
+- `avi client` escapes route paths in the generated file (a quote in a path broke it, or added
+  code), and leaves out routes whose method is not an HTTP method (AVI107).
+- `@avijs/workers`: messages the app's own code sends over IPC are ignored instead of crashing the
+  primary; replacements that cannot start count as crashes, so the cluster stops with exit code 1
+  instead of running with no workers.
+
+### Docs
+
+- `SECURITY.md` brought up to date, and a new `security/` folder with the threat model, the review
+  checklist and a guide for reviewers.
+- Notes on validation messages quoting input, incoming request ids, logging, CORS matchers, rate
+  limits for IPv6 and client-chosen keys, and which parts `accept` applies to.
+
 ## 0.5.1 - 2026-10-26
 
 ### Fixed

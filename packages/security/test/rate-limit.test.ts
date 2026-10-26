@@ -106,6 +106,18 @@ describe('memoryStore', () => {
     expect(store.increment('a', 100)).toEqual({ count: 1, resetAt: 1_200 });
   });
 
+  it('keeps a key that is still in use when a flood of new keys fills the store', () => {
+    vi.spyOn(Date, 'now').mockReturnValue(0);
+    const store = memoryStore({ maxKeys: 100 });
+    store.increment('attacker', 60_000);
+    // Client-chosen keys (an API key header, say) could otherwise reset a live counter.
+    for (let round = 0; round < 5; round++) {
+      for (let i = 0; i < 99; i++) store.increment(`junk-${String(round)}-${String(i)}`, 60_000);
+      store.increment('attacker', 60_000);
+    }
+    expect(store.increment('attacker', 60_000).count).toBe(7);
+  });
+
   it('caps the keys it tracks, dropping the oldest window', () => {
     vi.spyOn(Date, 'now').mockReturnValue(0);
     const store = memoryStore({ maxKeys: 2 });

@@ -76,6 +76,17 @@ for (const tarball of tarballs) {
     });
     if (manifest.includes('workspace:'))
       throw new Error('package.json still has workspace: ranges');
+    // Third-party runtime dependencies are part of the security review; adding one means
+    // reviewing it and listing it here.
+    const reviewed = { '@avijs/multipart': ['@fastify/busboy'] };
+    const pkg = JSON.parse(manifest);
+    const external = Object.keys(pkg.dependencies ?? {}).filter(
+      (name) => !name.startsWith('@avijs/'),
+    );
+    const allowed = reviewed[pkg.name] ?? [];
+    const unreviewed = external.filter((name) => !allowed.includes(name));
+    if (unreviewed.length)
+      throw new Error(`unreviewed runtime dependency: ${unreviewed.join(', ')}`);
   });
 }
 

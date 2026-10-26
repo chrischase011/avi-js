@@ -109,25 +109,26 @@ export interface MemoryStore extends RateLimitStore {
 /** Counts in this process only. For several processes or servers, use a shared store. */
 export function memoryStore(options: MemoryStoreOptions = {}): MemoryStore {
   const maxKeys = positive('maxKeys', options.maxKeys ?? 100_000);
-  // Insertion order is window order: a new window is re-inserted at the end.
+  // Least recently used first: every increment moves its key to the end.
   const windows = new Map<string, { count: number; resetAt: number }>();
 
   return {
     increment(key, window) {
       const now = Date.now();
       const current = windows.get(key);
-      if (current && current.resetAt > now) {
-        current.count++;
-        return { count: current.count, resetAt: current.resetAt };
-      }
       if (current) windows.delete(key);
-      for (const [oldest, entry] of windows) {
-        if (entry.resetAt > now && windows.size < maxKeys) break;
-        windows.delete(oldest);
+      const entry =
+        current && current.resetAt > now
+          ? { count: current.count + 1, resetAt: current.resetAt }
+          : { count: 1, resetAt: now + window };
+      windows.set(key, entry);
+      // Over the cap, the least recently used key goes. Pushing out a key that is still in use
+      // takes more new keys than the store holds between two of its requests.
+      if (windows.size > maxKeys) {
+        const oldest = windows.keys().next();
+        if (!oldest.done) windows.delete(oldest.value);
       }
-      const fresh = { count: 1, resetAt: now + window };
-      windows.set(key, fresh);
-      return { count: fresh.count, resetAt: fresh.resetAt };
+      return { count: entry.count, resetAt: entry.resetAt };
     },
   };
 }
