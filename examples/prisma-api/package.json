@@ -12,14 +12,14 @@
     "smoke": "node dist/smoke.js"
   },
   "dependencies": {
-    "@avijs/core": "^0.5.3",
+    "@avijs/core": "^0.6.0",
     "@prisma/client": "7.10.1",
     "valibot": "^1.5.0",
     "@prisma/adapter-libsql": "7.10.1"
   },
   "devDependencies": {
-    "@avijs/cli": "^0.5.3",
-    "@avijs/testing": "^0.5.3",
+    "@avijs/cli": "^0.6.0",
+    "@avijs/testing": "^0.6.0",
     "@types/node": "^22.0.0",
     "prisma": "7.10.1",
     "typescript": "~6.0.3"

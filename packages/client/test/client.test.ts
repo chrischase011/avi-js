@@ -16,7 +16,15 @@ import {
 } from '@avijs/core';
 import * as v from 'valibot';
 import { afterAll, beforeAll, describe, expect, expectTypeOf, it, vi } from 'vitest';
-import { AviClientError, createClient, fillPath } from '../src/index.js';
+import {
+  AviClientError,
+  createClient,
+  fillPath,
+  type BodyOf,
+  type ParamsOf,
+  type QueryOf,
+  type ResponseOf,
+} from '../src/index.js';
 
 const CreateUser = v.object({ name: v.pipe(v.string(), v.minLength(1)) });
 const ListQuery = v.object({ page: v.optional(v.pipe(v.string(), v.transform(Number))) });
@@ -404,5 +412,19 @@ describe('events', () => {
       seen.push(message.data);
     }
     expect(seen).toEqual([]);
+  });
+});
+
+describe('endpoint types', () => {
+  it('names the parts of an endpoint by its Api key', () => {
+    expectTypeOf<ResponseOf<Api, 'GET /users/:id'>>().toEqualTypeOf<{
+      id: number;
+      name: string;
+      joined: string;
+    }>();
+    expectTypeOf<BodyOf<Api, 'POST /users'>>().toEqualTypeOf<{ name: string }>();
+    expectTypeOf<QueryOf<Api, 'GET /users'>>().toEqualTypeOf<{ page?: string | undefined }>();
+    expectTypeOf<keyof ParamsOf<Api, 'GET /users/:id'>>().toEqualTypeOf<'id'>();
+    expectTypeOf<ParamsOf<Api, 'GET /users/:id'>['id']>().toEqualTypeOf<string>();
   });
 });

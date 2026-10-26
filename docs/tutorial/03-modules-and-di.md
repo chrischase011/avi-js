@@ -144,6 +144,9 @@ class CurrentUser {
 { provide: TenantId, useFactory: (ctx: Context) => ctx.headers['x-tenant'], inject: [REQUEST], scope: 'request' }
 ```
 
+Likewise, `APP` injects the app itself, for providers that read its routes; `OpenApiModule` uses
+it.
+
 A controller that injects a request-scoped provider, directly or through a transient, is created
 for each request. Other controllers are still created once. Use request scope where you need it, not
 by default: each request then builds the controller and its request providers.

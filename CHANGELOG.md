@@ -3,6 +3,33 @@
 All notable changes are listed here. Avi.js follows [Semantic Versioning](https://semver.org); all
 packages share one version.
 
+## 0.7.0 - 2026-10-26
+
+### Added
+
+- `ctx.need(key)`: a `ctx.state` value a guard or middleware set, typed without `undefined`. When it
+  is missing, because the route lacks the guard, it throws: a 500, with the reason in the log.
+- `OpenApiModule.forRoot({ info, ... })` in the openapi package serves the app's document at
+  `/openapi.json` (or `path`), built on the first request. Serving it took a placeholder variable,
+  a manual `init()` and no `AviFactory.create`.
+- `APP`: an injection token for the app itself, visible in every module.
+- `defineHook({ inject, create })`: an `onRequest` hook built from providers at startup, so CORS or
+  security settings can come from the config without loading it a second time by hand.
+- multipart: file parts have `size`, the bytes received, complete once the stream has ended.
+- client: `ResponseOf`, `BodyOf`, `QueryOf` and `ParamsOf` name an endpoint's types by its `Api`
+  key, such as `ResponseOf<Api, 'GET /teams'>`.
+- `avi new` ends with how to put the project in git.
+
+### Changed
+
+- multipart: limit and type errors quote the field name: `File "file" has type text/html`.
+
+### Docs
+
+- Chapter 14's streaming example removes a partially written file when the upload stops.
+- The Prisma example reads its settings with `defineConfig` and builds `PrismaClient` with
+  `defineFactory`.
+
 ## 0.6.0 - 2026-10-26
 
 ### Added

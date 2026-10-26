@@ -41,6 +41,7 @@ without ever being held in memory:
 ```ts
 import { randomUUID } from 'node:crypto';
 import { createWriteStream } from 'node:fs';
+import { rm } from 'node:fs/promises';
 import { pipeline } from 'node:stream/promises';
 import { multipart } from '@avijs/multipart';
 
@@ -48,12 +49,19 @@ route({
   method: 'POST',
   path: '/videos',
   handler: async (ctx) => {
-    const saved: string[] = [];
+    const saved: { id: string; size: number }[] = [];
     for await (const part of multipart(ctx, { fileSize: 500_000_000, files: 5 })) {
       if (part.kind === 'field') continue;
       const id = randomUUID();
-      await pipeline(part.stream, createWriteStream(`/data/uploads/${id}`));
-      saved.push(id);
+      const file = `/data/uploads/${id}`;
+      try {
+        await pipeline(part.stream, createWriteStream(file));
+      } catch (error) {
+        // A limit or a disconnect stopped the upload: remove what was written.
+        await rm(file, { force: true });
+        throw error;
+      }
+      saved.push({ id, size: part.size }); // from 0.7.0: bytes received, complete once ended
     }
     return { saved };
   },
@@ -61,7 +69,8 @@ route({
 ```
 
 Read or pipe each file before moving to the next part. A file you skip is discarded, so skipping
-is safe.
+is safe. Files saved before a later part fails stay on disk; delete them in a `catch` around the
+loop if the upload must be all or nothing.
 
 ## Limits
 
@@ -97,7 +106,7 @@ for await (const part of multipart(ctx, { accept: ['image/*'] })) {
 ```
 
 ```text
-415 File avatar has type text/html; expected image/png, image/jpeg, application/pdf
+415 File "avatar" has type text/html; expected image/png, image/jpeg, application/pdf
 ```
 
 Matching ignores case and parameters such as `; charset=utf-8`. Text fields are not affected, and

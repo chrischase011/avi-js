@@ -19,6 +19,29 @@ const app = createAvi({
 });
 ```
 
+### Settings from the config
+
+Hooks are created before your providers, so a setting from your [config](13-configuration.md)
+needs `defineHook` (from 0.7.0). It runs `create` once at startup with `inject` resolved and typed,
+and the config is loaded only once, through dependency injection:
+
+```ts
+import { createAvi, defineHook } from '@avijs/core';
+
+const app = createAvi({
+  onRequest: [
+    securityHeaders(),
+    defineHook({
+      inject: [Config],
+      create: (config) => cors({ origin: config.WEB_ORIGIN, credentials: true }),
+    }),
+  ],
+}).register(AppModule);
+```
+
+The tokens must be visible from the modules you register, as for app-wide middleware; a missing one
+stops startup with the usual error.
+
 ## Security headers
 
 `securityHeaders()` sends these by default:

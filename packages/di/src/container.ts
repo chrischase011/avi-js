@@ -20,6 +20,8 @@ export interface ContainerOptions {
    * itself. Visible in every module, as request-scoped providers.
    */
   readonly requestTokens?: readonly Token[];
+  /** Singletons with a fixed value, visible in every module, such as the app itself. Never disposed. */
+  readonly values?: ReadonlyMap<Token, unknown>;
 }
 
 /** Request-scoped instances for one request. */
@@ -80,6 +82,14 @@ const REQUEST_MODULE: ModuleRecord = {
   exported: new Map(),
 };
 
+const SUPPLIED_MODULE: ModuleRecord = {
+  definition: { name: 'app' },
+  name: 'app',
+  imports: [],
+  own: new Map(),
+  exported: new Map(),
+};
+
 /**
  * Builds and validates the module graph on construction. `init()` creates every singleton,
  * `dispose()` tears them down in reverse creation order.
@@ -117,6 +127,24 @@ export class Container {
         state: 'checked',
         instance: undefined,
         ready: undefined,
+      });
+    }
+
+    for (const [token, value] of options.values ?? []) {
+      this.#supplied.set(token, {
+        token,
+        kind: 'value',
+        scope: 'singleton',
+        deps: [],
+        create: () => value,
+        dispose: undefined,
+        module: SUPPLIED_MODULE,
+        links: [],
+        requestBound: false,
+        supplied: false,
+        state: 'checked',
+        instance: value,
+        ready: Promise.resolve(),
       });
     }
 

@@ -40,7 +40,8 @@ prisma.config.ts           schema path and DATABASE_URL
 src/
 ├── main.ts
 ├── app.module.ts
-├── prisma.module.ts       PrismaClient provider + Prisma error mapping
+├── config.ts              PORT and DATABASE_URL, validated at startup
+├── prisma.module.ts       PrismaClient from the config (defineFactory) + error mapping
 ├── schemas.ts             shared Valibot schemas
 ├── users/                 module, controller, service
 └── posts/                 module, controller, service

@@ -1,9 +1,36 @@
 # 11. OpenAPI documents
 
-> **Status: Runnable.** Everything on this page works today.
+> **Status: Runnable.** Everything on this page works today. `OpenApiModule` needs 0.7.0 or newer.
 
-`@avijs/openapi` builds an OpenAPI 3.1 document from an initialized app: every route, including
-routes created at runtime, with parameters, request bodies and responses taken from route schemas.
+`@avijs/openapi` builds an OpenAPI 3.1 document from your app: every route, including routes
+created at runtime, with parameters, request bodies and responses taken from route schemas.
+
+## Serve it
+
+Import `OpenApiModule` and the app serves its document at `/openapi.json`:
+
+```ts
+import { OpenApiModule } from '@avijs/openapi';
+
+@Module({
+  imports: [
+    OpenApiModule.forRoot({
+      info: { title: 'Greeter API', version: '1.0.0' },
+      servers: [{ url: 'https://api.example.com' }],
+      path: '/openapi.json', // the default
+    }),
+    UsersModule,
+  ],
+})
+export class AppModule {}
+```
+
+The document is built from the running app on the first request and then kept. Its own route is
+left out of it. To serve docs only outside production, import the module conditionally.
+
+## Generate it
+
+For a file, a build step or a test, `generateOpenApi` takes an initialized app:
 
 ```ts
 import { createAvi } from '@avijs/core';
@@ -12,19 +39,10 @@ import { generateOpenApi } from '@avijs/openapi';
 const app = createAvi().register(AppModule);
 await app.init();
 
-const document = generateOpenApi(app, {
-  info: { title: 'Greeter API', version: '1.0.0' },
-  servers: [{ url: 'https://api.example.com' }],
-});
+const document = generateOpenApi(app, { info: { title: 'Greeter API', version: '1.0.0' } });
 ```
 
-Serve it from the app itself:
-
-```ts
-const docs = defineController({
-  routes: [{ method: 'GET', path: '/openapi.json', handler: () => document }],
-});
-```
+`OpenApiModule.forRoot` takes the same options, plus `path`.
 
 ## What ends up in the document
 

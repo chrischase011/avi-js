@@ -100,6 +100,21 @@ const isAdmin: Guard = (ctx) => ctx.state.user?.role === 'admin';
 
 Guards run after all middleware, so authentication middleware can set `ctx.state.user` first.
 
+Behind `signedIn`, the user is always there, but `ctx.state.user` is still typed as optional, since
+the type cannot know which guards a route has. `ctx.need('user')` (from 0.7.0) returns it without
+`undefined`:
+
+```ts
+@Get('/me')
+@UseGuards(signedIn)
+me(ctx: Context) {
+  return ctx.need('user'); // { id: string; role: 'admin' | 'member' }
+}
+```
+
+If the value is missing, because the route lacks the guard that sets it, `ctx.need` throws: the
+client gets a 500 and the log says `ctx.state.user is not set: is a guard missing on this route?`.
+
 ## Classes with dependencies
 
 Middleware and guards can be classes with `use(ctx, next)` or `canActivate(ctx)`. Avi.js builds

@@ -9,7 +9,7 @@ import {
   type ModuleOptions,
   type ModuleRef,
 } from './module.js';
-import { REQUEST_TOKENS } from './request.js';
+import { APP, REQUEST_TOKENS } from './request.js';
 
 export interface ControllerDescription {
   readonly name: string;
@@ -45,7 +45,11 @@ export interface AppDescription {
  */
 export function describeApp(...roots: (ModuleRef | ModuleOptions)[]): AppDescription {
   const modules = roots.map((root) => toModule(root) ?? defineModule(root as ModuleOptions));
-  const container = new Container(modules, { requestTokens: REQUEST_TOKENS });
+  // No app exists here; APP only needs to resolve.
+  const container = new Container(modules, {
+    requestTokens: REQUEST_TOKENS,
+    values: new Map([[APP, undefined]]),
+  });
   checkConsumers(container);
   return describeModules(container);
 }

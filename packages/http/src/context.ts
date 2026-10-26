@@ -49,6 +49,11 @@ export interface Context<I extends object = NoInput, P extends object = Params> 
   readonly input: Readonly<I>;
   /** A fresh object for each request. */
   readonly state: AviState & Record<string, unknown>;
+  /**
+   * `ctx.state[key]`, which a guard or middleware set, typed without `undefined`. Throws (a 500)
+   * when it is missing, which means the route lacks the guard that sets it.
+   */
+  need<K extends keyof AviState>(key: K): NonNullable<AviState[K]>;
   /** Adds a response header. Headers from `reply()` or an `HttpError` win on conflict. */
   setHeader(name: string, value: string | number | readonly string[]): void;
   /** Reads the body as UTF-8 text, up to the body limit. */
@@ -111,6 +116,14 @@ export class RequestContext implements Context {
 
   get state(): AviState & Record<string, unknown> {
     return (this.#state ??= {});
+  }
+
+  need<K extends keyof AviState>(key: K): NonNullable<AviState[K]> {
+    const value = this.#state?.[key];
+    if (value === undefined || value === null) {
+      throw new Error(`ctx.state.${String(key)} is not set: is a guard missing on this route?`);
+    }
+    return value;
   }
 
   /** Headers collected through `setHeader`, if any. */

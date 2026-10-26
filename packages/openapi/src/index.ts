@@ -1,6 +1,18 @@
-import type { AviApp, RouteInfo, StandardSchemaV1 } from '@avijs/core';
+import {
+  APP,
+  defineController,
+  defineModule,
+  type AviApp,
+  type AviModule,
+  type RouteInfo,
+  type StandardSchemaV1,
+} from '@avijs/core';
 
 export type JsonSchema = Record<string, unknown>;
+
+// OpenApiModule's own route, left out of the document.
+const MODULE_NAME = 'OpenApiModule';
+const CONTROLLER_NAME = 'OpenApiController';
 
 export interface OpenApiOptions {
   info: { title: string; version: string; description?: string };
@@ -89,6 +101,7 @@ export function generateOpenApi(app: AviApp, options: OpenApiOptions): OpenApiDo
   let usesValidation = false;
 
   for (const route of [...app.routes()].sort(byPath)) {
+    if (route.module === MODULE_NAME && route.controller === CONTROLLER_NAME) continue;
     const { path, names } = openApiPath(route.path);
     const operation: Operation = { ...route.openapi, responses: {} };
     const parameters: Parameter[] = [];
@@ -185,3 +198,40 @@ function objectProperties(schema: JsonSchema | undefined): {
 function byPath(a: RouteInfo, b: RouteInfo): number {
   return a.path === b.path ? a.method.localeCompare(b.method) : a.path.localeCompare(b.path);
 }
+
+export interface OpenApiModuleOptions extends OpenApiOptions {
+  /** Where the document is served. Default `/openapi.json`. */
+  readonly path?: string;
+}
+
+export const OpenApiModule = {
+  /**
+   * Serves the app's OpenAPI document, built from its routes on the first request and then kept.
+   * Its own route is left out of the document.
+   */
+  forRoot(options: OpenApiModuleOptions): AviModule {
+    const { path = '/openapi.json', ...document } = options;
+    // Per app, so two apps registering this module never share a document.
+    const built = new WeakMap<AviApp, OpenApiDocument>();
+    return defineModule({
+      name: MODULE_NAME,
+      controllers: [
+        defineController({
+          name: CONTROLLER_NAME,
+          inject: [APP],
+          routes: (app) => [
+            {
+              method: 'GET',
+              path,
+              handler: () => {
+                let found = built.get(app);
+                if (!found) built.set(app, (found = generateOpenApi(app, document)));
+                return found;
+              },
+            },
+          ],
+        }),
+      ],
+    });
+  },
+};

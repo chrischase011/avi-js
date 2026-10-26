@@ -3,6 +3,7 @@ import {
   Get,
   createAvi,
   defineController,
+  defineModule,
   route,
   type AviApp,
   type StandardSchemaV1,
@@ -11,7 +12,7 @@ import { toJsonSchema as valibotToJsonSchema } from '@valibot/to-json-schema';
 import * as v from 'valibot';
 import { z } from 'zod';
 import { afterEach, describe, expect, it } from 'vitest';
-import { generateOpenApi, openApiPath, type JsonSchema } from '../src/index.js';
+import { OpenApiModule, generateOpenApi, openApiPath, type JsonSchema } from '../src/index.js';
 
 /** A schema that validates nothing but carries Standard JSON Schema converters. */
 function documented(json: JsonSchema): StandardSchemaV1 {
@@ -277,5 +278,61 @@ describe('generateOpenApi with schema libraries', () => {
       (schema) => valibotToJsonSchema(schema as never, { errorMode: 'ignore' }),
     );
     expect(operation).toMatchObject(expected);
+  });
+});
+
+describe('OpenApiModule', () => {
+  const users = defineController({
+    prefix: '/users',
+    routes: [
+      route({ method: 'GET', path: '/:id', schema: { params: UserParams }, handler: () => 1 }),
+    ],
+  });
+  const info = { title: 'Users', version: '1.0.0' };
+
+  async function serve(app: AviApp): Promise<string> {
+    running.push(app);
+    const { port } = await app.listen(0, '127.0.0.1');
+    return `http://127.0.0.1:${String(port)}`;
+  }
+
+  it('serves the document of the running app, without its own route', async () => {
+    const docs = OpenApiModule.forRoot({ info });
+    const base = await serve(
+      createAvi({ startupSummary: false }).register({ imports: [docs], controllers: [users] }),
+    );
+    const document = (await (await fetch(`${base}/openapi.json`)).json()) as {
+      info: unknown;
+      paths: Record<string, unknown>;
+    };
+    expect(document.info).toEqual(info);
+    expect(Object.keys(document.paths)).toEqual(['/users/{id}']);
+    expect(await (await fetch(`${base}/openapi.json`)).json()).toEqual(document);
+  });
+
+  it('serves at a custom path and documents prefixed modules', async () => {
+    const api = defineModule({ prefix: '/api', controllers: [users] });
+    const docs = OpenApiModule.forRoot({ info, path: '/docs.json' });
+    const base = await serve(
+      createAvi({ startupSummary: false }).register({ imports: [api, docs] }),
+    );
+    const document = (await (await fetch(`${base}/docs.json`)).json()) as {
+      paths: Record<string, unknown>;
+    };
+    expect(Object.keys(document.paths)).toEqual(['/api/users/{id}']);
+  });
+
+  it('builds one document per app when two apps share the module', async () => {
+    const docs = OpenApiModule.forRoot({ info });
+    const withUsers = await serve(
+      createAvi({ startupSummary: false }).register({ imports: [docs], controllers: [users] }),
+    );
+    const empty = await serve(createAvi({ startupSummary: false }).register({ imports: [docs] }));
+    const paths = async (base: string) =>
+      Object.keys(
+        ((await (await fetch(`${base}/openapi.json`)).json()) as { paths: object }).paths,
+      );
+    expect(await paths(withUsers)).toEqual(['/users/{id}']);
+    expect(await paths(empty)).toEqual([]);
   });
 });

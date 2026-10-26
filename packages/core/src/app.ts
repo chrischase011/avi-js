@@ -8,6 +8,7 @@ import {
   type HttpMethod,
   type Logger,
   type Middleware,
+  type RequestHook,
   type RouteDefinition,
   type ServerOptions,
 } from '@avijs/http';
@@ -20,6 +21,7 @@ import { isConfigToken } from './config.js';
 import { joinPath, type ControllerDefinition } from './controller.js';
 import { checkConsumers, injectOf } from './consumers.js';
 import { describeModules, firstDifference, type AppDescription } from './describe.js';
+import { isHookDefinition, type HookDefinition } from './hooks.js';
 import {
   defineModule,
   toModule,
@@ -36,7 +38,7 @@ import {
   type MiddlewareRef,
   type RouteDocs,
 } from './pipeline.js';
-import { REQUEST, REQUEST_TOKENS } from './request.js';
+import { APP, REQUEST, REQUEST_TOKENS } from './request.js';
 import {
   addressUrl,
   formatSummary,
@@ -48,7 +50,12 @@ import {
 
 const { version } = createRequire(import.meta.url)('../package.json') as { version: string };
 
-export interface AviOptions extends ServerOptions {
+export interface AviOptions extends Omit<ServerOptions, 'onRequest'> {
+  /**
+   * Run in order before routing, for every request. A hook that needs providers, such as the
+   * config, comes from `defineHook`.
+   */
+  onRequest?: readonly (RequestHook | HookDefinition)[];
   /** Runs first, for every route. */
   middleware?: readonly MiddlewareRef[];
   /** Checked first, for every route. */
@@ -126,6 +133,7 @@ class Application implements AviApp {
   readonly #guards: readonly GuardRef[];
   readonly #manifest: AppDescription | undefined;
   readonly #overrides: readonly Provider[];
+  readonly #lateHooks: { definition: HookDefinition; hook: RequestHook | undefined }[] = [];
   readonly #logger: Logger;
   readonly #summary: false | 'basic' | 'routes';
   readonly #createdAt = performance.now();
@@ -136,7 +144,18 @@ class Application implements AviApp {
   #init: Promise<void> | undefined;
 
   constructor(options: AviOptions) {
-    this.#server = new HttpServer(this.#router, options);
+    // defineHook hooks are created at init; until then their slot passes every request on.
+    const hooks = options.onRequest;
+    // Anything but an array goes to the HTTP server as is, which rejects it.
+    const onRequest = Array.isArray(hooks)
+      ? hooks.map((hook: RequestHook | HookDefinition): RequestHook => {
+          if (!isHookDefinition(hook)) return hook;
+          const slot = { definition: hook, hook: undefined as RequestHook | undefined };
+          this.#lateHooks.push(slot);
+          return (ctx) => slot.hook?.(ctx);
+        })
+      : (hooks as readonly RequestHook[] | undefined);
+    this.#server = new HttpServer(this.#router, { ...options, onRequest });
     this.#middleware = checkRefs(options.middleware, 'use', 'App middleware');
     this.#guards = checkRefs(options.guards, 'canActivate', 'App guards');
     this.#manifest = options.manifest;
@@ -226,6 +245,7 @@ class Application implements AviApp {
     const container = new Container(this.#roots, {
       overrides: this.#overrides,
       requestTokens: REQUEST_TOKENS,
+      values: new Map([[APP, this]]),
     });
     const modules = container.modules as AviModule[];
     const report = this.#report;
@@ -238,6 +258,14 @@ class Application implements AviApp {
     report.providers = container.describe().reduce((sum, m) => sum + m.providers.length, 0);
     report.configVariables = countConfig(container, modules);
     try {
+      for (const slot of this.#lateHooks) {
+        const deps = slot.definition.inject.map((token) => container.get(token));
+        const hook: unknown = slot.definition.create(...(deps as never[]));
+        if (typeof hook !== 'function') {
+          throw new TypeError('defineHook: create must return a request hook function');
+        }
+        slot.hook = hook as RequestHook;
+      }
       this.#step = 'Routes';
       const appScope = new Pipeline((token) => container.get(token));
       const appMiddleware = appScope.middleware(this.#middleware);

@@ -113,7 +113,12 @@ describe('readForm', () => {
   });
 
   it.each<[string, ReadFormOptions, [string, string | Blob, string?][], RegExp]>([
-    ['a file over fileSize', { fileSize: 4 }, [['f', file('12345'), 'a.txt']], /File f is larger/],
+    [
+      'a file over fileSize',
+      { fileSize: 4 },
+      [['f', file('12345'), 'a.txt']],
+      /File "f" is larger/,
+    ],
     [
       'too many files',
       { files: 1 },
@@ -132,7 +137,7 @@ describe('readForm', () => {
       ],
       /More than 1 fields/,
     ],
-    ['a field over fieldSize', { fieldSize: 3 }, [['a', '1234']], /Field a is larger/],
+    ['a field over fieldSize', { fieldSize: 3 }, [['a', '1234']], /Field "a" is larger/],
     [
       'too many parts',
       { parts: 1 },
@@ -214,7 +219,7 @@ describe('readForm', () => {
     expect(rejected).toEqual({
       status: 415,
       body: expect.objectContaining({
-        message: 'File doc has type text/html; expected image/*, application/PDF',
+        message: 'File "doc" has type text/html; expected image/*, application/PDF',
       }) as unknown,
     });
   });
@@ -230,6 +235,26 @@ describe('readForm', () => {
 });
 
 describe('multipart', () => {
+  it('reports a file part size once its stream has ended', async () => {
+    const { url } = await serve(async (ctx) => {
+      const sizes: number[] = [];
+      for await (const part of multipart(ctx)) {
+        if (part.kind !== 'file') continue;
+        await part.stream.toArray();
+        sizes.push(part.size);
+      }
+      return sizes;
+    });
+    const res = await post(
+      url,
+      form([
+        ['a', file('x'.repeat(300_000)), 'a.bin'],
+        ['b', file('hé')],
+      ]),
+    );
+    expect(res.body).toEqual([300_000, 3]);
+  });
+
   it('streams parts in order and discards files the caller skips', async () => {
     const { url } = await serve(async (ctx) => {
       const seen: string[] = [];

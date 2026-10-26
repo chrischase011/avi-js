@@ -109,7 +109,9 @@ async function create(args: readonly string[]): Promise<number> {
 Next:
   cd ${path.relative(process.cwd(), target) || '.'}
   npm install
-  npm run dev`);
+  npm run dev
+
+To track it in git: git init && git add -A && git commit -m "Create project"`);
   return 0;
 }
 

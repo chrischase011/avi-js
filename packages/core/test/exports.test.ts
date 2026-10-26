@@ -13,6 +13,7 @@ describe('@avijs/core', () => {
 
   it('exposes only the documented runtime exports', () => {
     expect(Object.keys(core).sort()).toEqual([
+      'APP',
       'AviFactory',
       'ConfigError',
       'Controller',
@@ -35,6 +36,7 @@ describe('@avijs/core', () => {
       'defineConfig',
       'defineController',
       'defineFactory',
+      'defineHook',
       'defineModule',
       'describeApp',
       'jsonLogger',

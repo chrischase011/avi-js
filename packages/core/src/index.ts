@@ -31,7 +31,7 @@ export type { CheckInject } from './decorators.js';
 export { defineModule } from './module.js';
 export type { AviModule, ModuleOptions, ModuleRef } from './module.js';
 export { route } from './pipeline.js';
-export { REQUEST } from './request.js';
+export { APP, REQUEST } from './request.js';
 export type {
   GuardClass,
   GuardRef,
@@ -81,6 +81,8 @@ export type {
   SseSource,
 } from '@avijs/http';
 export { createToken, defineFactory } from '@avijs/di';
+export { defineHook } from './hooks.js';
+export type { HookDefinition } from './hooks.js';
 export type {
   Class,
   ClassProvider,

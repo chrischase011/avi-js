@@ -1,7 +1,8 @@
 # 15. Typed client
 
 > **Status: Runnable from 0.3.0.** `avi dev` updating `api.gen.ts`, `avi build`, `api.events()`,
-> numbers in queries and the declarations for a Vite frontend need 0.6.0 or newer.
+> numbers in queries and the declarations for a Vite frontend need 0.6.0 or newer; `ResponseOf` and
+> the other type helpers need 0.7.0.
 
 Your routes already know their paths, schemas and results. `avi client` turns that into one
 `Api` type, and `@avijs/client` calls your API with it: paths autocomplete, a wrong body fails to
@@ -142,6 +143,19 @@ try {
 
 `@avijs/client` has no dependencies and runs anywhere `fetch` does: browsers, Node.js, Bun, Deno
 and workers.
+
+## Naming the types
+
+To name a type in your frontend, such as a component's props, pick it out of `Api` by its key:
+
+```ts
+import type { BodyOf, ResponseOf } from '@avijs/client';
+
+type Team = ResponseOf<Api, 'GET /teams'>[number];
+type NewTask = BodyOf<Api, 'POST /projects/:projectId/tasks'>;
+```
+
+`QueryOf` and `ParamsOf` work the same way.
 
 ## Live events
 

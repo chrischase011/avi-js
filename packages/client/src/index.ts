@@ -65,12 +65,21 @@ export type RequestOptions<E> = (E extends EndpointShape
 export type RequestArgs<E> =
   object extends RequestOptions<E> ? [options?: RequestOptions<E>] : [options: RequestOptions<E>];
 
-type ResponseOf<E> = E extends EndpointShape ? E['response'] : never;
+type EndpointResponse<E> = E extends EndpointShape ? E['response'] : never;
+
+/** The JSON response of an endpoint: `ResponseOf<Api, 'GET /teams'>`. */
+export type ResponseOf<A, K extends keyof A> = EndpointResponse<A[K]>;
+/** The request body an endpoint takes: `BodyOf<Api, 'POST /teams'>`. */
+export type BodyOf<A, K extends keyof A> = A[K] extends EndpointShape ? A[K]['body'] : never;
+/** The query an endpoint takes, before the client stringifies it. */
+export type QueryOf<A, K extends keyof A> = A[K] extends EndpointShape ? A[K]['query'] : never;
+/** The path parameters of an endpoint. */
+export type ParamsOf<A, K extends keyof A> = A[K] extends EndpointShape ? A[K]['params'] : never;
 
 type Call<A, M extends Method> = <P extends PathsOf<A, M>>(
   path: P,
   ...args: RequestArgs<EndpointAt<A, M, P>>
-) => Promise<ResponseOf<EndpointAt<A, M, P>>>;
+) => Promise<EndpointResponse<EndpointAt<A, M, P>>>;
 
 type RawCall<A, M extends Method> = <P extends PathsOf<A, M>>(
   path: P,

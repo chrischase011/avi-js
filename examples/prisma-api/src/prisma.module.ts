@@ -1,20 +1,24 @@
-import { HttpError, Module } from '@avijs/core';
+import { HttpError, Module, defineFactory } from '@avijs/core';
 import { PrismaLibSql } from '@prisma/adapter-libsql';
+import { Config } from './config.js';
 import { Prisma, PrismaClient } from './generated/prisma/client.js';
 
 /** One PrismaClient for the whole app: connected before the server starts, closed on shutdown. */
 @Module({
+  imports: [Config.module],
   providers: [
-    {
+    defineFactory({
       provide: PrismaClient,
-      useFactory: async () => {
-        const url = process.env['DATABASE_URL'] ?? 'file:./dev.db';
-        const prisma = new PrismaClient({ adapter: new PrismaLibSql({ url }) });
+      inject: [Config],
+      useFactory: async (config) => {
+        const prisma = new PrismaClient({
+          adapter: new PrismaLibSql({ url: config.DATABASE_URL }),
+        });
         await prisma.$connect();
         return prisma;
       },
-      dispose: (prisma: PrismaClient) => prisma.$disconnect(),
-    },
+      dispose: (prisma) => prisma.$disconnect(),
+    }),
   ],
   exports: [PrismaClient],
 })

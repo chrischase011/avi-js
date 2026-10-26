@@ -38,6 +38,8 @@ export interface FilePart {
   readonly mimeType: string;
   /** The file's bytes. Read or pipe it before asking for the next part. */
   readonly stream: Readable;
+  /** Bytes received so far: the file's size once `stream` has ended. */
+  readonly size: number;
 }
 
 export type Part = FieldPart | FilePart;
@@ -113,7 +115,7 @@ export async function* multipart(
       fail(
         new HttpError(
           415,
-          `File ${name} has type ${mimeType || '(none)'}; expected ${(options.accept ?? []).join(', ')}`,
+          `File ${JSON.stringify(name)} has type ${mimeType || '(none)'}; expected ${(options.accept ?? []).join(', ')}`,
         ),
       );
       return;
@@ -142,14 +144,27 @@ export async function* multipart(
       notify();
     });
     source.once('limit', () => {
-      fail(tooLarge(`File ${name} is larger than ${String(max.fileSize)} bytes`));
+      fail(tooLarge(`File ${JSON.stringify(name)} is larger than ${String(max.fileSize)} bytes`));
     });
-    queue.push({ kind: 'file', name, filename, mimeType, stream });
+    let size = 0;
+    source.on('data', (chunk: Buffer) => {
+      size += chunk.length;
+    });
+    queue.push({
+      kind: 'file',
+      name,
+      filename,
+      mimeType,
+      stream,
+      get size() {
+        return size;
+      },
+    });
     notify();
   });
   busboy.on('field', (name, value, _nameTruncated, valueTruncated) => {
     if (valueTruncated) {
-      fail(tooLarge(`Field ${name} is larger than ${String(max.fieldSize)} bytes`));
+      fail(tooLarge(`Field ${JSON.stringify(name)} is larger than ${String(max.fieldSize)} bytes`));
       return;
     }
     queue.push({ kind: 'field', name, value });

@@ -668,3 +668,28 @@ describe('request scope', () => {
     });
   });
 });
+
+describe('values', () => {
+  it('supplies fixed values to every module, and never disposes them', async () => {
+    const Root = createToken<{ name: string; [Symbol.dispose](): void }>('Root');
+    let disposed = false;
+    const root = {
+      name: 'app',
+      [Symbol.dispose]: () => {
+        disposed = true;
+      },
+    };
+    const Name = createToken<string>('Name');
+    const inner = mod('Inner', {
+      providers: [{ provide: Name, useFactory: (r: typeof root) => r.name, inject: [Root] }],
+      exports: [Name],
+    });
+    const c = new Container([mod('App', { imports: [inner] })], {
+      values: new Map([[Root, root]]),
+    });
+    await c.init();
+    expect(c.get(Name)).toBe('app');
+    await c.dispose();
+    expect(disposed).toBe(false);
+  });
+});
