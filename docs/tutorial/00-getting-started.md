@@ -7,6 +7,18 @@ a feature with the CLI.
 
 You need **Node.js 22.12 or newer**. Check with `node --version`.
 
+## Try it in your browser
+
+The project this chapter creates, running on StackBlitz: edit a file and the server restarts.
+[Open it in a new tab](https://stackblitz.com/github/chrischase011/avi-js-example-app/tree/main/stackblitz?file=src/modules/users/users.controller.ts&initialpath=/users).
+
+<iframe
+  src="https://stackblitz.com/github/chrischase011/avi-js-example-app/tree/main/stackblitz?embed=1&file=src/modules/users/users.controller.ts&initialpath=/users"
+  title="Avi.js starter on StackBlitz"
+  loading="lazy"
+  style="width: 100%; height: 600px; border: 0; border-radius: 8px"
+></iframe>
+
 ## Create a project
 
 ```sh

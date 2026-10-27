@@ -20,3 +20,22 @@ pnpm --filter @avijs/example-crud-api start
 ```
 
 `prisma-api` is a standalone app that installs Avi.js from npm; see its README.
+
+## Run in your browser
+
+[avi-js-example-app](https://github.com/chrischase011/avi-js-example-app) is a larger app: a team
+task tracker with sign-in, roles, projects, tasks, file uploads, live updates, OpenAPI, a React
+frontend with the typed client, and end-to-end tests. Its main branch uses Prisma and SQLite.
+StackBlitz cannot run Prisma's native engines, so this version keeps the data in memory, and the
+API and the React app start together.
+[Open it in a new tab](https://stackblitz.com/github/chrischase011/avi-js-example-app/tree/stackblitz?file=src/modules/tasks/tasks.service.ts).
+
+<iframe
+  src="https://stackblitz.com/github/chrischase011/avi-js-example-app/tree/stackblitz?embed=1&file=src/modules/tasks/tasks.service.ts"
+  title="Avi.js example app on StackBlitz"
+  loading="lazy"
+  style="width: 100%; height: 600px; border: 0; border-radius: 8px"
+></iframe>
+
+The project `npm create avi` makes is in [chapter 0](https://chrischase011.github.io/avi-js/tutorial/00-getting-started#try-it-in-your-browser),
+ready to edit in the browser too.
