@@ -3,7 +3,7 @@ import path from 'node:path';
 import ts from 'typescript';
 import { formatDiagnostic, type Diagnostic } from './check.js';
 import { generateFrom, sameContent } from './client.js';
-import { INJECT_HEADER, generateInjectsFrom } from './inject.js';
+import { INJECT_HEADER, generateInjectsFrom, plural } from './inject.js';
 
 export interface WatchProjectOptions {
   /** Path to tsconfig.json. */
@@ -104,7 +104,7 @@ export function clientWriter(out: string, root: string | undefined) {
 export function injectWriter(out: string) {
   return fileWriter(out, INJECT_HEADER, (program, roots, file) => {
     const result = generateInjectsFrom(program, roots, { out: file });
-    return { ...result, summary: `${String(result.classes.length)} dependency lists` };
+    return { ...result, summary: plural(result.classes.length, 'dependency list') };
   });
 }
 

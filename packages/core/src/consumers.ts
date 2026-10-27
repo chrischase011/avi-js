@@ -1,4 +1,4 @@
-import type { Container, Token } from '@avijs/di';
+import { resolveInjects, type Container, type Token } from '@avijs/di';
 import type { AviModule } from './module.js';
 import { isClass, type GuardClass, type GuardRef, type MiddlewareRef } from './pipeline.js';
 
@@ -29,5 +29,6 @@ export function checkConsumers(container: Container): void {
 }
 
 export function injectOf(cls: { readonly inject?: readonly Token[] }): readonly Token[] {
+  resolveInjects();
   return cls.inject ?? [];
 }

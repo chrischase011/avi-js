@@ -146,14 +146,15 @@ describe.each(TEMPLATES.flatMap((t) => VALIDATORS.map((v) => [t, v] as const)))(
     }, 60_000);
 
     it('builds with avi build, dropping compiled files whose source is gone', async () => {
-      const stale = path.join(project, 'dist/modules/old/old.test.js');
-      await mkdir(path.dirname(stale), { recursive: true });
-      await writeFile(stale, 'throw new Error("stale");');
+      const source = path.join(project, 'src/old.test.ts');
+      const compiled = path.join(project, 'dist/old.test.js');
       const build = () => main(['build', '--project', path.join(project, 'tsconfig.json')]);
-      // The first avi build in a folder tsc already wrote only marks it.
+      await writeFile(source, 'export const old = 1;\n');
       expect(await build()).toBe(0);
+      expect(existsSync(compiled)).toBe(true);
+      await rm(source);
       expect(await build()).toBe(0);
-      expect(existsSync(stale)).toBe(false);
+      expect(existsSync(compiled)).toBe(false);
       expect(existsSync(path.join(project, 'dist/main.js'))).toBe(true);
     }, 60_000);
 
@@ -266,28 +267,26 @@ describe.each(TEMPLATES.flatMap((t) => VALIDATORS.map((v) => [t, v] as const)))(
       60_000,
     );
 
-    it.runIf(template === 'modular')(
-      'ships the dependency lists avi inject generates, and no static inject',
-      async () => {
-        const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
-        const code = await main([
-          'inject',
-          '--project',
-          path.join(project, 'tsconfig.json'),
-          '--out',
-          path.join(project, 'src/inject.gen.ts'),
-          '--check',
-        ]);
-        log.mockRestore();
-        expect(code).toBe(0);
+    it('ships the dependency lists avi inject generates, and no static inject', async () => {
+      const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+      const code = await main([
+        'inject',
+        '--project',
+        path.join(project, 'tsconfig.json'),
+        '--out',
+        path.join(project, 'src/inject.gen.ts'),
+        '--check',
+      ]);
+      log.mockRestore();
+      expect(code).toBe(0);
+      if (template === 'modular') {
         const controller = await readFile(
           path.join(project, 'src/modules/users/users.controller.ts'),
           'utf8',
         );
         expect(controller).not.toContain('static inject');
-      },
-      60_000,
-    );
+      }
+    }, 60_000);
   },
 );
 
@@ -639,6 +638,10 @@ describe('avi usage mistakes', () => {
     expect(await main(['generate', '--help'])).toBe(0);
     expect(await main(['new', 'x', '-h'])).toBe(0);
     expect(String(log.mock.calls[0]?.[0])).toContain('Usage:');
+    expect(await main(['--version'])).toBe(0);
+    expect(log).toHaveBeenLastCalledWith(expect.stringMatching(/^\d+\.\d+\.\d+/));
+    expect(await main(['g', '--help'])).toBe(0);
+    expect(String(log.mock.lastCall?.[0])).not.toContain('avi dev');
     expect(await main(['build', '--nope'])).toBe(2);
     expect(String(error.mock.calls[0]?.[0])).toContain("Unknown option '--nope'");
     log.mockRestore();

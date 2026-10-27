@@ -28,3 +28,14 @@ export class UsersRepo {
 export class Profiles {
   constructor(readonly user: User) {}
 }
+
+// An object with a description is not a token: only createToken and defineConfig make them.
+export interface Product {
+  name: string;
+}
+export const Product = { description: 'A product' };
+
+@Injectable()
+export class Catalog {
+  constructor(readonly product: Product) {}
+}

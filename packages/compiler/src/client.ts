@@ -55,9 +55,15 @@ export function generateFrom(
   return generator.finish();
 }
 
-/** Formatters may rewrap the file; only the content counts. */
+/**
+ * Formatters may rewrap a generated file; only the content counts. Whitespace and semicolons
+ * outside strings, and trailing commas, are what formatters change; other commas are content.
+ */
 export const sameContent = (a: string, b: string): boolean => squash(a) === squash(b);
-const squash = (text: string) => text.replace(/[\s,;]+/g, '');
+const squash = (text: string) =>
+  text
+    .replace(/'[^'\n]*'|"[^"\n]*"|[\s;]+/g, (match) => (/^['"]/.test(match) ? match : ''))
+    .replace(/,(?=[\])}])/g, '');
 
 interface Found {
   readonly method: string;

@@ -34,6 +34,10 @@ same name: `PrismaClient`, `Config` with `type Config = TokenType<typeof Config>
 `createToken<Db>('Db')` next to `interface Db`. For anything else, such as a `string`, the build
 warns (`AVI201`) and names the class. Outside `avi dev`, `avi inject` writes the file once.
 
+The lists are loaded by the import in `app.module.ts`. An entry point that does not import the app
+module, such as a worker built from a few modules, imports `./inject.gen.js` itself; a test that
+registers single providers does the same.
+
 **Written by you.** A class can always list its dependencies in `static inject`. A list in the
 class wins over a generated one, and it needs no build step:
 

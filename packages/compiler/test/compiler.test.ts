@@ -359,7 +359,7 @@ describe('watchProject', { timeout: 60_000 }, () => {
       ),
     );
     await rebuilt;
-    expect(log).toHaveBeenCalledWith(`${out} updated: 3 dependency lists`);
+    expect(log).toHaveBeenCalledWith(`${out} updated: 5 dependency lists`);
     expect(await readFile(out, 'utf8')).toContain('[UsersController, [UsersService, Clock]],');
   });
 
@@ -432,24 +432,22 @@ describe('buildProject', () => {
     return path.join(dir, 'tsconfig.json');
   };
 
-  it('removes compiled files whose source is gone, from the second build on', async () => {
+  it('removes what an earlier build compiled from a source that is gone, and nothing else', async () => {
     const config = await project('dist', 'export const a = 1;');
     const root = path.dirname(config);
-    const stale = path.join(root, 'dist/old/old.test.js');
-    const mine = path.join(root, 'dist/index.html');
-    await mkdir(path.dirname(stale), { recursive: true });
-    await writeFile(stale, 'throw new Error("stale")');
-    await writeFile(mine, '<html>');
-
-    // The first build only marks the folder: it may hold things avi build did not write.
+    await mkdir(path.join(root, 'src/old'));
+    await writeFile(path.join(root, 'src/old/old.test.ts'), 'export const old = 1;');
     expect(buildProject({ project: config })).toBe(0);
-    expect(existsSync(stale)).toBe(true);
-    expect(existsSync(path.join(root, 'dist/.avi-build'))).toBe(true);
+    expect(existsSync(path.join(root, 'dist/old/old.test.js'))).toBe(true);
 
+    // Files avi build did not write stay, compiled-looking or not.
+    await writeFile(path.join(root, 'dist/handwritten.js'), '');
+    await writeFile(path.join(root, 'dist/index.html'), '<html>');
+    await rm(path.join(root, 'src/old'), { recursive: true });
     expect(buildProject({ project: config })).toBe(0);
-    expect(existsSync(stale)).toBe(false);
     expect(existsSync(path.join(root, 'dist/old'))).toBe(false);
-    expect(existsSync(mine)).toBe(true);
+    expect(existsSync(path.join(root, 'dist/handwritten.js'))).toBe(true);
+    expect(existsSync(path.join(root, 'dist/index.html'))).toBe(true);
     expect(existsSync(path.join(root, 'dist/a.js'))).toBe(true);
   });
 
@@ -493,13 +491,35 @@ describe('buildProject', () => {
     dirs.push(linked);
     await symlink(real, path.join(linked, 'p'), 'junction');
     const via = path.join(linked, 'p', 'tsconfig.json');
-    const stale = path.join(real, 'dist/gone.js');
 
+    await writeFile(path.join(real, 'src/gone.ts'), 'export const gone = 1;');
     expect(buildProject({ project: via })).toBe(0);
-    await writeFile(stale, '');
+    expect(existsSync(path.join(real, 'dist/gone.js'))).toBe(true);
+    await rm(path.join(real, 'src/gone.ts'));
     expect(buildProject({ project: via })).toBe(0);
-    expect(existsSync(stale)).toBe(false);
+    expect(existsSync(path.join(real, 'dist/gone.js'))).toBe(false);
     expect(existsSync(path.join(real, 'dist/a.js'))).toBe(true);
+  });
+
+  it('keeps output compiled from sources outside include, such as a sibling folder', async () => {
+    dirs.push(await mkdtemp(path.join(tmpdir(), 'avi-sibling-')));
+    const root = dirs.at(-1) as string;
+    await mkdir(path.join(root, 'src'));
+    await mkdir(path.join(root, 'shared'));
+    await writeFile(path.join(root, 'shared/x.ts'), 'export const x = 1;');
+    await writeFile(
+      path.join(root, 'src/main.ts'),
+      "import { x } from '../shared/x.js';\nexport const y = x;",
+    );
+    const compilerOptions = { outDir: 'dist', module: 'nodenext', types: [], skipLibCheck: true };
+    await writeFile(
+      path.join(root, 'tsconfig.json'),
+      JSON.stringify({ compilerOptions, include: ['src'] }),
+    );
+    const config = path.join(root, 'tsconfig.json');
+    expect(buildProject({ project: config })).toBe(0);
+    expect(buildProject({ project: config })).toBe(0);
+    expect(existsSync(path.join(root, 'dist/shared/x.js'))).toBe(true);
   });
 
   it('counts client generation errors, so a failed client fails the build', async () => {
@@ -565,8 +585,20 @@ describe('generateInjects', { timeout: 60_000 }, () => {
     const result = generate();
     expect(result.source).toBe(await readFile(path.join(dir, 'src/inject.gen.ts'), 'utf8'));
     // Explicit has static inject; Money takes a number and is not a DI class. Db is a constructor
-    // and Mailer a token, each named like its type.
-    expect(result.classes).toEqual(['UsersRepo', 'UsersController', 'UsersService']);
+    // and Mailer a token, each named like its type. The abstract Repo gets a list its subclass
+    // inherits, WithOptional leaves its optional parameter out, and seed.ts, which the app never
+    // imports, is not imported either.
+    expect(result.classes).toEqual([
+      'UsersRepo',
+      'Repo',
+      'WithOptional',
+      'UsersController',
+      'UsersService',
+    ]);
+    expect(result.source).not.toContain('seed');
+    expect(result.source).toContain('[WithOptional, [Clock]],');
+    // A function, so classes in an import cycle with the file exist when it runs.
+    expect(result.source).toContain('registerInjects(() => [');
   });
 
   it('warns about a DI class it cannot complete, and one it cannot import', () => {
@@ -576,6 +608,11 @@ describe('generateInjects', { timeout: 60_000 }, () => {
       [
         'AVI201',
         'Cannot infer what to inject for `user` of Profiles: only classes and tokens named like their type can be inferred; add static inject',
+      ],
+      // Product is an object with a description, not a token made by createToken.
+      [
+        'AVI201',
+        'Cannot infer what to inject for `product` of Catalog: only classes and tokens named like their type can be inferred; add static inject',
       ],
       [
         'AVI201',

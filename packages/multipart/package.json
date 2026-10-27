@@ -1,6 +1,6 @@
 {
   "name": "@avijs/multipart",
-  "version": "1.0.0-rc.3",
+  "version": "1.0.0-rc.4",
   "description": "Streaming file uploads (multipart/form-data) for Avi.js.",
   "keywords": [
     "avi",

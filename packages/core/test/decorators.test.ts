@@ -177,15 +177,19 @@ describe('misuse', () => {
     expect(() => createAvi().register(Plain)).toThrow('Plain is not a module: add @Module()');
   });
 
-  it('checks static inject length at runtime too', () => {
+  it('checks static inject length at runtime too, when the app starts', async () => {
     // @ts-expect-error the compile-time check catches this first
     @Controller()
     class NeedsDb {
       static inject = [] as const;
       constructor(readonly db: unknown) {}
     }
-    expect(() => defineModule({ controllers: [NeedsDb as never] })).toThrow(
-      'NeedsDb takes 1 constructor arguments but static inject lists 0',
+    // Read at startup, not when the module loads: a generated list may come later.
+    const app = createAvi({ startupSummary: false }).register(
+      defineModule({ controllers: [NeedsDb] }),
+    );
+    await expect(app.init()).rejects.toThrow(
+      'NeedsDb takes 1 constructor argument but static inject lists 0',
     );
   });
 });

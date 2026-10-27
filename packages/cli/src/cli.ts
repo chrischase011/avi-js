@@ -36,11 +36,22 @@ ${GENERATE_USAGE}
       file is out of date, for CI; --watch updates it on every change.
   avi inject [--out src/inject.gen.ts] [--project tsconfig.json] [--check | --watch]
       Infer the dependency lists of classes without static inject from their constructor
-      types, for src/inject.gen.ts. --check fails when the file is out of date.`;
+      types, for src/inject.gen.ts. --check fails when the file is out of date.
+  avi --version`;
 
 export async function main(argv: readonly string[]): Promise<number> {
+  if (argv[0] === '--version' || argv[0] === '-v') {
+    console.log(version);
+    return 0;
+  }
   if (argv.includes('--help') || argv.includes('-h')) {
-    console.log(USAGE);
+    const generating = argv[0] === 'generate' || argv[0] === 'g';
+    console.log(
+      generating
+        ? `Usage:
+${GENERATE_USAGE}`
+        : USAGE,
+    );
     return 0;
   }
   try {
@@ -95,7 +106,7 @@ async function create(args: readonly string[]): Promise<number> {
   if (positionals.length > 1) {
     // npm create keeps unknown flags for itself and passes their values on as arguments.
     console.error(
-      `Unexpected argument "${String(positionals[1])}". With npm create, put options after --: npm create avi@latest ${String(name)} -- --template minimal`,
+      `Unexpected argument "${String(positionals[1])}". With npm create, put options after --: npm create avi@${version.includes('-') ? 'next' : 'latest'} ${String(name)} -- --template minimal`,
     );
     return 2;
   }
@@ -177,7 +188,6 @@ async function dev(args: readonly string[]): Promise<number> {
     const watcher = watchProject({
       project: values.project,
       ...(client ? { client: { out: client, root: values.root } } : {}),
-      ...(inject ? { inject: { out: inject } } : {}),
       ...(inject ? { inject: { out: inject } } : {}),
       onBuild: (errors) => {
         if (errors > 0 || app) return;

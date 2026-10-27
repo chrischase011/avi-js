@@ -1,6 +1,6 @@
 {
   "name": "@avijs/openapi",
-  "version": "1.0.0-rc.3",
+  "version": "1.0.0-rc.4",
   "description": "OpenAPI 3.1 documents for Avi.js apps.",
   "keywords": [
     "avi",

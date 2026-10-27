@@ -1,5 +1,5 @@
 // Decorated classes map to the same definitions the explicit API produces.
-import type { Class, Scope, Token } from '@avijs/di';
+import { injectListError, resolveInjects, type Class, type Scope, type Token } from '@avijs/di';
 import type { HttpMethod } from '@avijs/http';
 import type { RouteSchema } from '@avijs/validation';
 import type { ControllerDefinition } from './controller.js';
@@ -80,13 +80,20 @@ export function controllerFromClass(cls: Class): ControllerDefinition {
     throw new TypeError(`${cls.name || 'This class'} is not a controller: add @Controller()`);
   }
 
-  const inject = (cls as { inject?: unknown }).inject ?? [];
-  if (!Array.isArray(inject)) throw new TypeError(`${cls.name}.inject must be an array of tokens`);
-  if (cls.length > inject.length) {
-    throw new TypeError(
-      `${cls.name} takes ${String(cls.length)} constructor arguments but static inject lists ${String(inject.length)}: add static inject, or import inject.gen.ts, which avi dev keeps up to date`,
-    );
-  }
+  // Read when the app starts, not when the module loads: a list from inject.gen.ts may not be
+  // registered yet, since that file can be in an import cycle with this module.
+  let inject: readonly Token[] | undefined;
+  const injectList = (): readonly Token[] => {
+    if (inject) return inject;
+    resolveInjects();
+    const given = (cls as { inject?: unknown }).inject;
+    const list = given ?? [];
+    if (!Array.isArray(list)) throw new TypeError(`${cls.name}.inject must be an array of tokens`);
+    if (cls.length > list.length) {
+      throw injectListError(cls.name, cls.length, given === undefined ? undefined : list);
+    }
+    return (inject = Object.freeze([...(list as Token[])]));
+  };
 
   const { metadata } = meta;
   const entries = collect<RouteEntry>(metadata, ROUTES);
@@ -109,7 +116,9 @@ export function controllerFromClass(cls: Class): ControllerDefinition {
     name: cls.name,
     prefix: meta.prefix,
     staticRoutes: Object.freeze(entries.map(({ method, path }) => ({ method, path }))),
-    inject: Object.freeze([...(inject as Token[])]),
+    get inject() {
+      return injectList();
+    },
     middleware: checkRefs(
       collect<MiddlewareRef>(metadata, MIDDLEWARE),
       'use',

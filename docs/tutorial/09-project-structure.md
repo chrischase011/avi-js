@@ -45,8 +45,10 @@ Functional and explicit. Good for small services, prototypes and people new to A
 src/
 ├── main.ts            starts the app
 ├── app.ts             createApp(), shared by main.ts and the tests
+├── app.test.ts        tests through createTestClient
 ├── config.ts          with a validator
 ├── api.gen.ts         the typed Api for @avijs/client
+├── inject.gen.ts      dependency lists avi dev infers; app.ts imports it first
 ├── routes/
 │   ├── health.ts
 │   └── users.ts
@@ -57,7 +59,7 @@ src/
 ```ts
 // src/services/users.ts
 export class UsersService {
-  #users = [{ id: '1', name: 'Shiela' }];
+  #users = [{ id: 1, name: 'Shiela' }];
 
   findAll() {
     return this.#users;

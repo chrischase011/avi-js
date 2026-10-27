@@ -4,6 +4,7 @@ import {
   createToken,
   defineFactory,
   registerInjects,
+  resolveInjects,
   type ModuleDefinition,
 } from '../src/index.js';
 
@@ -157,7 +158,7 @@ describe('validation', () => {
             ],
           }),
         ]),
-      'NoInject takes 1 constructor arguments but static inject lists 0',
+      'NoInject has no dependency list for its 1 constructor argument',
     ],
     [
       'an undefined token in inject',
@@ -722,6 +723,30 @@ describe('registerInjects', () => {
     expect(Explicit.inject).toEqual([Clock]);
     const c = await start(mod('App', { providers: [Clock, Service, Explicit] }));
     expect((c.get(Service) as Service).clock).toBe(c.get(Clock));
+  });
+
+  it('reads lists given as a function when the app starts, after every class exists', async () => {
+    registerInjects(() => [[Later, [Clock]]]);
+    // Declared after the call, as in an import cycle with inject.gen.ts.
+    class Clock {
+      readonly now = 0;
+    }
+    class Later {
+      constructor(readonly clock: Clock) {}
+    }
+    const c = await start(mod('App', { providers: [Clock, Later] }));
+    expect((c.get(Later) as Later).clock).toBe(c.get(Clock));
+  });
+
+  it('says which class is missing when the function runs too early', () => {
+    registerInjects(() => [[Missing, []]]);
+    expect(() => {
+      resolveInjects();
+    }).toThrow('inject.gen.ts lists a class that is not created yet');
+    class Missing {
+      readonly ok = true;
+    }
+    expect(new Missing().ok).toBe(true);
   });
 
   it('names an entry broken by a circular import', () => {

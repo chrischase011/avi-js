@@ -13,7 +13,7 @@ A lightweight, TypeScript-first backend framework for Node.js, featuring NestJS-
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%E2%89%A522.12-339933.svg)](package.json)
 [![npm](https://img.shields.io/npm/v/@avijs/core.svg)](https://www.npmjs.com/package/@avijs/core)
-[![Status](https://img.shields.io/badge/status-pre--alpha-orange.svg)](#try-it-now)
+[![Status](https://img.shields.io/badge/status-1.0%20release%20candidate-blue.svg)](#try-it-now)
 
 [Website](https://chrischase011.github.io/avi-js/) · [Tutorial](docs/tutorial/README.md) · [Project structure](#project-structure) · [Why Avi.js](#why-avijs) · [Try it](#try-it-now)
 
@@ -175,7 +175,8 @@ npm run dev    # http://localhost:3000
 ```
 
 Run `npm create avi@latest` without a name to be asked for the name and the template, or pass
-`-- --template minimal` for the minimal one. `npx @avijs/cli new my-api` does the same.
+`-- --template minimal` for the minimal one. `npx @avijs/cli new my-api` does the same. Until
+1.0.0 is out, `@latest` is 0.x: use `npm create avi@next` for the release candidate.
 
 Or add it to an existing project:
 
@@ -190,18 +191,20 @@ authentication with guards and roles, and Prisma with SQLite.
 
 ## Packages
 
-| Package             | Purpose                                                      |
-| ------------------- | ------------------------------------------------------------ |
-| `@avijs/core`       | The public API you import: app factory, modules, controllers |
-| `@avijs/di`         | Explicit, reflection-free dependency injection               |
-| `@avijs/http`       | Router, request pipeline and the native Node.js adapter      |
-| `@avijs/validation` | Standard Schema validation for routes                        |
-| `@avijs/compiler`   | Optional build-time checks and manifests (`avi-compile`)     |
-| `@avijs/testing`    | A test client with provider overrides                        |
-| `@avijs/openapi`    | OpenAPI 3.1 documents from routes and schemas                |
-| `@avijs/security`   | CORS, security headers and rate limits                       |
-| `@avijs/multipart`  | Streaming file uploads with limits                           |
-| `@avijs/cli`        | `avi new`, `avi generate`, `avi dev`, `avi check`            |
+| Package             | Purpose                                                            |
+| ------------------- | ------------------------------------------------------------------ |
+| `@avijs/core`       | The public API you import: app factory, modules, controllers       |
+| `@avijs/di`         | Explicit, reflection-free dependency injection                     |
+| `@avijs/http`       | Router, request pipeline and the native Node.js adapter            |
+| `@avijs/validation` | Standard Schema validation for routes                              |
+| `@avijs/compiler`   | Generated dependency lists and typed client, build checks          |
+| `@avijs/testing`    | A test client with provider overrides                              |
+| `@avijs/client`     | A typed `fetch` client from your routes, for any frontend          |
+| `@avijs/workers`    | `cluster()` on every core, and `runWorker()` for jobs              |
+| `@avijs/openapi`    | OpenAPI 3.1 documents from routes and schemas                      |
+| `@avijs/security`   | CORS, security headers and rate limits                             |
+| `@avijs/multipart`  | Streaming file uploads with limits                                 |
+| `@avijs/cli`        | `avi new`, `generate`, `dev`, `build`, `check`, `client`, `inject` |
 
 ## Compatibility
 

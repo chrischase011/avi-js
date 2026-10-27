@@ -1,4 +1,4 @@
-import { Container, type Provider, type Token, type TokenType } from '@avijs/di';
+import { Container, injectListError, type Provider, type Token, type TokenType } from '@avijs/di';
 import {
   HttpServer,
   Router,
@@ -454,9 +454,7 @@ class Pipeline {
     if (!instance) {
       const inject = injectOf(cls);
       if (cls.length > inject.length) {
-        throw new TypeError(
-          `${cls.name} takes ${String(cls.length)} constructor arguments but static inject lists ${String(inject.length)}: add static inject, or import inject.gen.ts, which avi dev keeps up to date`,
-        );
+        throw injectListError(cls.name, cls.length, cls.inject === undefined ? undefined : inject);
       }
       const Ctor = cls as unknown as new (...args: unknown[]) => unknown;
       instance = new Ctor(...inject.map(this.resolve));

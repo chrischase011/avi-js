@@ -84,7 +84,8 @@ and needs no `cluster()`.
 
 A queue consumer, a scheduler or a one-off script needs your services and database, but no HTTP
 server. `runWorker()` starts the app's providers, runs your function, and closes everything when
-it ends:
+it ends. A worker that imports `AppModule` gets the inferred dependency lists through it; one built
+from other modules imports `./inject.gen.js` first ([chapter 3](03-modules-and-di.md#dependency-lists)):
 
 ```ts
 // src/worker.ts

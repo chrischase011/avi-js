@@ -3,6 +3,50 @@
 All notable changes are listed here. Avi.js follows [Semantic Versioning](https://semver.org); all
 packages share one version.
 
+## 1.0.0-rc.4 - 2026-10-27
+
+Fixes from testing 1.0.0-rc.3: a correctness review of the new dependency lists, a new-user run of
+every chapter from npm, the real app on generated lists, and deeper fuzzing.
+
+### Fixed
+
+- A class declared in a file that imports `inject.gen.ts`, such as `app.module.ts` or `main.ts`,
+  crashed the app at startup (`Cannot access ... before initialization`), and so did a test that
+  registered a feature module before the lists loaded. The generated file now registers a function
+  (`registerInjects(() => [...])`) that runs when the app starts, and controllers read their list
+  then instead of when their module loads.
+- `inject.gen.ts` imported every file with a class, so a seed script or a test helper ran when the
+  app started. Only files the app loads are read now: those its entry points (`AviFactory.create`,
+  `register`, `createAvi`, `runWorker`, `cluster`) import. With no entry point, nothing is
+  inferred and AVI202 says why.
+- A subclass of an abstract base had `undefined` dependencies: abstract classes were skipped. They
+  get lists now, which subclasses without a constructor inherit.
+- An optional or defaulted constructor parameter was inferred as required, so startup failed when
+  nothing provided it. Lists stop at the first one, as `constructor.length` does.
+- An object with a `description` named like a type was taken for a token. Only classes,
+  constructors, and `createToken` and `defineConfig` values are.
+- The up-to-date check ignored commas and spaces inside strings, so `[A, B]` matched `[AB]` and a
+  changed list could stay stale. Only formatting is ignored now.
+- `avi build` removed any compiled-looking file without a source, including one written by hand,
+  a bundler's assets and output compiled from outside `include` (a sibling `shared/` folder).
+  It now records what it writes and removes only what an earlier build wrote and this one did not.
+- A class with no dependency list now says so, and how to fix it, instead of "static inject lists
+  0"; counts read "1 constructor argument" and "1 dependency list".
+- The minimal template ships `src/inject.gen.ts` too, so `avi inject --check` passes and its
+  services can take dependencies without `static inject`.
+- `avi inject` and `avi client` write next to the `--project` tsconfig, like `avi dev`.
+  `avi g` no longer rewrites `inject.gen.ts` for line endings alone.
+- `avi --version` prints the version; `avi g --help` shows the generate usage; the hint for a
+  missing `--` names `@next` during a release candidate.
+
+### Docs
+
+- Chapters 3, 8 and 16: an entry point or test that skips `app.module.ts` imports
+  `inject.gen.js` itself. Chapter 10 explains which files are read, and AVI202. Chapter 0's
+  script table and summary note, chapter 9's minimal tree and chapter 17's CLI list are corrected.
+- README: the status badge, the packages table (client, workers) and `@next` during the release
+  candidate.
+
 ## 1.0.0-rc.3 - 2026-10-27
 
 ### Added

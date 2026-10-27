@@ -7,6 +7,8 @@ it('exposes only the reviewed runtime exports', () => {
     'Container',
     'createToken',
     'defineFactory',
+    'injectListError',
     'registerInjects',
+    'resolveInjects',
   ]);
 });

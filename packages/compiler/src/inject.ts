@@ -1,6 +1,6 @@
 import path from 'node:path';
 import ts from 'typescript';
-import { readProgram, type Diagnostic } from './check.js';
+import { readProgram, unwrap, type Diagnostic } from './check.js';
 
 export interface GeneratedInjects {
   /** The generated file's contents. */
@@ -61,10 +61,9 @@ class InjectGenerator {
   }
 
   run(): GeneratedInjects {
-    for (const source of this.program.getSourceFiles()) {
-      if (!this.#inProject(source)) continue;
-      // Test files are not loaded by the app, and the generated file must not import them.
-      if (/\.(test|spec)\.[cm]?tsx?$/.test(source.fileName)) continue;
+    // Only files the app loads: importing any other file would run its code, such as a seed script.
+    const files = this.#loaded();
+    for (const source of files) {
       if (path.resolve(source.fileName) === this.out) continue;
       for (const statement of source.statements) {
         if (ts.isClassDeclaration(statement)) this.#class(statement, source);
@@ -92,10 +91,11 @@ class InjectGenerator {
         ([specifier, names]) => `import { ${names.join(', ')} } from '${specifier}';`,
       ),
       '',
+      // A function, read when the app starts: classes in an import cycle with this file exist by then.
       this.#entries.length === 0
-        ? 'registerInjects([]);'
+        ? 'registerInjects(() => []);'
         : [
-            'registerInjects([',
+            'registerInjects(() => [',
             ...this.#entries.map((e) => `  [${e.cls}, [${e.deps.join(', ')}]],`),
             ']);',
           ].join('\n'),
@@ -113,8 +113,6 @@ class InjectGenerator {
 
   #class(node: ts.ClassDeclaration, source: ts.SourceFile): void {
     if (!node.name) return;
-    const modifiers = ts.getCombinedModifierFlags(node);
-    if (modifiers & ts.ModifierFlags.Abstract) return;
     const hasList = node.members.some(
       (member) =>
         ts.isPropertyDeclaration(member) &&
@@ -126,14 +124,23 @@ class InjectGenerator {
       (member): member is ts.ConstructorDeclaration =>
         ts.isConstructorDeclaration(member) && member.body !== undefined,
     );
-    if (!ctor || ctor.parameters.length === 0) return;
+    if (!ctor) return;
+    // Like constructor.length: optional, defaulted and rest parameters are left out.
+    const optional = ctor.parameters.findIndex(
+      (p) =>
+        p.questionToken !== undefined ||
+        p.initializer !== undefined ||
+        p.dotDotDotToken !== undefined,
+    );
+    const required = optional === -1 ? [...ctor.parameters] : ctor.parameters.slice(0, optional);
+    if (required.length === 0) return;
 
-    const tokens = ctor.parameters.map((param) => this.#token(param, source));
+    const tokens = required.map((param) => this.#token(param, source));
     const resolved = tokens.filter((token): token is string => token !== undefined);
     if (resolved.length < tokens.length) {
       // A class none of whose parameters are injectable is not a DI class: say nothing.
       if (resolved.length === 0 && !isDecorated(node)) return;
-      const param = ctor.parameters[tokens.findIndex((token) => token === undefined)];
+      const param = required[tokens.findIndex((token) => token === undefined)];
       const which = param ? `\`${param.name.getText(source)}\`` : 'a parameter';
       this.#report(
         source,
@@ -182,17 +189,58 @@ class InjectGenerator {
     return this.#importValue(symbol, declaration, param.type.typeName, source);
   }
 
-  /** A class, a constructor, or an injection token (which has a `description`). */
+  /** A class, a constructor, or a token made by `createToken` or `defineConfig`. */
   #canBeToken(symbol: ts.Symbol): boolean {
     if (symbol.flags & ts.SymbolFlags.Class) return true;
     const declaration = symbol.valueDeclaration;
     if (!declaration) return false;
     const type = this.#checker.getTypeOfSymbolAtLocation(symbol, declaration);
     if (type.getConstructSignatures().length > 0) return true;
-    const description = type.getProperty('description');
-    if (!description) return false;
-    const text = this.#checker.getTypeOfSymbolAtLocation(description, declaration);
-    return (text.flags & ts.TypeFlags.StringLike) !== 0;
+    if (!ts.isVariableDeclaration(declaration) || !declaration.initializer) return false;
+    const call = unwrap(declaration.initializer);
+    if (!call || !ts.isCallExpression(call)) return false;
+    const callee = ts.isPropertyAccessExpression(call.expression)
+      ? call.expression.name.text
+      : ts.isIdentifier(call.expression)
+        ? call.expression.text
+        : undefined;
+    return callee === 'createToken' || callee === 'defineConfig';
+  }
+
+  /** The project's files the app loads: value imports followed from its entry points. */
+  #loaded(): ts.SourceFile[] {
+    const project = this.program
+      .getSourceFiles()
+      .filter(
+        (source) => this.#inProject(source) && !/\.(test|spec)\.[cm]?tsx?$/.test(source.fileName),
+      );
+    const entries = project.filter((source) => startsApp(source));
+    if (entries.length === 0) {
+      const first = project[0];
+      if (first) {
+        this.#report(
+          first,
+          first,
+          'No app entry found (AviFactory.create, register, createAvi, runWorker or cluster): no dependency lists inferred',
+          'AVI202',
+        );
+      }
+      return [];
+    }
+    const seen = new Set<ts.SourceFile>(entries);
+    const queue = [...entries];
+    for (let source = queue.shift(); source; source = queue.shift()) {
+      for (const specifier of valueImports(source)) {
+        const file = this.#checker
+          .getSymbolAtLocation(specifier)
+          ?.declarations?.find(ts.isSourceFile);
+        if (file && !seen.has(file) && this.#inProject(file)) {
+          seen.add(file);
+          queue.push(file);
+        }
+      }
+    }
+    return [...seen];
   }
 
   #importClass(node: ts.ClassDeclaration, source: ts.SourceFile): string | undefined {
@@ -272,14 +320,14 @@ class InjectGenerator {
     return !source.isDeclarationFile && this.roots.has(path.resolve(source.fileName));
   }
 
-  #report(source: ts.SourceFile, at: ts.Node, message: string): void {
+  #report(source: ts.SourceFile, at: ts.Node, message: string, code = 'AVI201'): void {
     const { line, character } = source.getLineAndCharacterOfPosition(at.getStart(source));
     this.#diagnostics.push({
       file: source.fileName,
       line: line + 1,
       column: character + 1,
       severity: 'warning',
-      code: 'AVI201',
+      code,
       message,
     });
   }
@@ -297,3 +345,80 @@ function configTarget(type: ts.TypeNode): ts.EntityName | undefined {
 function isDecorated(node: ts.ClassDeclaration): boolean {
   return (ts.getDecorators(node) ?? []).length > 0;
 }
+
+/** Whether a file starts an app: `AviFactory.create`, `.register`, `createAvi`, `runWorker`, `cluster`. */
+function startsApp(source: ts.SourceFile): boolean {
+  let found = false;
+  const visit = (node: ts.Node): void => {
+    if (found) return;
+    if (ts.isCallExpression(node)) {
+      const callee = node.expression;
+      const name = ts.isIdentifier(callee)
+        ? callee.text
+        : ts.isPropertyAccessExpression(callee)
+          ? callee.name.text
+          : undefined;
+      const owner =
+        ts.isPropertyAccessExpression(callee) && ts.isIdentifier(callee.expression)
+          ? callee.expression.text
+          : undefined;
+      if (
+        name === 'createAvi' ||
+        name === 'runWorker' ||
+        name === 'cluster' ||
+        name === 'register' ||
+        (name === 'create' && owner === 'AviFactory')
+      ) {
+        found = true;
+        return;
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return found;
+}
+
+/** Module specifiers a file loads at runtime: imports and re-exports that are not type-only. */
+function valueImports(source: ts.SourceFile): ts.StringLiteral[] {
+  const found: ts.StringLiteral[] = [];
+  for (const statement of source.statements) {
+    if (ts.isImportDeclaration(statement) && ts.isStringLiteral(statement.moduleSpecifier)) {
+      const clause = statement.importClause;
+      if (clause?.phaseModifier === ts.SyntaxKind.TypeKeyword) continue;
+      const named = clause?.namedBindings;
+      const allTypes =
+        clause !== undefined &&
+        clause.name === undefined &&
+        named !== undefined &&
+        ts.isNamedImports(named) &&
+        named.elements.length > 0 &&
+        named.elements.every((element) => element.isTypeOnly);
+      if (!allTypes) found.push(statement.moduleSpecifier);
+    } else if (
+      ts.isExportDeclaration(statement) &&
+      !statement.isTypeOnly &&
+      statement.moduleSpecifier &&
+      ts.isStringLiteral(statement.moduleSpecifier)
+    ) {
+      found.push(statement.moduleSpecifier);
+    }
+  }
+  // import('...') loads too.
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isCallExpression(node) &&
+      node.expression.kind === ts.SyntaxKind.ImportKeyword &&
+      node.arguments[0] &&
+      ts.isStringLiteral(node.arguments[0])
+    ) {
+      found.push(node.arguments[0]);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return found;
+}
+
+export const plural = (count: number, noun: string): string =>
+  `${String(count)} ${noun}${count === 1 ? '' : 's'}`;

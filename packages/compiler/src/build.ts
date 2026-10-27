@@ -1,4 +1,14 @@
-import { existsSync, readdirSync, realpathSync, rmdirSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  rmdirSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
 import { readConfig } from './check.js';
@@ -36,7 +46,13 @@ export function buildProject(options: BuildProjectOptions): number {
     });
   }
 
-  const emitted = program.emit();
+  // What this build writes; the next build removes what it no longer writes.
+  const written = new Set<string>();
+  const emitted = program.emit(undefined, (file, text, bom) => {
+    mkdirSync(path.dirname(file), { recursive: true });
+    ts.sys.writeFile(file, text, bom);
+    written.add(path.resolve(file));
+  });
   const diagnostics = ts.sortAndDeduplicateDiagnostics([
     ...config.errors,
     ...ts.getPreEmitDiagnostics(program),
@@ -55,18 +71,19 @@ export function buildProject(options: BuildProjectOptions): number {
     );
   }
   if (config.errors.length === 0 && !emitted.emitSkipped) {
-    removeStale(config, path.dirname(path.resolve(options.project)));
+    removeStale(config, path.dirname(path.resolve(options.project)), written);
   }
   const errors = diagnostics.filter((d) => d.category === ts.DiagnosticCategory.Error).length;
   return errors + generated.reduce((sum, result) => sum + result.errors, 0);
 }
 
 /**
- * Deletes compiled files (`.js`, `.d.ts`, `.map`) in `outDir` that this build did not emit. Only
- * in a real folder inside the project, reached without links, not hidden or `node_modules`, and
- * marked by an earlier `avi build`; the first build only leaves the marker.
+ * Deletes the files an earlier `avi build` wrote to `outDir` and this one did not, such as a deleted
+ * module's tests. Nothing else in the folder is touched: hand-written files, a bundler's assets.
+ * Only in a real folder inside the project, reached without links, not hidden or `node_modules`.
+ * The list of written files is kept in the marker file.
  */
-function removeStale(config: ts.ParsedCommandLine, projectDir: string): void {
+function removeStale(config: ts.ParsedCommandLine, projectDir: string, written: Set<string>): void {
   const outDir = config.options.outDir;
   if (!outDir || !existsSync(outDir)) return;
   let out: string;
@@ -89,33 +106,56 @@ function removeStale(config: ts.ParsedCommandLine, projectDir: string): void {
     return;
   }
 
-  const marker = path.join(out, MARKER);
-  if (!existsSync(marker)) {
-    writeFileSync(marker, 'Written by avi build, which removes stale compiled files here.\n');
-    return;
-  }
-  // Compared by their place in the output folder: the real and the configured path may differ above it.
+  // Paths by their place in the output folder: the real and configured paths may differ above it.
   const configuredOut = path.resolve(outDir);
-  const expected = new Set(
-    config.fileNames
-      .flatMap((file) => ts.getOutputFileNames(config, file, ignoreCase))
-      .map((file) => key(path.relative(configuredOut, path.resolve(file)))),
-  );
-  const sweep = (dir: string): void => {
-    for (const entry of readdirSync(dir, { withFileTypes: true })) {
-      const file = path.join(dir, entry.name);
-      // Dirents describe links as links, so nothing here follows one.
-      if (entry.isDirectory()) {
-        sweep(file);
-        if (readdirSync(file).length === 0) rmdirSync(file);
-      } else if (
-        entry.isFile() &&
-        OUTPUT.test(entry.name) &&
-        !expected.has(key(path.relative(out, file)))
-      ) {
-        rmSync(file);
-      }
+  const current = [...written]
+    .map((file) => path.relative(configuredOut, file))
+    .filter((relative) => relative && !relative.startsWith('..') && !path.isAbsolute(relative))
+    .map((relative) => relative.split(path.sep).join('/'))
+    .sort();
+  const marker = path.join(out, MARKER);
+  const previous = readMarker(marker);
+  const keep = new Set(current.map(key));
+  for (const relative of previous) {
+    if (keep.has(key(relative)) || !OUTPUT.test(relative)) continue;
+    const file = path.resolve(out, relative);
+    const within = path.relative(out, file);
+    if (!within || within.startsWith('..') || path.isAbsolute(within)) continue;
+    let stat;
+    try {
+      stat = lstatSync(file);
+    } catch {
+      continue;
     }
-  };
-  sweep(out);
+    // Only a plain file: never a link, and never through one.
+    if (!stat.isFile() || realpathSync.native(path.dirname(file)) !== path.dirname(file)) continue;
+    rmSync(file);
+    removeEmptyDirs(path.dirname(file), out);
+  }
+  writeFileSync(
+    marker,
+    `${JSON.stringify({ note: 'Written by avi build: the files it compiled here, so the next build can remove the ones whose source is gone.', files: current }, null, 2)}\n`,
+  );
+}
+
+function readMarker(marker: string): string[] {
+  try {
+    const parsed = JSON.parse(readFileSync(marker, 'utf8')) as { files?: unknown };
+    return Array.isArray(parsed.files)
+      ? parsed.files.filter((file): file is string => typeof file === 'string')
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function removeEmptyDirs(dir: string, stop: string): void {
+  for (
+    let current = dir;
+    current !== stop && current.startsWith(stop);
+    current = path.dirname(current)
+  ) {
+    if (readdirSync(current).length > 0) return;
+    rmdirSync(current);
+  }
 }

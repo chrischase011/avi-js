@@ -4,7 +4,7 @@ import { parseArgs } from 'node:util';
 import { checkInjectLists, formatDiagnostic as format, type Diagnostic } from './check.js';
 import { generateClient, sameContent } from './client.js';
 import { writeManifest } from './manifest.js';
-import { INJECT_HEADER, generateInjects } from './inject.js';
+import { INJECT_HEADER, generateInjects, plural } from './inject.js';
 import { GENERATED, watchProject, type WatchProjectOptions } from './watch.js';
 
 const USAGE = `Usage:
@@ -44,7 +44,7 @@ export async function main(argv: readonly string[]): Promise<number> {
   }
 
   if (command === 'client') {
-    const out = values.out ?? 'src/api.gen.ts';
+    const out = values.out ?? inProject(values.project, 'src/api.gen.ts');
     if (values.watch)
       return watch({ project: values.project, client: { out, root: values.root } }, out);
     const result = generateClient({ project: values.project, out, root: values.root });
@@ -52,10 +52,10 @@ export async function main(argv: readonly string[]): Promise<number> {
     return once({ ...result, summary }, out, GENERATED, 'avi client', values.check);
   }
   if (command === 'inject') {
-    const out = values.out ?? 'src/inject.gen.ts';
+    const out = values.out ?? inProject(values.project, 'src/inject.gen.ts');
     if (values.watch) return watch({ project: values.project, inject: { out } }, out);
     const result = generateInjects({ project: values.project, out });
-    const summary = `${String(result.classes.length)} dependency lists`;
+    const summary = plural(result.classes.length, 'dependency list');
     return once({ ...result, summary }, out, INJECT_HEADER, 'avi inject', values.check);
   }
 
@@ -77,6 +77,11 @@ export async function main(argv: readonly string[]): Promise<number> {
 
   console.error(USAGE);
   return 2;
+}
+
+/** A path next to the tsconfig.json, as avi dev and avi build resolve it. */
+function inProject(project: string, file: string): string {
+  return path.posix.join(path.dirname(project).replaceAll('\\', '/'), file);
 }
 
 interface Generated {

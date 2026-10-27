@@ -1,3 +1,4 @@
+import { injectListError } from './inject.js';
 import { isToken, tokenName, type Constructor, type ResolveTokens, type Token } from './token.js';
 
 /**
@@ -137,9 +138,7 @@ export function normalizeProvider(provider: unknown, where: string): ProviderSpe
 function classSpec(token: Token, cls: Constructor, scope: Scope, where: string): ProviderSpec {
   const deps = checkInject(cls.inject, `${where} ${cls.name}.inject`);
   if (cls.length > deps.length) {
-    throw new TypeError(
-      `${cls.name || 'Class'} takes ${String(cls.length)} constructor arguments but static inject lists ${String(deps.length)} (at ${where}): add static inject, or import inject.gen.ts, which avi dev keeps up to date`,
-    );
+    throw injectListError(cls.name || 'Class', cls.length, cls.inject, where);
   }
   const Ctor = cls as unknown as new (...args: unknown[]) => unknown;
   return {

@@ -21,6 +21,11 @@ avi inject --check    # in CI: fail when it is out of date
 | Code   | Meaning                                                                                                  |
 | ------ | -------------------------------------------------------------------------------------------------------- |
 | AVI201 | A parameter's type has no token (a `string`, a union), or the class is not exported; add `static inject` |
+| AVI202 | No app entry point found, so no lists are inferred                                                       |
+
+Only files the app loads are read: those the entry points (`AviFactory.create`, `register`,
+`createAvi`, `runWorker`, `cluster`) import, directly or not. A seed script the app never imports
+is never imported by `inject.gen.ts` either. Diagnostics name files by absolute path.
 
 `avi generate` updates the file when it adds a class, so a new controller works right away.
 

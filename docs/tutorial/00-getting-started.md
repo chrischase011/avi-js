@@ -29,7 +29,8 @@ AVI.JS 1.0.0 · Application bootstrap
 Startup completed in 5.3 ms
 ```
 
-That summary lists what Avi.js checked before accepting requests ([chapter 7](07-production.md#startup-summary)).
+That summary lists what Avi.js checked before accepting requests. It shows as this block in a
+terminal; in logs and CI, piped, it is one line ([chapter 7](07-production.md#startup-summary)).
 Open http://localhost:3000/users. `npm run dev` recompiles and restarts on every change.
 
 Without a name, `npm create avi@latest` asks for the name, the template and the validation
@@ -66,13 +67,13 @@ my-api/
 └── tsconfig.json
 ```
 
-| Script          | What it does                                                                        |
-| --------------- | ----------------------------------------------------------------------------------- |
-| `npm run dev`   | Compile, then recompile and restart on every change; keeps `src/api.gen.ts` current |
-| `npm test`      | Compile and run the tests with `node --test`                                        |
-| `npm run build` | `avi build`: update `src/api.gen.ts`, empty `dist/`, compile into it                |
-| `npm start`     | Run the compiled app                                                                |
-| `npm run check` | Check every `static inject` list against its class                                  |
+| Script          | What it does                                                                            |
+| --------------- | --------------------------------------------------------------------------------------- |
+| `npm run dev`   | Compile, then recompile and restart on every change; keeps the `*.gen.ts` files current |
+| `npm test`      | Build with `avi build` and run the tests with `node --test`                             |
+| `npm run build` | `avi build`: update the `*.gen.ts` files, compile, remove output of deleted sources     |
+| `npm start`     | Run the compiled app                                                                    |
+| `npm run check` | Check every hand-written `static inject` list against its class                         |
 
 ## Add a feature
 

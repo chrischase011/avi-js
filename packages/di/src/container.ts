@@ -1,4 +1,5 @@
 import { normalizeProvider, type Provider, type ProviderSpec, type Scope } from './provider.js';
+import { resolveInjects } from './inject.js';
 import { isToken, tokenName, type Token } from './token.js';
 
 export interface ModuleDefinition {
@@ -104,6 +105,7 @@ export class Container {
   #state: 'new' | 'initializing' | 'ready' | 'disposed' = 'new';
 
   constructor(roots: readonly ModuleDefinition[], options: ContainerOptions = {}) {
+    resolveInjects();
     (options.overrides ?? []).forEach((provider, i) => {
       const spec = normalizeProvider(provider, `overrides[${String(i)}]`);
       if (this.#overrides.has(spec.token)) {

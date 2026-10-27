@@ -80,9 +80,12 @@ client = await createTestClient(createAvi({ middleware: [apiVersion] }).register
 
 ## Testing providers directly
 
-For unit tests of a single service, skip HTTP:
+For unit tests of a single service, skip HTTP. A test that registers a feature module instead of
+`AppModule` imports the generated dependency lists itself, as `app.module.ts` does:
 
 ```ts
+import '../../inject.gen.js';
+
 const app = createAvi({ overrides: [{ provide: Db, useValue: fakeDb }] }).register(UsersModule);
 await app.init();
 const users = app.get(UsersService);
