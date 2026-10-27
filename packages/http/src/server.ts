@@ -104,9 +104,9 @@ export interface ServerOptions {
   onResponse?: (info: ResponseInfo) => unknown;
   /**
    * Takes over requests that ask to upgrade the connection, such as WebSockets; `ws`'s
-   * `handleUpgrade` fits. The socket is the handler's from then on. `signal` aborts when shutdown
-   * starts, so connections can be closed politely; any still open after `shutdownTimeout` are
-   * destroyed.
+   * `handleUpgrade` fits. The socket is the handler's from then on, and HTTP timeouts no longer
+   * apply to it. Each connection gets its own `signal`, which aborts when shutdown starts, so it
+   * can be closed politely; any still open after `shutdownTimeout` are destroyed.
    */
   onUpgrade?: UpgradeHandler;
 }
@@ -163,9 +163,9 @@ export class HttpServer {
   readonly #trustProxy: number;
   readonly #onResponse: ((info: ResponseInfo) => unknown) | undefined;
   readonly #onUpgrade: UpgradeHandler | undefined;
-  // Upgraded connections, which server.close() waits for but no longer manages.
-  readonly #upgraded = new Set<Duplex>();
-  #shutdown = new AbortController();
+  // Upgraded connections, which server.close() waits for but no longer manages, each with the
+  // controller of the signal its handler got. Dropped on close, so nothing piles up.
+  readonly #upgraded = new Map<Duplex, AbortController>();
   #server: Server | undefined;
   #closing: Promise<void> | undefined;
   // Connections whose first request has not arrived yet.
@@ -256,11 +256,11 @@ export class HttpServer {
     this.#closing ??= new Promise<void>((resolve, reject) => {
       const force = setTimeout(() => {
         server.closeAllConnections();
-        for (const socket of this.#upgraded) socket.destroy();
+        for (const socket of this.#upgraded.keys()) socket.destroy();
       }, this.#shutdownTimeout);
       force.unref();
       // Upgraded connections are the handler's to close; tell it to.
-      this.#shutdown.abort();
+      for (const controller of this.#upgraded.values()) controller.abort();
 
       // Refuse new connections at once. In a cluster, Node hands them to another worker.
       server.maxConnections = 0;
@@ -271,7 +271,6 @@ export class HttpServer {
           clearTimeout(force);
           this.#server = undefined;
           this.#closing = undefined;
-          this.#shutdown = new AbortController();
           if (error) reject(error);
           else resolve();
         });
@@ -295,14 +294,15 @@ export class HttpServer {
       );
       return;
     }
-    this.#upgraded.add(socket);
+    const controller = new AbortController();
+    this.#upgraded.set(socket, controller);
     socket.once('close', () => this.#upgraded.delete(socket));
     const failed = (error: unknown) => {
       this.#logger.error(`Upgrade handler failed: ${req.method ?? ''} ${req.url ?? ''}`, error);
       socket.destroy();
     };
     try {
-      const result = handler(req, socket, head, this.#shutdown.signal);
+      const result = handler(req, socket, head, controller.signal);
       if (result instanceof Promise) result.catch(failed);
     } catch (error) {
       failed(error);

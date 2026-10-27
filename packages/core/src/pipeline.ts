@@ -40,6 +40,8 @@ export interface RouteDocs {
   readonly tags?: readonly string[];
   readonly operationId?: string;
   readonly deprecated?: boolean;
+  /** Leaves the route out of the OpenAPI document, such as an internal or admin route. */
+  readonly exclude?: boolean;
 }
 
 /**

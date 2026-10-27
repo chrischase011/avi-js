@@ -1,6 +1,6 @@
 {
   "name": "@avijs/workers",
-  "version": "1.0.0-rc.1",
+  "version": "1.0.0-rc.2",
   "description": "Run an Avi.js app on every CPU core, and background workers with the app's providers.",
   "keywords": [
     "avi",
@@ -45,6 +45,6 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@avijs/core": "workspace:*"
+    "@avijs/core": "workspace:^"
   }
 }

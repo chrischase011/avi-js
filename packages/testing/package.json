@@ -1,6 +1,6 @@
 {
   "name": "@avijs/testing",
-  "version": "1.0.0-rc.1",
+  "version": "1.0.0-rc.2",
   "description": "Testing helpers for Avi.js apps.",
   "keywords": [
     "avi",
@@ -43,8 +43,8 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@avijs/client": "workspace:*",
-    "@avijs/core": "workspace:*"
+    "@avijs/client": "workspace:^",
+    "@avijs/core": "workspace:^"
   },
   "devDependencies": {
     "valibot": "1.5.0"

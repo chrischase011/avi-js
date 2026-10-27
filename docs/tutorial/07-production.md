@@ -261,12 +261,14 @@ Startup failed after 1.1 ms
 
 Where it goes depends on where the output goes:
 
-| Situation                    | Output                                                     |
-| ---------------------------- | ---------------------------------------------------------- |
-| A terminal                   | The block above, in color (plain with `NO_COLOR`)          |
-| Logs, containers, CI         | One line: `Avi.js 1.0.0 started in 5.3 ms: 3 modules, ...` |
-| A logger with `info`         | One structured entry, `Application started`, with counts   |
-| `NODE_ENV=test`, test client | Nothing                                                    |
+| Situation                     | Output                                                                                           |
+| ----------------------------- | ------------------------------------------------------------------------------------------------ |
+| A terminal                    | The block above, in color (plain with `NO_COLOR`)                                                |
+| Logs, containers, CI          | One line: `Avi.js 1.0.0 started in 5.3 ms: 3 modules, ...`                                       |
+| Startup fails, not a terminal | One line on stderr: `Avi.js 1.0.0 failed to start after 12 ms: Providers: ...` (from 1.0.0-rc.2) |
+| A logger with `info`          | One structured entry, `Application started`, with counts                                         |
+| `NODE_ENV=test`               | Nothing                                                                                          |
+| `createTestClient(AppModule)` | Nothing; an app you built yourself keeps its own setting                                         |
 
 ```ts
 createAvi({ startupSummary: 'routes' }); // also list every route with its controller

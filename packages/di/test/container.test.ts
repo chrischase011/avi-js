@@ -597,7 +597,9 @@ describe('request scope', () => {
     expect(() => c.resolve(app, Session)).toThrow(
       'Session is request-scoped and can only be resolved while handling a request',
     );
-    expect(() => c.get(Request)).toThrow('Request is not visible to the root modules');
+    expect(() => c.get(Request)).toThrow(
+      'Request is request-scoped and can only be resolved while handling a request',
+    );
     expect(() => c.requestScope(new Map()).resolve(app, Session)).toThrow(
       'This request scope has no value for Request',
     );

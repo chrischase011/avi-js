@@ -1,6 +1,6 @@
 {
   "name": "@avijs/security",
-  "version": "1.0.0-rc.1",
+  "version": "1.0.0-rc.2",
   "description": "CORS and security headers for Avi.js.",
   "keywords": [
     "avi",
@@ -45,6 +45,6 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@avijs/http": "workspace:*"
+    "@avijs/http": "workspace:^"
   }
 }

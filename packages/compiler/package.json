@@ -1,6 +1,6 @@
 {
   "name": "@avijs/compiler",
-  "version": "1.0.0-rc.1",
+  "version": "1.0.0-rc.2",
   "description": "Optional build-time checks and manifests for Avi.js apps.",
   "keywords": [
     "avi",
@@ -48,13 +48,13 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@avijs/core": "workspace:*"
+    "@avijs/core": "workspace:^"
   },
   "peerDependencies": {
     "typescript": ">=5.8"
   },
   "devDependencies": {
-    "@avijs/client": "workspace:*",
+    "@avijs/client": "workspace:^",
     "valibot": "1.5.0"
   }
 }

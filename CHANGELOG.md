@@ -3,6 +3,69 @@
 All notable changes are listed here. Avi.js follows [Semantic Versioning](https://semver.org); all
 packages share one version.
 
+## 1.0.0-rc.2 - 2026-10-27
+
+Fixes from testing 1.0.0-rc.1: a correctness review, a security review, a new-user run of every
+chapter from npm, deeper fuzzing and a stress run.
+
+### Security
+
+- `avi build` could delete files outside the project, or folders that were never build output. The
+  output folder was emptied after a string check, so a link in its path (a symlink or junction an
+  untrusted checkout can carry) led the delete elsewhere, and an `outDir` such as `.git`, `public`
+  or one set by an extended config was wiped. It now deletes nothing on the first build in a
+  folder, only marks it, and later removes only compiled files (`.js`, `.d.ts`, `.map`) the build
+  no longer emits, in a real folder inside the project that is not hidden or `node_modules`, and
+  not when the config has errors.
+- `avi client`, `avi dev` and `avi build` refuse to overwrite a file they did not generate, so a
+  mistyped `--out` or `--client` cannot replace source code.
+- `onUpgrade` gives each connection its own `signal`. All connections shared one, so listeners
+  added per connection, as chapter 7 shows, were kept for the life of the app: about 10 KB per
+  closed connection.
+- `api.events()` refuses an event or line larger than `maxEventSize` (default 1 MiB, a new client
+  option) and a response that is not `text/event-stream`. A stream without line breaks grew memory
+  without limit and took quadratic time.
+- `APP` now gives a read-only view with `routes()`, not the app: through `app.get()` a module could
+  read providers it was never given, or close the app.
+
+### Added
+
+- `OpenApiModule.forRoot({ guards, middleware })` protects the document, and
+  `openapi: { exclude: true }` leaves a route out of it.
+- `avi dev` and `avi build` take `--root`, like `avi client`.
+- `--help` works for every `avi` command and for `npm create avi`; an unknown option prints the
+  usage instead of a stack trace.
+- A startup failure that is not shown in a terminal prints one line on stderr, with the failing step
+  and the reason; a logger with `info` gets an `Application failed to start` error entry.
+  `AviFactory.create`, as the templates use it, reported nothing before.
+
+### Fixed
+
+- Response types from handlers turned into `any` in a frontend compiled without Node types, such
+  as a Vite app: a type imported `node:stream`. Only routes with a response schema kept theirs.
+- `avi dev --client` with a file outside the TypeScript program never compiled or started the app.
+- `avi build` exited 0 when the client could not be generated, leaving it stale.
+- `app.get(APP)` and `defineHook({ inject: [APP] })` threw; supplied tokens now resolve there too.
+- The test client dropped headers given as a `Headers` object or as `[name, value]` pairs.
+- Config errors redacted variable names and allowed values (`Expected "[redacted]"`). Only text
+  holding the received value is redacted now; a missing variable's message is shown as is.
+- `jsonLogger` printed a plain-object `cause`, such as validation issues, as `[object Object]`.
+- On Windows, stopping `avi dev` left the app running and its port taken.
+- `npm create avi my-app --template minimal`, without `--`, made a modular app: npm swallows the
+  flag. A stray argument is now an error that says to put options after `--`.
+- A module made by another copy of `@avijs/core` is named as such in the error. Packages now
+  depend on each other with `^` ranges, so npm can share one core across 1.x versions.
+- `avi client` no longer warns about modules made by a library, such as
+  `OpenApiModule.forRoot(...)`: they have no app routes, like library modules referenced by name.
+- A failed `cluster()` start printed its reason twice.
+- Generated tests no longer add a second error when their setup fails.
+
+### Docs
+
+- Chapter 12 shows options with `AviFactory.create`, as in the generated `main.ts`; chapter 17 says
+  to install every package from `next` during a release candidate; chapter 8 says response
+  `headers` is a `Headers`; chapter 7's summary table covers failures and the test client.
+
 ## 1.0.0-rc.1 - 2026-10-26
 
 The first release candidate for 1.0. From here, the stable API only gets fixes until 1.0.0; see

@@ -180,6 +180,11 @@ class Generator {
       const arg = unwrap(node.arguments[0]);
       return arg && ts.isObjectLiteralExpression(arg) ? arg : undefined;
     }
+    if (ts.isCallExpression(node)) {
+      // A library's module factory, such as OpenApiModule.forRoot, has no app routes either.
+      const callee = this.#declarationOf(node.expression);
+      if (callee && !this.#inProject(callee.getSourceFile())) return undefined;
+    }
     if (ts.isIdentifier(node) || ts.isPropertyAccessExpression(node)) {
       const declaration = this.#declarationOf(node);
       // Modules from libraries, such as a config token's module, have no app routes.

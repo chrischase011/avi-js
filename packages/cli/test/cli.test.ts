@@ -149,7 +149,10 @@ describe.each(TEMPLATES.flatMap((t) => VALIDATORS.map((v) => [t, v] as const)))(
       const stale = path.join(project, 'dist/modules/old/old.test.js');
       await mkdir(path.dirname(stale), { recursive: true });
       await writeFile(stale, 'throw new Error("stale");');
-      expect(await main(['build', '--project', path.join(project, 'tsconfig.json')])).toBe(0);
+      const build = () => main(['build', '--project', path.join(project, 'tsconfig.json')]);
+      // The first avi build in a folder tsc already wrote only marks it.
+      expect(await build()).toBe(0);
+      expect(await build()).toBe(0);
       expect(existsSync(stale)).toBe(false);
       expect(existsSync(path.join(project, 'dist/main.js'))).toBe(true);
     }, 60_000);
@@ -191,6 +194,12 @@ describe.each(TEMPLATES.flatMap((t) => VALIDATORS.map((v) => [t, v] as const)))(
           'export async function name(): Promise<string> {',
           "  const user = await api.get('/users/:id', { params: { id: 1 } });",
           '  return user.name;',
+          '}',
+          'export async function typed(): Promise<void> {',
+          "  const user = await api.get('/users/:id', { params: { id: 1 } });",
+          '  // @ts-expect-error name is a string: the response type must survive without Node types',
+          '  const wrong: number = user.name;',
+          '  void wrong;',
           '}',
           ...(validator === 'none'
             ? []
@@ -578,4 +587,25 @@ export class PostsModule {}
     expect(unknown.code).toBe(2);
     expect(unknown.err[0]).toContain('Unknown validator "yup"');
   }, 60_000);
+});
+
+describe('avi usage mistakes', () => {
+  it('answers --help for every command, and turns bad options into usage', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    expect(await main(['generate', '--help'])).toBe(0);
+    expect(await main(['new', 'x', '-h'])).toBe(0);
+    expect(String(log.mock.calls[0]?.[0])).toContain('Usage:');
+    expect(await main(['build', '--nope'])).toBe(2);
+    expect(String(error.mock.calls[0]?.[0])).toContain("Unknown option '--nope'");
+    log.mockRestore();
+    error.mockRestore();
+  });
+
+  it('explains a stray argument from npm create without --', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    expect(await main(['new', 'shop', 'minimal', '--dir', workdir])).toBe(2);
+    expect(String(error.mock.calls[0]?.[0])).toContain('put options after --');
+    error.mockRestore();
+  });
 });

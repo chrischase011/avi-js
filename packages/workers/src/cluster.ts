@@ -293,7 +293,9 @@ async function runPrimary(
     await Promise.all(Array.from({ length: count }, fork));
   } catch (error) {
     await handle.close();
-    throw new Error(`Avi.js cluster failed to start: ${errorText(error)}`, { cause: error });
+    // The message already holds the whole cause chain; attaching the cause would print it twice.
+    // eslint-disable-next-line preserve-caught-error -- the chain is in the message
+    throw new Error(`Avi.js cluster failed to start: ${errorText(error)}`);
   }
 
   process.once('SIGINT', onSignal);

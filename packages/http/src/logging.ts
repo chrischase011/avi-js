@@ -75,7 +75,7 @@ export function logRequests(
 }
 
 function serializeError(error: unknown, depth = 0): unknown {
-  if (!(error instanceof Error)) return text(error);
+  if (!(error instanceof Error)) return plain(error);
   const result: Record<string, unknown> = {
     name: error.name,
     message: error.message,
@@ -85,6 +85,22 @@ function serializeError(error: unknown, depth = 0): unknown {
     result['cause'] = serializeError(error.cause, depth + 1);
   }
   return result;
+}
+
+// A thrown or cause object, such as validation issues, as JSON when it is small and serializable.
+function plain(value: unknown): unknown {
+  if (typeof value === 'object' && value !== null) {
+    try {
+      // JSON.stringify gives undefined for some values despite its type; length then throws.
+      const json = JSON.stringify(value) as string | undefined;
+      if (json !== undefined && json !== '{}' && json.length <= 10_000) {
+        return JSON.parse(json) as unknown;
+      }
+    } catch {
+      // Cycles and throwing getters fall back to text.
+    }
+  }
+  return text(value);
 }
 
 // Anything can be thrown, including objects without a prototype, which String() cannot convert.

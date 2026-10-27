@@ -115,3 +115,17 @@ describe('withHeaders', () => {
     expect((await client.get('/users/whoami')).body).not.toHaveProperty('auth');
   });
 });
+
+describe('headers', () => {
+  it('accepts Headers objects and tuple arrays, as typed calls allow', async () => {
+    client = await createTestClient(AppModule);
+    const fromHeaders = await client.get('/users/whoami', {
+      headers: new Headers({ authorization: 'Bearer a' }),
+    });
+    expect(fromHeaders.body).toMatchObject({ auth: 'Bearer a' });
+    const fromTuples = await client
+      .withHeaders([['authorization', 'Bearer b']])
+      .get('/users/whoami');
+    expect(fromTuples.body).toMatchObject({ auth: 'Bearer b' });
+  });
+});

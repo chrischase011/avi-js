@@ -19,6 +19,10 @@ const app = createAvi({
 });
 ```
 
+In a project from `npm create avi`, pass the same options to `AviFactory.create` in `src/main.ts`:
+`await AviFactory.create(AppModule, { onRequest: [...] })`. It initializes the app, so
+`app.get(Config)` keeps working there.
+
 ### Settings from the config
 
 Hooks are created before your providers, so a setting from your [config](13-configuration.md)
@@ -26,9 +30,9 @@ needs `defineHook` (from 0.7.0). It runs `create` once at startup with `inject` 
 and the config is loaded only once, through dependency injection:
 
 ```ts
-import { createAvi, defineHook } from '@avijs/core';
+import { AviFactory, defineHook } from '@avijs/core';
 
-const app = createAvi({
+const app = await AviFactory.create(AppModule, {
   onRequest: [
     securityHeaders(),
     defineHook({
@@ -36,7 +40,8 @@ const app = createAvi({
       create: (config) => cors({ origin: config.WEB_ORIGIN, credentials: true }),
     }),
   ],
-}).register(AppModule);
+});
+await app.listen(app.get(Config).PORT);
 ```
 
 The tokens must be visible from the modules you register, as for app-wide middleware; a missing one

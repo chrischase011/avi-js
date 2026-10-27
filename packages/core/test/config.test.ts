@@ -184,3 +184,20 @@ describe('defineConfig', () => {
     expect(() => defineConfig({} as never)).toThrow('defineConfig needs a Standard Schema');
   });
 });
+
+describe('config error messages', () => {
+  it('keep variable names and allowed values readable', async () => {
+    const Config = defineConfig(
+      v.object({
+        WEB_ORIGIN: v.pipe(v.string(), v.url()),
+        LOG_LEVEL: v.picklist(['info', 'warn', 'error']),
+      }),
+      { env: { LOG_LEVEL: 'verbose' } },
+    );
+    const error = (await Config.load().catch((e: unknown) => e)) as ConfigError;
+    const text = String(error);
+    expect(text).toContain('"WEB_ORIGIN"');
+    expect(text).toContain('"info"');
+    expect(text).not.toContain('verbose');
+  });
+});

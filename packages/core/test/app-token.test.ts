@@ -4,6 +4,7 @@ import {
   createAvi,
   createToken,
   defineFactory,
+  defineHook,
   describeApp,
   type AviApp,
 } from '../src/index.js';
@@ -30,5 +31,33 @@ describe('APP', () => {
 
   it('resolves in describeApp, which creates no app', () => {
     expect(() => describeApp({ providers })).not.toThrow();
+  });
+});
+
+describe('APP view', () => {
+  it('gives routes() and nothing else, also through app.get and hooks', async () => {
+    const seen: unknown[] = [];
+    const app = createAvi({
+      startupSummary: false,
+      onRequest: [
+        defineHook({
+          inject: [APP],
+          create: (view) => {
+            seen.push(view);
+            return () => undefined;
+          },
+        }),
+      ],
+    }).register({});
+    await app.init();
+    try {
+      const view = app.get(APP);
+      expect(Object.keys(view)).toEqual(['routes']);
+      expect(view).not.toBe(app);
+      expect(seen).toEqual([view]);
+      expect(view.routes()).toEqual(app.routes());
+    } finally {
+      await app.close();
+    }
   });
 });

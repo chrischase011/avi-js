@@ -135,6 +135,11 @@ export interface ClientOptions {
   readonly fetch?: (input: string, init: RequestInit) => Promise<Response>;
   /** Extra `fetch` options for every request, such as `credentials: 'include'`. */
   readonly init?: Omit<RequestInit, 'method' | 'body' | 'headers' | 'signal'>;
+  /**
+   * Largest server-sent event `events()` reads, in characters; a bigger one, or a line that never
+   * ends, throws. Default 1 MiB.
+   */
+  readonly maxEventSize?: number;
 }
 
 /** A response outside 2xx. `body` is Avi.js's error JSON when the server sent one. */
@@ -169,6 +174,10 @@ export function createClient<A extends ApiShape<A>>(options: ClientOptions): Cli
   // Paths are appended to it, so they would land in the query or the fragment.
   if (/[?#]/.test(base)) {
     throw new TypeError(`createClient: baseUrl cannot have a query or fragment: ${base}`);
+  }
+  const maxEventSize = options.maxEventSize ?? 1024 * 1024;
+  if (!Number.isSafeInteger(maxEventSize) || maxEventSize <= 0) {
+    throw new RangeError(`createClient: maxEventSize must be a positive integer`);
   }
 
   const send = async (method: Method, path: string, init: Options = {}): Promise<Response> => {
@@ -208,7 +217,14 @@ export function createClient<A extends ApiShape<A>>(options: ClientOptions): Cli
         if (!response.ok) {
           throw new AviClientError('GET', path, response, await readBody(response, 'GET'));
         }
-        if (response.body) yield* readEvents(response.body);
+        const type = response.headers.get('content-type') ?? '';
+        if (!/^text\/event-stream\b/i.test(type.trim())) {
+          await response.body?.cancel();
+          throw new TypeError(
+            `GET ${path} did not return an event stream (content-type: ${type || 'none'})`,
+          );
+        }
+        if (response.body) yield* readEvents(response.body, maxEventSize, path);
       } catch (error) {
         // Aborting is how a caller stops listening, not a failure.
         if (!init.signal?.aborted) throw error;
@@ -223,11 +239,18 @@ export function createClient<A extends ApiShape<A>>(options: ClientOptions): Cli
 }
 
 /** Parses an event stream as the HTML spec describes; `retry` is ignored since nothing reconnects. */
-async function* readEvents(body: ReadableStream<Uint8Array>): AsyncGenerator<SseMessage> {
+async function* readEvents(
+  body: ReadableStream<Uint8Array>,
+  max: number,
+  path: string,
+): AsyncGenerator<SseMessage> {
+  const tooLarge = () =>
+    new RangeError(`An event from GET ${path} is larger than ${String(max)} characters`);
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
   let data: string[] = [];
+  let size = 0;
   let event = '';
   let id: string | undefined;
   try {
@@ -238,6 +261,8 @@ async function* readEvents(body: ReadableStream<Uint8Array>): AsyncGenerator<Sse
       const end = !done && buffer.endsWith('\r') ? buffer.length - 1 : buffer.length;
       const lines = buffer.slice(0, end).split(/\r\n|\r|\n/);
       buffer = (lines.pop() ?? '') + buffer.slice(end);
+      // Bounds memory and the cost of re-splitting a line that never ends.
+      if (buffer.length > max) throw tooLarge();
       for (const line of lines) {
         if (line === '') {
           if (data.length > 0) {
@@ -248,6 +273,7 @@ async function* readEvents(body: ReadableStream<Uint8Array>): AsyncGenerator<Sse
             };
           }
           data = [];
+          size = 0;
           event = '';
           continue;
         }
@@ -256,8 +282,11 @@ async function* readEvents(body: ReadableStream<Uint8Array>): AsyncGenerator<Sse
         const field = colon === -1 ? line : line.slice(0, colon);
         let text = colon === -1 ? '' : line.slice(colon + 1);
         if (text.startsWith(' ')) text = text.slice(1);
-        if (field === 'data') data.push(text);
-        else if (field === 'event') event = text;
+        if (field === 'data') {
+          size += text.length + 1;
+          if (size > max) throw tooLarge();
+          data.push(text);
+        } else if (field === 'event') event = text;
         else if (field === 'id' && !text.includes('\0')) id = text;
       }
       // What is left is an event the stream cut off; the format drops it.

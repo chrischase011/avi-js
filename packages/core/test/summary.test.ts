@@ -181,6 +181,21 @@ describe('startup summary', () => {
     );
   });
 
+  it('reports a failing init() once, as AviFactory.create hits it', async () => {
+    terminal(false);
+    const Broken = createToken<string>('Broken');
+    const failing = { provide: Broken, useFactory: () => Promise.reject(new Error('no db')) };
+    const app = createAvi({ startupSummary: true }).register({ name: 'App', providers: [failing] });
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    await expect(app.init()).rejects.toThrow('Failed to create Broken');
+    // listen() after a failed init reports nothing more.
+    await expect(app.listen(0, '127.0.0.1')).rejects.toThrow('Failed to create Broken');
+    expect(error).toHaveBeenCalledTimes(1);
+    expect(String(error.mock.calls[0]?.[0])).toMatch(
+      /^Avi\.js \S+ failed to start after [\d.]+ ms: Providers: Failed to create Broken in App: no db$/,
+    );
+  });
+
   it('names the HTTP server when the port is taken', async () => {
     terminal(true);
     const blocker = createServer();

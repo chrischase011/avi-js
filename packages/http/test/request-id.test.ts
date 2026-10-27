@@ -161,6 +161,19 @@ describe('jsonLogger', () => {
     });
   });
 
+  it('keeps a plain-object cause, such as validation issues, as JSON', () => {
+    const lines: string[] = [];
+    const logger = jsonLogger({ write: (line) => lines.push(line) });
+    const issues = { issues: [{ path: ['id'], message: 'Expected number' }] };
+    logger.error('Request failed: GET /', new Error('Response does not match', { cause: issues }));
+    const circular: Record<string, unknown> = {};
+    circular['self'] = circular;
+    logger.error('Request failed: GET /x', new Error('odd', { cause: circular }));
+    const [first, second] = lines.map((line) => JSON.parse(line) as Record<string, unknown>);
+    expect(first?.['error']).toMatchObject({ cause: issues });
+    expect(second?.['error']).toMatchObject({ cause: '[object Object]' });
+  });
+
   it('honours the level and keeps its own keys over fields', () => {
     const lines: string[] = [];
     const logger = jsonLogger({ level: 'warn', write: (line) => lines.push(line) });

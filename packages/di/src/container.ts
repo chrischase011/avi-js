@@ -239,7 +239,12 @@ export class Container {
       }
       if (hit) found.add(hit);
     }
-    if (found.size === 0) throw new Error(`${tokenName(token)} is not visible to the root modules`);
+    if (found.size === 0) {
+      // Supplied tokens, such as `values`, are visible everywhere.
+      const supplied = this.#supplied.get(token);
+      if (supplied) return this.#instance(supplied);
+      throw new Error(`${tokenName(token)} is not visible to the root modules`);
+    }
     if (found.size > 1)
       throw new Error(`${tokenName(token)} is provided by more than one root module`);
     return this.#instance([...found][0] as ProviderRecord);

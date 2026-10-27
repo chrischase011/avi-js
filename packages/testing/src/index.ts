@@ -4,6 +4,7 @@ import {
   type ApiShape,
   type EndpointAt,
   type EndpointShape,
+  type HeadersLike,
   type Method,
   type PathsOf,
   type Query,
@@ -17,10 +18,12 @@ import {
   type ModuleRef,
 } from '@avijs/core';
 
+type HeadersArg = ConstructorParameters<typeof Headers>[0];
+
 export interface TestRequest {
   /** Objects are sent as JSON; strings, bytes and forms as they are. */
   body?: unknown;
-  headers?: Record<string, string>;
+  headers?: HeadersLike;
   query?: Query;
 }
 
@@ -53,7 +56,7 @@ export interface TestClient<A = never> {
    * The same client, sending these headers on every request, such as a user's token. Headers
    * passed to a call still win. Calls from either client reach the same app.
    */
-  withHeaders(headers: Record<string, string>): TestClient<A>;
+  withHeaders(headers: HeadersLike): TestClient<A>;
   /** Closes the app, which also disposes its providers. */
   close(): Promise<void>;
 }
@@ -99,7 +102,7 @@ export async function createTestClient<A extends ApiShape<A> = never>(
 function client<A>(app: AviApp, url: string, defaults: Headers): TestClient<A> {
   const request = async (method: string, path: string, init: TestRequest = {}) => {
     const headers = new Headers(defaults);
-    for (const [name, value] of Object.entries(init.headers ?? {})) headers.set(name, value);
+    for (const [name, value] of new Headers(init.headers as HeadersArg)) headers.set(name, value);
     let body: string | Uint8Array | FormData | URLSearchParams | Blob | undefined;
     if (init.body !== undefined) {
       if (isRawBody(init.body)) {
@@ -141,7 +144,7 @@ function client<A>(app: AviApp, url: string, defaults: Headers): TestClient<A> {
     api: Object.freeze(api) as unknown as TestApi<A>,
     withHeaders: (extra) => {
       const headers = new Headers(defaults);
-      for (const [name, value] of Object.entries(extra)) headers.set(name, value);
+      for (const [name, value] of new Headers(extra as HeadersArg)) headers.set(name, value);
       return client<A>(app, url, headers);
     },
     close: () => app.close(),

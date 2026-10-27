@@ -1,6 +1,6 @@
 {
   "name": "@avijs/openapi",
-  "version": "1.0.0-rc.1",
+  "version": "1.0.0-rc.2",
   "description": "OpenAPI 3.1 documents for Avi.js apps.",
   "keywords": [
     "avi",
@@ -44,7 +44,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@avijs/core": "workspace:*"
+    "@avijs/core": "workspace:^"
   },
   "devDependencies": {
     "@valibot/to-json-schema": "1.8.0",

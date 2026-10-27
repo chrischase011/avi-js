@@ -35,6 +35,16 @@ export interface AviModule extends ModuleDefinition {
 }
 
 const modules = new WeakSet<AviModule>();
+
+function notModuleHint(ref: unknown): string {
+  if (ref === undefined) return ' (is there a circular import?)';
+  const shaped =
+    typeof ref === 'object' && ref !== null && 'controllers' in ref && 'imports' in ref;
+  // A module made by another copy of @avijs/core looks right but is not registered here.
+  return shaped
+    ? ' (it comes from another copy of @avijs/core: use one version of every @avijs package; `npm ls @avijs/core` lists them)'
+    : '';
+}
 let anonymous = 0;
 
 export function defineModule(options: ModuleOptions = {}): AviModule {
@@ -46,7 +56,7 @@ export function defineModule(options: ModuleOptions = {}): AviModule {
     const module = toModule(ref);
     if (!module) {
       throw new TypeError(
-        `${name}.imports[${String(i)}] is not a module: use defineModule or @Module${(ref as unknown) === undefined ? ' (is there a circular import?)' : ''}`,
+        `${name}.imports[${String(i)}] is not a module: use defineModule or @Module${notModuleHint(ref)}`,
       );
     }
     return module;

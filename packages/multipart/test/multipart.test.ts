@@ -331,9 +331,12 @@ describe('multipart', () => {
 
   it('stops cleanly when the client disconnects mid-upload', async () => {
     let outcome: string | undefined;
+    let reading!: () => void;
+    const started = new Promise<void>((resolve) => (reading = resolve));
     const { port } = await serve(async (ctx) => {
       try {
         for await (const part of multipart(ctx)) {
+          reading();
           if (part.kind === 'file') await part.stream.toArray();
         }
         outcome = 'finished';
@@ -351,10 +354,10 @@ describe('multipart', () => {
     });
     req.on('error', () => undefined);
     req.write('--b\r\nContent-Disposition: form-data; name="f"; filename="a"\r\n\r\npartial data');
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    // Disconnect once the file is being read; a fixed delay can come before the request arrives.
+    await started;
     req.destroy();
 
-    // Generous: under a full parallel test run the abort can take over a second to land.
     await vi.waitFor(
       () => {
         expect(outcome).toBeDefined();
@@ -362,7 +365,7 @@ describe('multipart', () => {
       { timeout: 5_000 },
     );
     expect(outcome).not.toBe('finished');
-  });
+  }, 15_000);
 
   it('never fails with a 500 or hangs on arbitrary bodies', async () => {
     const { url, logger } = await serve(async (ctx) => {
@@ -403,5 +406,6 @@ describe('multipart', () => {
       { numRuns: Number(process.env['FUZZ_RUNS'] ?? 100) },
     );
     expect(logger.error).not.toHaveBeenCalled();
-  });
+    // Each run is a real request; deeper FUZZ_RUNS under a full parallel run needs the time.
+  }, 60_000);
 });

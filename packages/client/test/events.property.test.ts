@@ -53,6 +53,7 @@ it('reads back what was sent, however the bytes are split', async () => {
                     controller.close();
                   },
                 }),
+                { headers: { 'content-type': 'text/event-stream' } },
               ),
             ),
         });

@@ -76,6 +76,38 @@ describe('onUpgrade', () => {
     expect(Date.now() - started).toBeLessThan(2_000);
   });
 
+  it('gives each connection its own signal and forgets closed ones', async () => {
+    const signals: AbortSignal[] = [];
+    running = await startServer(ok, {
+      shutdownTimeout: 300,
+      onUpgrade: (req, socket, head, signal) => {
+        signals.push(signal);
+        echo(req, socket, head, signal);
+      },
+    });
+    for (let i = 0; i < 3; i++) {
+      const result = await upgrade(running.port);
+      if (!('socket' in result)) throw new Error('no upgrade');
+      const closed = new Promise<void>((resolve) => {
+        result.socket.once('close', () => {
+          resolve();
+        });
+      });
+      result.socket.destroy();
+      await closed;
+    }
+    const open = await upgrade(running.port);
+    if (!('socket' in open)) throw new Error('no upgrade');
+    open.socket.resume();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(new Set(signals).size).toBe(4);
+
+    await running.server.close();
+    running = undefined;
+    // Only the connection still open hears about shutdown; closed ones hold nothing.
+    expect(signals.map((s) => s.aborted)).toEqual([false, false, false, true]);
+  });
+
   it('destroys upgraded connections left open after shutdownTimeout', async () => {
     running = await startServer(ok, { shutdownTimeout: 200, onUpgrade: echo });
     const result = await upgrade(running.port);

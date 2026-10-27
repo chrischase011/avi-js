@@ -336,3 +336,28 @@ describe('OpenApiModule', () => {
     expect(await paths(empty)).toEqual([]);
   });
 });
+
+describe('OpenApiModule options', () => {
+  it('guards the document and leaves excluded routes out', async () => {
+    const routes = defineController({
+      routes: [
+        route({ method: 'GET', path: '/public', handler: () => 1 }),
+        route({ method: 'GET', path: '/admin', openapi: { exclude: true }, handler: () => 2 }),
+      ],
+    });
+    const staffOnly = (ctx: { headers: Record<string, unknown> }) => ctx.headers['x-staff'] === '1';
+    const app = createAvi({ startupSummary: false }).register({
+      imports: [OpenApiModule.forRoot({ info: { title: 'T', version: '1' }, guards: [staffOnly] })],
+      controllers: [routes],
+    });
+    running.push(app);
+    const { port } = await app.listen(0, '127.0.0.1');
+    const url = `http://127.0.0.1:${String(port)}/openapi.json`;
+    expect((await fetch(url)).status).toBe(403);
+    const document = (await (await fetch(url, { headers: { 'x-staff': '1' } })).json()) as {
+      paths: Record<string, Record<string, object>>;
+    };
+    expect(Object.keys(document.paths)).toEqual(['/public']);
+    expect(document.paths['/public']?.['get']).not.toHaveProperty('exclude');
+  });
+});

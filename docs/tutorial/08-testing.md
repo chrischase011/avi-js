@@ -38,8 +38,9 @@ The client has `get`, `post`, `put`, `patch`, `delete` and a general `request(me
 | `headers` | Request headers                                         |
 | `query`   | `{ tag: ['a', 'b'] }` becomes `?tag=a&tag=b`            |
 
-Each response has `status`, `headers`, `text`, and `body`: parsed JSON for JSON responses, the text
-otherwise. `client.close()` stops the app and disposes its providers.
+Each response has `status`, `headers` (a `Headers`, so `res.headers.get('x-request-id')`), `text`,
+and `body`: parsed JSON for JSON responses, the text otherwise. `client.close()` stops the app and
+disposes its providers.
 
 ### Signed-in requests
 

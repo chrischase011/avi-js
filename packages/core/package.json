@@ -1,6 +1,6 @@
 {
   "name": "@avijs/core",
-  "version": "1.0.0-rc.1",
+  "version": "1.0.0-rc.2",
   "description": "Avi.js public API: application factory, modules and controllers.",
   "keywords": [
     "avi",
@@ -46,9 +46,9 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@avijs/di": "workspace:*",
-    "@avijs/http": "workspace:*",
-    "@avijs/validation": "workspace:*"
+    "@avijs/di": "workspace:^",
+    "@avijs/http": "workspace:^",
+    "@avijs/validation": "workspace:^"
   },
   "devDependencies": {
     "valibot": "1.5.0"

@@ -1,4 +1,3 @@
-import type { Readable } from 'node:stream';
 import type { Reply } from '@avijs/http';
 import type { InferInput, InferOutput, PathParams, StandardSchemaV1 } from '@avijs/validation';
 import type { ControllerDefinition } from './controller.js';
@@ -43,6 +42,15 @@ export type Jsonify<T> = unknown extends T
             ? Record<string, never>
             : JsonObject<T>;
 
+/**
+ * A Node.js stream, by shape: importing `node:stream` here would turn every response type into
+ * `any` in a frontend compiled without Node types.
+ */
+interface NodeStream {
+  readonly readable: boolean;
+  pipe(destination: never, options?: never): unknown;
+}
+
 /** What the client receives for a handler result `R`. */
 export type ResponseBody<R> = unknown extends R
   ? unknown
@@ -51,7 +59,7 @@ export type ResponseBody<R> = unknown extends R
     ? undefined
     : R extends Reply<infer B>
       ? ResponseBody<B>
-      : R extends Uint8Array | ReadableStream | Readable
+      : R extends Uint8Array | ReadableStream | NodeStream
         ? Response
         : R extends Response
           ? unknown

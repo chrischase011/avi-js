@@ -85,6 +85,13 @@ export function summaryLine(report: StartupReport): string {
   return `Avi.js ${report.version} started in ${ms(report.durationMs)}: ${parts.join(', ')}, listening on ${report.url ?? '?'}`;
 }
 
+/** One line for logs when startup fails: the step and the reason, causes included. */
+export function failureLine(report: StartupReport): string {
+  const { step = 'Startup', message = '' } = report.failure ?? {};
+  const reason = message.split('\n').join(': ');
+  return `Avi.js ${report.version} failed to start after ${ms(report.durationMs)}: ${step}: ${reason}`;
+}
+
 /** Fields for a structured logger. */
 export function summaryFields(report: StartupReport): Record<string, unknown> {
   return {

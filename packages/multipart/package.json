@@ -1,6 +1,6 @@
 {
   "name": "@avijs/multipart",
-  "version": "1.0.0-rc.1",
+  "version": "1.0.0-rc.2",
   "description": "Streaming file uploads (multipart/form-data) for Avi.js.",
   "keywords": [
     "avi",
@@ -45,7 +45,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@avijs/http": "workspace:*",
+    "@avijs/http": "workspace:^",
     "@fastify/busboy": "3.2.4"
   }
 }

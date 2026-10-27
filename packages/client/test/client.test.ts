@@ -333,6 +333,34 @@ describe('events', () => {
       },
     });
 
+  it('refuses events larger than maxEventSize, and responses that are not event streams', async () => {
+    const serve = (body: string, type = 'text/event-stream') =>
+      createClient<FeedApi>({
+        baseUrl: 'http://test',
+        maxEventSize: 100,
+        fetch: () => Promise.resolve(new Response(body, { headers: { 'content-type': type } })),
+      });
+    const first = (api: ReturnType<typeof serve>) =>
+      api
+        .events('/feed/:room', { params: { room: 'a' } })
+        [Symbol.asyncIterator]()
+        .next()
+        .catch((e: unknown) => e);
+
+    expect(await first(serve('x'.repeat(500)))).toBeInstanceOf(RangeError);
+    expect(await first(serve('data: 0123456789\n'.repeat(20)))).toBeInstanceOf(RangeError);
+    expect(await first(serve('data: small\n\n'))).toEqual({
+      done: false,
+      value: { event: 'message', data: 'small' },
+    });
+    const html = await first(serve('<html>', 'text/html'));
+    expect(html).toBeInstanceOf(TypeError);
+    expect((html as Error).message).toContain('did not return an event stream');
+    expect(() => createClient<FeedApi>({ baseUrl: 'http://test', maxEventSize: 0 })).toThrow(
+      RangeError,
+    );
+  });
+
   it('reads an sse() stream with the client headers', async () => {
     const server = createAvi({ startupSummary: false }).register({ controllers: [feed] });
     const { port } = await server.listen(0, '127.0.0.1');

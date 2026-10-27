@@ -262,7 +262,8 @@ let client: TestClient<Api>;
 before(async () => {
   client = await createTestClient<Api>(AppModule);
 });
-after(() => client.close());
+// client is unset when before() failed; that error is the one to read.
+after(() => client?.close());
 
 test('lists users', async () => {
   // client.api is typed from src/api.gen.ts: paths, params, bodies and responses.
@@ -384,7 +385,8 @@ let client: TestClient<Api>;
 before(async () => {
   client = await createTestClient<Api>(createApp());
 });
-after(() => client.close());
+// client is unset when before() failed; that error is the one to read.
+after(() => client?.close());
 
 test('lists users', async () => {
   // client.api is typed from src/api.gen.ts: paths, params, bodies and responses.
@@ -522,7 +524,8 @@ let client: TestClient<Api>;
 before(async () => {
   client = await createTestClient<Api>(AppModule);
 });
-after(() => client.close());
+// client is unset when before() failed; that error is the one to read.
+after(() => client?.close());
 
 test('lists users', async () => {
   // client.api is typed from src/api.gen.ts: paths, params, bodies and responses.
@@ -617,7 +620,8 @@ let client: TestClient<Api>;
 before(async () => {
   client = await createTestClient<Api>(createApp());
 });
-after(() => client.close());
+// client is unset when before() failed; that error is the one to read.
+after(() => client?.close());
 
 test('lists users', async () => {
   // client.api is typed from src/api.gen.ts: paths, params, bodies and responses.

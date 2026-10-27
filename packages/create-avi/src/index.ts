@@ -25,10 +25,11 @@ export async function create(
       dir: { type: 'string' },
       'avi-version': { type: 'string' },
       from: { type: 'string' },
+      help: { type: 'boolean' },
     },
   });
 
-  if (positionals.length === 0 && ask) {
+  if (positionals.length === 0 && ask && !values.help && !args.includes('-h')) {
     args.unshift(await ask('Project name', 'my-avi-app'));
     if (values.template === undefined) {
       args.push('--template', await ask('Template, modular or minimal', 'modular'));

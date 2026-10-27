@@ -208,3 +208,12 @@ describe('defineModule', () => {
     expect(instance.get(GreetingService).greet('Linus')).toBe('Hi, Linus!');
   });
 });
+
+describe('module from another copy of core', () => {
+  it('says so when an import looks like a module but is not registered', () => {
+    const foreign = Object.freeze({ name: 'Other', prefix: '/', imports: [], controllers: [] });
+    expect(() => defineModule({ imports: [foreign as never] })).toThrow(
+      'another copy of @avijs/core',
+    );
+  });
+});

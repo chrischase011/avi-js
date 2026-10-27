@@ -1,6 +1,6 @@
 {
   "name": "@avijs/validation",
-  "version": "1.0.0-rc.1",
+  "version": "1.0.0-rc.2",
   "description": "Standard Schema validation for Avi.js routes.",
   "keywords": [
     "avi",
@@ -44,7 +44,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@avijs/http": "workspace:*"
+    "@avijs/http": "workspace:^"
   },
   "devDependencies": {
     "valibot": "1.5.0"

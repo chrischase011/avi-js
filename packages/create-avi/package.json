@@ -1,6 +1,6 @@
 {
   "name": "create-avi",
-  "version": "1.0.0-rc.1",
+  "version": "1.0.0-rc.2",
   "description": "Create an Avi.js project: npm create avi@latest my-app",
   "keywords": [
     "avi",
@@ -48,7 +48,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@avijs/cli": "workspace:*"
+    "@avijs/cli": "workspace:^"
   },
   "peerDependencies": {
     "typescript": ">=5.8"

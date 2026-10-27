@@ -61,6 +61,9 @@ it; the changelog says so.
 
 Stable releases are published to npm's `latest` tag, which `npm install` uses. Release candidates
 go to `next`: `npm install @avijs/core@next` tries one before it becomes the next stable release.
+Install every `@avijs` package from `next` then, such as `npm install @avijs/security@next`: a
+package from `latest` would bring its own copy of `@avijs/core`, and modules from one copy are not
+modules to the other.
 
 ## Next
 

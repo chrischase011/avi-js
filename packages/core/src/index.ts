@@ -32,6 +32,7 @@ export { defineModule } from './module.js';
 export type { AviModule, ModuleOptions, ModuleRef } from './module.js';
 export { route } from './pipeline.js';
 export { APP, REQUEST } from './request.js';
+export type { AppInfo } from './request.js';
 export type {
   GuardClass,
   GuardRef,

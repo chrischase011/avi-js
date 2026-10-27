@@ -41,6 +41,7 @@ import {
 import { APP, REQUEST, REQUEST_TOKENS } from './request.js';
 import {
   addressUrl,
+  failureLine,
   formatSummary,
   summaryFields,
   summaryLine,
@@ -182,7 +183,20 @@ class Application implements AviApp {
   }
 
   init(): Promise<void> {
-    return (this.#init ??= this.#start());
+    // AviFactory.create calls this directly, so a failure is reported here, not only by listen().
+    this.#init ??= this.#start().catch((error: unknown) => {
+      this.#fail(error);
+      throw error;
+    });
+    return this.#init;
+  }
+
+  #failed = false;
+
+  #fail(error: unknown): void {
+    if (this.#failed) return;
+    this.#failed = true;
+    this.#announce({ step: this.#step, message: describeFailure(error) });
   }
 
   async listen(port: number, host?: string): Promise<AddressInfo> {
@@ -192,7 +206,7 @@ class Application implements AviApp {
       this.#step = 'HTTP server';
       address = await this.#server.listen(port, host);
     } catch (error) {
-      this.#announce({ step: this.#step, message: describeFailure(error) });
+      this.#fail(error);
       throw error;
     }
     this.#report.url = addressUrl(address);
@@ -215,13 +229,16 @@ class Application implements AviApp {
     }
 
     if (this.#logger.info) {
-      if (!failure) this.#logger.info('Application started', summaryFields(report));
+      if (failure) this.#logger.error('Application failed to start', undefined, { ...failure });
+      else this.#logger.info('Application started', summaryFields(report));
     } else if (process.stdout.isTTY) {
       // isTTY can be set on a plain stream (tests do), which has no hasColors.
       const { hasColors } = process.stdout as { hasColors?: () => boolean };
       const colors = hasColors?.call(process.stdout) ?? false;
       process.stdout.write(formatSummary(report, this.#summary === 'routes', colors));
-    } else if (!failure) {
+    } else if (failure) {
+      console.error(failureLine(report));
+    } else {
       console.log(summaryLine(report));
     }
   }
@@ -245,7 +262,8 @@ class Application implements AviApp {
     const container = new Container(this.#roots, {
       overrides: this.#overrides,
       requestTokens: REQUEST_TOKENS,
-      values: new Map([[APP, this]]),
+      // Not the app itself: a module must not reach providers it was not given, or close the app.
+      values: new Map([[APP, Object.freeze({ routes: () => this.routes() })]]),
     });
     const modules = container.modules as AviModule[];
     const report = this.#report;

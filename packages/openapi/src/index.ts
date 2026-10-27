@@ -2,8 +2,10 @@ import {
   APP,
   defineController,
   defineModule,
-  type AviApp,
+  type AppInfo,
   type AviModule,
+  type GuardRef,
+  type MiddlewareRef,
   type RouteInfo,
   type StandardSchemaV1,
 } from '@avijs/core';
@@ -81,7 +83,7 @@ const VALIDATION_ERROR: JsonSchema = {
 };
 
 /** Builds an OpenAPI 3.1 document from an initialized app's routes and schemas. */
-export function generateOpenApi(app: AviApp, options: OpenApiOptions): OpenApiDocument {
+export function generateOpenApi(app: AppInfo, options: OpenApiOptions): OpenApiDocument {
   const toJson = options.toJsonSchema ?? standardJsonSchema;
   const convert = (route: RouteInfo, part: 'params' | 'query' | 'body' | 'response') => {
     const schema = route.schema?.[part];
@@ -102,8 +104,11 @@ export function generateOpenApi(app: AviApp, options: OpenApiOptions): OpenApiDo
 
   for (const route of [...app.routes()].sort(byPath)) {
     if (route.module === MODULE_NAME && route.controller === CONTROLLER_NAME) continue;
+    // exclude is Avi.js's own: it never goes into the document.
+    const { exclude, ...docs } = route.openapi ?? {};
+    if (exclude) continue;
     const { path, names } = openApiPath(route.path);
-    const operation: Operation = { ...route.openapi, responses: {} };
+    const operation: Operation = { ...docs, responses: {} };
     const parameters: Parameter[] = [];
 
     const params = objectProperties(convert(route, 'params'));
@@ -202,6 +207,9 @@ function byPath(a: RouteInfo, b: RouteInfo): number {
 export interface OpenApiModuleOptions extends OpenApiOptions {
   /** Where the document is served. Default `/openapi.json`. */
   readonly path?: string;
+  /** Guards for the document's route, such as one that only lets staff read it. */
+  readonly guards?: readonly GuardRef[];
+  readonly middleware?: readonly MiddlewareRef[];
 }
 
 export const OpenApiModule = {
@@ -210,15 +218,17 @@ export const OpenApiModule = {
    * Its own route is left out of the document.
    */
   forRoot(options: OpenApiModuleOptions): AviModule {
-    const { path = '/openapi.json', ...document } = options;
+    const { path = '/openapi.json', guards = [], middleware = [], ...document } = options;
     // Per app, so two apps registering this module never share a document.
-    const built = new WeakMap<AviApp, OpenApiDocument>();
+    const built = new WeakMap<AppInfo, OpenApiDocument>();
     return defineModule({
       name: MODULE_NAME,
       controllers: [
         defineController({
           name: CONTROLLER_NAME,
           inject: [APP],
+          guards,
+          middleware,
           routes: (app) => [
             {
               method: 'GET',

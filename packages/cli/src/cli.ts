@@ -1,5 +1,5 @@
 import { buildProject, main as compile, watchProject } from '@avijs/compiler';
-import { spawn, type ChildProcess } from 'node:child_process';
+import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdir, readdir, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -20,10 +20,10 @@ const USAGE = `Usage:
       a folder of packed @avijs tarballs (pnpm pack) to install instead of the registry.
       --avi-version defaults to this CLI's version.
 ${GENERATE_USAGE}
-  avi dev [--project tsconfig.json] [--entry dist/main.js] [--client src/api.gen.ts | --no-client]
+  avi dev [--project tsconfig.json] [--entry dist/main.js] [--client src/api.gen.ts | --no-client] [--root file.ts#AppModule]
       Compile, then recompile and restart on every change. Keeps src/api.gen.ts (when the
       project has one) in step with the routes.
-  avi build [--project tsconfig.json] [--client src/api.gen.ts | --no-client]
+  avi build [--project tsconfig.json] [--client src/api.gen.ts | --no-client] [--root file.ts#AppModule]
       Update src/api.gen.ts, empty the output folder, and compile, so files deleted from
       src do not linger in dist.
   avi check [--project tsconfig.json]
@@ -35,6 +35,24 @@ ${GENERATE_USAGE}
       file is out of date, for CI; --watch updates it on every change.`;
 
 export async function main(argv: readonly string[]): Promise<number> {
+  if (argv.includes('--help') || argv.includes('-h')) {
+    console.log(USAGE);
+    return 0;
+  }
+  try {
+    return await run(argv);
+  } catch (error) {
+    // parseArgs rejects unknown options and missing values; that is a usage mistake, not a crash.
+    const code = (error as { code?: unknown }).code;
+    if (typeof code === 'string' && code.startsWith('ERR_PARSE_ARGS_')) {
+      console.error(`${(error as Error).message}\n\n${USAGE}`);
+      return 2;
+    }
+    throw error;
+  }
+}
+
+async function run(argv: readonly string[]): Promise<number> {
   const [command, ...rest] = argv;
   switch (command) {
     case 'new':
@@ -69,6 +87,13 @@ async function create(args: readonly string[]): Promise<number> {
     },
   });
   const name = positionals[0];
+  if (positionals.length > 1) {
+    // npm create keeps unknown flags for itself and passes their values on as arguments.
+    console.error(
+      `Unexpected argument "${String(positionals[1])}". With npm create, put options after --: npm create avi@latest ${String(name)} -- --template minimal`,
+    );
+    return 2;
+  }
   if (!name || !/^[a-z0-9][a-z0-9._-]*$/.test(name)) {
     console.error('avi new needs a project name in lowercase letters, digits, ".", "_" or "-"');
     return 2;
@@ -123,6 +148,7 @@ async function dev(args: readonly string[]): Promise<number> {
       entry: { type: 'string', default: 'dist/main.js' },
       client: { type: 'string' },
       'no-client': { type: 'boolean', default: false },
+      root: { type: 'string' },
       'dry-run': { type: 'boolean', default: false },
     },
   });
@@ -142,7 +168,7 @@ async function dev(args: readonly string[]): Promise<number> {
     // The app starts after the first clean build; node --watch restarts it from then on.
     const watcher = watchProject({
       project: values.project,
-      ...(client ? { client: { out: client } } : {}),
+      ...(client ? { client: { out: client, root: values.root } } : {}),
       onBuild: (errors) => {
         if (errors > 0 || app) return;
         // development unless set: cluster() then runs in one process, which node --watch restarts.
@@ -155,7 +181,7 @@ async function dev(args: readonly string[]): Promise<number> {
     });
     const stop = (code: number) => {
       watcher.close();
-      app?.kill();
+      if (app) killTree(app);
       resolve(code);
     };
     process.once('SIGINT', () => {
@@ -167,6 +193,15 @@ async function dev(args: readonly string[]): Promise<number> {
   });
 }
 
+/** Ends a child and what it started: on Windows kill() would leave node --watch's app running. */
+function killTree(child: ChildProcess): void {
+  if (process.platform === 'win32' && child.pid !== undefined) {
+    spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
+  } else {
+    child.kill();
+  }
+}
+
 function build(args: readonly string[]): number {
   const { values } = parseArgs({
     args: [...args],
@@ -174,12 +209,13 @@ function build(args: readonly string[]): number {
       project: { type: 'string', default: 'tsconfig.json' },
       client: { type: 'string' },
       'no-client': { type: 'boolean', default: false },
+      root: { type: 'string' },
     },
   });
   const client = clientFile(values.project, values.client, values['no-client']);
   const errors = buildProject({
     project: values.project,
-    ...(client ? { client: { out: client } } : {}),
+    ...(client ? { client: { out: client, root: values.root } } : {}),
   });
   return errors > 0 ? 1 : 0;
 }

@@ -308,7 +308,7 @@ importers:
   packages/cli:
     dependencies:
       '@avijs/compiler':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../compiler
       typescript:
         specifier: '>=5.8'
@@ -324,7 +324,7 @@ importers:
   packages/client:
     devDependencies:
       '@avijs/core':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../core
       valibot:
         specifier: 1.5.0
@@ -333,14 +333,14 @@ importers:
   packages/compiler:
     dependencies:
       '@avijs/core':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../core
       typescript:
         specifier: '>=5.8'
         version: 6.0.3
     devDependencies:
       '@avijs/client':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../client
       valibot:
         specifier: 1.5.0
@@ -349,13 +349,13 @@ importers:
   packages/core:
     dependencies:
       '@avijs/di':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../di
       '@avijs/http':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../http
       '@avijs/validation':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../validation
     devDependencies:
       valibot:
@@ -365,7 +365,7 @@ importers:
   packages/create-avi:
     dependencies:
       '@avijs/cli':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../cli
       typescript:
         specifier: '>=5.8'
@@ -378,7 +378,7 @@ importers:
   packages/multipart:
     dependencies:
       '@avijs/http':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../http
       '@fastify/busboy':
         specifier: 3.2.4
@@ -387,7 +387,7 @@ importers:
   packages/openapi:
     dependencies:
       '@avijs/core':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../core
     devDependencies:
       '@valibot/to-json-schema':
@@ -403,16 +403,16 @@ importers:
   packages/security:
     dependencies:
       '@avijs/http':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../http
 
   packages/testing:
     dependencies:
       '@avijs/client':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../client
       '@avijs/core':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../core
     devDependencies:
       valibot:
@@ -422,7 +422,7 @@ importers:
   packages/validation:
     dependencies:
       '@avijs/http':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../http
     devDependencies:
       valibot:
@@ -432,7 +432,7 @@ importers:
   packages/workers:
     dependencies:
       '@avijs/core':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../core
 
   web:

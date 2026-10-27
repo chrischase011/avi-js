@@ -82,7 +82,9 @@ export function defineConfig<S extends StandardSchemaV1>(
       result.issues.map((issue) => {
         const segment = issue.path?.[0];
         const key = String(typeof segment === 'object' ? segment.key : (segment ?? '(config)'));
-        return { key, message: redact(issue.message, env[key]) };
+        // An issue about the whole config may quote any variable.
+        const values = segment === undefined ? Object.values(env) : [env[key]];
+        return { key, message: redact(issue.message, values) };
       }),
       name,
     );
@@ -109,10 +111,19 @@ async function readEnvFile(path: string, required: boolean): Promise<Record<stri
   return parseEnv(text) as Record<string, string>;
 }
 
-// Libraries quote the received value in messages, often after a transform changed it, and config
-// values can be secrets. Every quoted text goes, and the raw value wherever it still appears.
-function redact(message: string, value: string | undefined): string {
-  const unquoted = message.replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g, '"[redacted]"');
+// Libraries quote the received value in messages, sometimes after a transform trimmed or cut it,
+// and config values can be secrets. Quoted text that is part of the value, or holds it, goes, and
+// the raw value wherever it still appears. Names and allowed values stay readable.
+function redact(message: string, values: readonly (string | undefined)[]): string {
+  const secrets = values.filter((value): value is string => Boolean(value));
+  if (secrets.length === 0) return message;
+  const raws = secrets.map((value) => value.toLowerCase());
+  let text = message.replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g, (quoted) => {
+    const inner = quoted.slice(1, -1).toLowerCase();
+    const related = raws.some((raw) => raw.includes(inner) || inner.includes(raw));
+    return inner && related ? '"[redacted]"' : quoted;
+  });
   // Very short values would match inside other words and numbers.
-  return value && value.length >= 4 ? unquoted.replaceAll(value, '[redacted]') : unquoted;
+  for (const value of secrets) if (value.length >= 4) text = text.replaceAll(value, '[redacted]');
+  return text;
 }
