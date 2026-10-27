@@ -22,10 +22,10 @@ A lightweight, TypeScript-first backend framework for Node.js, featuring NestJS-
 ---
 
 > [!IMPORTANT]
-> Avi.js is in early development (0.x), so the API may still change between minor versions before
-> 1.0. Everything shown below works today: both API styles, routing, modules and dependency injection, middleware and guards, safe
-> errors, schema validation with any Standard Schema library, and graceful shutdown. Follow along,
-> try it, and help shape it before 1.0.
+> Avi.js 1.0 is in its release candidate: `npm install @avijs/core@next`, or
+> `npm create avi@next my-app`. Until 1.0.0 the API only gets fixes; see
+> [Stability and versions](docs/tutorial/17-stability.md) for what 1.x promises. Try it, and
+> report what gets in your way.
 
 ## Two styles, one engine
 
@@ -58,7 +58,6 @@ import { Controller, Get, Module, AviFactory, type Context } from '@avijs/core';
 
 @Controller('/users')
 class UsersController {
-  static inject = [UsersService] as const;
   constructor(private readonly users: UsersService) {}
 
   @Get('/')
@@ -78,6 +77,10 @@ class AppModule {}
 const app = await AviFactory.create(AppModule);
 await app.listen(3000);
 ```
+
+`avi dev` reads `UsersController`'s constructor and writes its dependency list into
+`src/inject.gen.ts`, plain code you can read. `static inject = [UsersService] as const` in the
+class does the same by hand, and wins.
 
 ## Project structure
 
@@ -139,12 +142,12 @@ so you can move from minimal to modular one feature at a time. The tutorial's
 
 ## Why Avi.js
 
-**Explicit by design.** Each class lists its dependencies in code, so there is no need for
-`reflect-metadata`, `emitDecoratorMetadata` or `experimentalDecorators`. What you read is what
-runs.
+**Explicit by design.** Every class's dependencies exist as code, generated from its constructor
+or written by you, so there is no need for `reflect-metadata`, `emitDecoratorMetadata` or
+`experimentalDecorators`. What you read is what runs.
 
-**Types that follow your wiring.** List a service's dependencies once and TypeScript infers the
-rest. Swap two entries by mistake and the compiler tells you.
+**Types that follow your wiring.** Write a dependency list yourself and TypeScript checks it
+against the constructor: swap two entries by mistake and the compiler tells you.
 
 **Catch configuration errors early.** Missing providers, invalid exports, dependency cycles, and
 conflicting routes are detected during application initialization, before the server starts
