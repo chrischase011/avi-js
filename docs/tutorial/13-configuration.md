@@ -39,7 +39,7 @@ other dependency:
 ```ts
 @Injectable()
 export class Database {
-  static inject = [Config] as const;
+  // Config is a token named like its type, so avi dev infers it; no list needed.
   constructor(private readonly config: Config) {}
 
   connect() {

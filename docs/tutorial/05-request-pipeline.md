@@ -121,12 +121,12 @@ client gets a 500 and the log says `ctx.state.user is not set: is a guard missin
 ## Classes with dependencies
 
 Middleware and guards can be classes with `use(ctx, next)` or `canActivate(ctx)`. Avi.js builds
-each class once per app with its `static inject`, resolved from the module where it is attached.
-You do not list them in `providers`.
+each class once per app, with dependencies resolved from the module where it is attached. Their
+lists are inferred like any class's ([chapter 3](03-modules-and-di.md#dependency-lists)), or
+written in `static inject`. You do not list them in `providers`.
 
 ```ts
-class AuthMiddleware {
-  static inject = [SessionStore] as const;
+export class AuthMiddleware {
   constructor(private readonly sessions: SessionStore) {}
 
   async use(ctx: Context, next: Next) {

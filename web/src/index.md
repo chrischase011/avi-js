@@ -63,7 +63,6 @@ class UsersService {
 
 @Controller('/users')
 class UsersController {
-  static inject = [UsersService] as const;
   constructor(private readonly users: UsersService) {}
 
   @Get()
@@ -100,4 +99,9 @@ await app.listen(3000);
 
 :::
 
-Avi.js is in early development (0.x): the API may still change between minor versions before 1.0.
+No `reflect-metadata`: with decorators, `avi dev` reads `UsersController`'s constructor and writes
+its dependency list into `src/inject.gen.ts`, plain code you can read. `static inject =
+[UsersService]` in the class does the same by hand.
+
+Avi.js 1.0 is in its release candidate: install it with `npm install @avijs/core@next`. Until
+1.0.0 the API only gets fixes; [Stability and versions](/tutorial/17-stability) says what 1.x promises.

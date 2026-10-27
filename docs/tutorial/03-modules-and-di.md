@@ -163,6 +163,7 @@ import { Injectable, REQUEST, type Context } from '@avijs/core';
 
 @Injectable({ scope: 'request' })
 class CurrentUser {
+  // REQUEST is not named like its type Context, so this class lists what it needs.
   static inject = [REQUEST, UsersService] as const;
   readonly id: string;
   constructor(ctx: Context, users: UsersService) {
