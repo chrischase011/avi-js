@@ -84,7 +84,7 @@ export function controllerFromClass(cls: Class): ControllerDefinition {
   if (!Array.isArray(inject)) throw new TypeError(`${cls.name}.inject must be an array of tokens`);
   if (cls.length > inject.length) {
     throw new TypeError(
-      `${cls.name} takes ${String(cls.length)} constructor arguments but static inject lists ${String(inject.length)}`,
+      `${cls.name} takes ${String(cls.length)} constructor arguments but static inject lists ${String(inject.length)}: add static inject, or import inject.gen.ts, which avi dev keeps up to date`,
     );
   }
 

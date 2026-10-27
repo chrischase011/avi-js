@@ -36,8 +36,8 @@ advisory and a note in the [changelog](https://github.com/chrischase011/avi-js/b
   `avi client` and are never set at runtime.
 - **Wording**: the text of error messages, log lines and the startup summary may improve. Match on
   status codes, error classes and the error JSON shape, not on messages.
-- **Generated files**: what `avi client` writes may change in a minor release, as long as it gives
-  the same types. Regenerate it after upgrading, or let `avi dev` do it.
+- **Generated files**: what `avi client` and `avi inject` write may change in a minor release, as
+  long as it gives the same types and lists. Regenerate them after upgrading, or let `avi dev` do it.
 
 ## Deprecations
 

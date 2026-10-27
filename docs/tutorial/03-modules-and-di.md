@@ -3,10 +3,39 @@
 > **Status: Runnable.** Everything on this page works today. The decorator versions
 > (`@Injectable`, `@Module`) arrive in [Chapter 4](04-controllers.md).
 
-## Services declare their dependencies
+## Dependency lists
 
-Avi.js does not use `reflect-metadata` and never guesses constructor types. A class lists what it
-needs in `static inject`, in constructor order:
+Avi.js does not use `reflect-metadata`: TypeScript's types are gone at runtime, so each class has a
+list of what to inject, in constructor order. You write it, or the build writes it for you.
+
+**Written for you.** In a project from `npm create avi`, a class just takes its dependencies:
+
+```ts
+export class UsersService {
+  constructor(
+    private readonly db: Db,
+    private readonly config: Config,
+  ) {}
+}
+```
+
+`avi dev` and `avi build` read the constructor's types with the TypeScript compiler they already
+run, and keep the lists in `src/inject.gen.ts` (from 1.0.0-rc.3), which `app.module.ts` imports
+first:
+
+```ts
+// src/inject.gen.ts, generated: do not edit
+registerInjects([[UsersService, [Db, Config]]]);
+```
+
+It is plain code you can read and commit, so tests and other runners need no plugin, and it only
+changes when a constructor does. A type can be inferred when it is a class, or has a token of the
+same name: `PrismaClient`, `Config` with `type Config = TokenType<typeof Config>`, or
+`createToken<Db>('Db')` next to `interface Db`. For anything else, such as a `string`, the build
+warns (`AVI201`) and names the class. Outside `avi dev`, `avi inject` writes the file once.
+
+**Written by you.** A class can always list its dependencies in `static inject`. A list in the
+class wins over a generated one, and it needs no build step:
 
 ```ts
 import { createToken } from '@avijs/core';
@@ -29,8 +58,9 @@ export class GreetingService {
 ```
 
 A token is either a class or a typed token from `createToken<T>()`. Plain strings are not tokens,
-so a typo fails to compile instead of failing at runtime. If a constructor takes more arguments
-than `inject` lists, startup fails and names the class.
+so a typo fails to compile instead of failing at runtime. With `@Injectable` or `@Controller`,
+TypeScript checks a written list against the constructor. If a class has no list at all, startup
+fails, names the class, and says how to fix it.
 
 ## Modules group providers
 

@@ -32,9 +32,18 @@ interface InjectMismatch {
   readonly 'static inject must list the constructor parameter types in order, declared `as const`': never;
 }
 
-/** Resolves to `unknown` when `static inject` fits the constructor, else to an error type. */
+/**
+ * Resolves to `unknown` when `static inject` fits the constructor, else to an error type. A class
+ * without one passes: its list comes from inject.gen.ts, or startup says it is missing.
+ */
 export type CheckInject<C extends Class> =
-  ResolveTokens<InjectOf<C>> extends ConstructorParameters<C> ? unknown : InjectMismatch;
+  HasInject<C> extends false
+    ? unknown
+    : ResolveTokens<InjectOf<C>> extends ConstructorParameters<C>
+      ? unknown
+      : InjectMismatch;
+
+type HasInject<C> = 'inject' extends keyof C ? true : false;
 
 export function Controller(prefix = '/') {
   if (typeof prefix !== 'string') throw usage('@Controller');

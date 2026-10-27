@@ -47,8 +47,7 @@ describe('static inject is checked against the constructor', () => {
     expectTypeOf(Repo).not.toBeNever();
   });
 
-  it('rejects a missing inject list', () => {
-    // @ts-expect-error constructor needs Db but inject is missing
+  it('accepts a class without an inject list, for inject.gen.ts to fill in', () => {
     @Controller()
     class Users {
       constructor(readonly db: Db) {}

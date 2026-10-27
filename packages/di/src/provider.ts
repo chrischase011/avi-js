@@ -138,7 +138,7 @@ function classSpec(token: Token, cls: Constructor, scope: Scope, where: string):
   const deps = checkInject(cls.inject, `${where} ${cls.name}.inject`);
   if (cls.length > deps.length) {
     throw new TypeError(
-      `${cls.name || 'Class'} takes ${String(cls.length)} constructor arguments but static inject lists ${String(deps.length)} (at ${where})`,
+      `${cls.name || 'Class'} takes ${String(cls.length)} constructor arguments but static inject lists ${String(deps.length)} (at ${where}): add static inject, or import inject.gen.ts, which avi dev keeps up to date`,
     );
   }
   const Ctor = cls as unknown as new (...args: unknown[]) => unknown;

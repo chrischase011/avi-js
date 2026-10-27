@@ -14,13 +14,13 @@ npm create avi@latest my-api -- --template minimal
 Each generated project compiles, has a passing test suite and serves `/health` and `/users` out of
 the box:
 
-| Script          | Does                                                                                          |
-| --------------- | --------------------------------------------------------------------------------------------- |
-| `npm run dev`   | `avi dev`: compiles, then recompiles and restarts on change, keeping `src/api.gen.ts` current |
-| `npm test`      | builds with `avi build` and runs the tests with Node's test runner                            |
-| `npm run build` | `avi build`: updates `src/api.gen.ts`, empties `dist/` and compiles into it                   |
-| `npm run check` | `avi check`: type-checks every `static inject` list                                           |
-| `npm start`     | runs the compiled app                                                                         |
+| Script          | Does                                                                                              |
+| --------------- | ------------------------------------------------------------------------------------------------- |
+| `npm run dev`   | `avi dev`: compiles, then recompiles and restarts on change, keeping the `*.gen.ts` files current |
+| `npm test`      | builds with `avi build` and runs the tests with Node's test runner                                |
+| `npm run build` | `avi build`: updates the `*.gen.ts` files, compiles, removes stale compiled files                 |
+| `npm run check` | `avi check`: type-checks every `static inject` list                                               |
+| `npm start`     | runs the compiled app                                                                             |
 
 The `users` routes validate input with route schemas, using [Valibot](https://valibot.dev) by
 default. Pick another library, or none, with `--validator`:
@@ -108,7 +108,9 @@ APIs and teams.
 ```text
 src/
 ├── main.ts
-├── app.module.ts
+├── app.module.ts      imports inject.gen.ts first
+├── inject.gen.ts      dependency lists avi dev infers from constructors
+├── api.gen.ts         the typed Api for @avijs/client
 ├── modules/
 │   └── users/
 │       ├── users.module.ts
@@ -139,8 +141,7 @@ import { UsersService } from './users.service.js';
 
 @Controller('/users')
 export class UsersController {
-  static inject = [UsersService] as const;
-
+  // Its dependency list is generated into src/inject.gen.ts by avi dev.
   constructor(private readonly users: UsersService) {}
 
   @Get('/')

@@ -8,3 +8,5 @@ export { watchProject } from './watch.js';
 export type { ProjectWatcher, WatchProjectOptions } from './watch.js';
 export { buildProject } from './build.js';
 export type { BuildProjectOptions } from './build.js';
+export { generateInjects } from './inject.js';
+export type { GenerateInjectsOptions, GeneratedInjects } from './inject.js';

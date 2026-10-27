@@ -82,7 +82,7 @@ export type {
   SseSource,
   UpgradeHandler,
 } from '@avijs/http';
-export { createToken, defineFactory } from '@avijs/di';
+export { createToken, defineFactory, registerInjects } from '@avijs/di';
 export { defineHook } from './hooks.js';
 export type { HookDefinition } from './hooks.js';
 export type {

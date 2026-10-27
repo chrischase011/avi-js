@@ -53,6 +53,7 @@ my-api/
 │   ├── app.module.ts              the root module
 │   ├── config.ts                  environment variables, validated at startup (with a validator)
 │   ├── api.gen.ts                 the typed Api for @avijs/client, kept current by avi dev
+│   ├── inject.gen.ts              dependency lists inferred from constructors, by avi dev
 │   ├── common/
 │   │   └── health.controller.ts   GET /health
 │   └── modules/users/
@@ -100,6 +101,7 @@ CREATE src/modules/posts/posts.service.ts
 UPDATE src/modules/posts/posts.module.ts
 CREATE src/modules/posts/posts.controller.ts
 UPDATE src/modules/posts/posts.module.ts
+UPDATE src/inject.gen.ts
 ```
 
 `npm run dev` picks the change up, and http://localhost:3000/posts answers `[]`. The controller
@@ -108,8 +110,6 @@ injects the service it found next to it:
 ```ts
 @Controller('/posts')
 export class PostsController {
-  static inject = [PostsService] as const;
-
   constructor(private readonly posts: PostsService) {}
 
   @Get()
@@ -119,8 +119,10 @@ export class PostsController {
 }
 ```
 
-`static inject` lists the constructor's dependencies in order. That list is how Avi.js wires
-classes together without `reflect-metadata`, and TypeScript checks it against the constructor.
+Nothing says what to inject: `avi dev` reads the constructor's types and keeps the list in
+`src/inject.gen.ts`, a generated file like `api.gen.ts`. Avi.js wires classes from such lists,
+never from `reflect-metadata`. You can also write the list yourself, `static inject =
+[PostsService] as const`, and then it wins ([chapter 3](03-modules-and-di.md#dependency-lists)).
 
 ## Add Avi.js to an existing project
 

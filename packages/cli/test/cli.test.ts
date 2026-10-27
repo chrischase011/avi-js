@@ -250,6 +250,44 @@ describe.each(TEMPLATES.flatMap((t) => VALIDATORS.map((v) => [t, v] as const)))(
       log.mockRestore();
       expect(code).toBe(0);
     }, 60_000);
+
+    it.runIf(template === 'modular')(
+      'regenerates inject.gen.ts in avi build',
+      async () => {
+        const file = path.join(project, 'src/inject.gen.ts');
+        const shipped = await readFile(file, 'utf8');
+        const header = shipped.split('\n').slice(0, 3).join('\n');
+        await writeFile(file, `${header}\n\nregisterInjects([]);\n`);
+        const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+        expect(await main(['build', '--project', path.join(project, 'tsconfig.json')])).toBe(0);
+        log.mockRestore();
+        expect(await readFile(file, 'utf8')).toBe(shipped);
+      },
+      60_000,
+    );
+
+    it.runIf(template === 'modular')(
+      'ships the dependency lists avi inject generates, and no static inject',
+      async () => {
+        const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+        const code = await main([
+          'inject',
+          '--project',
+          path.join(project, 'tsconfig.json'),
+          '--out',
+          path.join(project, 'src/inject.gen.ts'),
+          '--check',
+        ]);
+        log.mockRestore();
+        expect(code).toBe(0);
+        const controller = await readFile(
+          path.join(project, 'src/modules/users/users.controller.ts'),
+          'utf8',
+        );
+        expect(controller).not.toContain('static inject');
+      },
+      60_000,
+    );
   },
 );
 
@@ -297,13 +335,15 @@ describe('avi', () => {
     process.chdir(path.join(workdir, 'dev-client'));
     try {
       expect(await main(['dev', '--dry-run'])).toBe(0);
-      expect(await main(['dev', '--dry-run', '--no-client'])).toBe(0);
+      expect(await main(['dev', '--dry-run', '--no-client', '--no-inject'])).toBe(0);
     } finally {
       process.chdir(cwd);
     }
     const lines = log.mock.calls.map((call) => String(call[0]));
     log.mockRestore();
-    expect(lines).toContain('watch tsconfig.json, updating src/api.gen.ts when routes change');
+    expect(lines).toContain(
+      'watch tsconfig.json, updating src/api.gen.ts when routes change, updating src/inject.gen.ts when constructors change',
+    );
     expect(lines.at(-2)).toBe('watch tsconfig.json');
   });
 
@@ -363,6 +403,7 @@ describe('avi generate', () => {
     expect((await generate(dir, 'co', 'posts')).out).toEqual([
       'CREATE src/modules/posts/posts.controller.ts',
       'UPDATE src/modules/posts/posts.module.ts',
+      'UPDATE src/inject.gen.ts',
       CLIENT_NOTE,
     ]);
     expect((await generate(dir, 'controller', 'admin/reports')).out).toEqual([
@@ -388,9 +429,9 @@ export class PostsModule {}
     expect(app).toContain(
       '@Module({ imports: [Config.module, UsersModule, PostsModule], controllers: [HealthController, ReportsController] })',
     );
-    expect(await read(dir, 'src/modules/posts/posts.controller.ts')).toContain(
-      'static inject = [PostsService] as const;',
-    );
+    // The project infers dependency lists: none in the class, and avi g updated inject.gen.ts.
+    expect(await read(dir, 'src/modules/posts/posts.controller.ts')).not.toContain('static inject');
+    expect(await read(dir, 'src/inject.gen.ts')).toContain('[PostsController, [PostsService]],');
 
     const result = run([tsc, '-p', 'tsconfig.json'], dir);
     expect(result.stdout + result.stderr).toBe('');
@@ -520,6 +561,7 @@ export class PostsModule {}
               `CREATE ${folder}/categories.service.ts`,
               `CREATE ${folder}/categories.controller.ts`,
               'UPDATE src/app.module.ts',
+              'UPDATE src/inject.gen.ts',
               NOTE,
               CLIENT_NOTE,
             ]
@@ -529,6 +571,7 @@ export class PostsModule {}
               `CREATE ${folder}/categories.service.ts`,
               `CREATE ${folder}/categories.controller.ts`,
               'UPDATE src/app.module.ts',
+              'UPDATE src/inject.gen.ts',
               CLIENT_NOTE,
             ],
       );

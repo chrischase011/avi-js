@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { Container, createToken, defineFactory, type ModuleDefinition } from '../src/index.js';
+import {
+  Container,
+  createToken,
+  defineFactory,
+  registerInjects,
+  type ModuleDefinition,
+} from '../src/index.js';
 
 const mod = (name: string, def: Omit<ModuleDefinition, 'name'> = {}): ModuleDefinition => ({
   name,
@@ -693,5 +699,37 @@ describe('values', () => {
     expect(c.get(Name)).toBe('app');
     await c.dispose();
     expect(disposed).toBe(false);
+  });
+});
+
+describe('registerInjects', () => {
+  it('gives classes without static inject their lists, and never replaces one', async () => {
+    class Clock {
+      readonly now = 0;
+    }
+    class Service {
+      constructor(readonly clock: Clock) {}
+    }
+    class Explicit {
+      static inject = [Clock] as const;
+      constructor(readonly clock: Clock) {}
+    }
+    registerInjects([
+      [Service, [Clock]],
+      [Explicit, [Service]],
+    ]);
+    expect((Service as { inject?: unknown }).inject).toEqual([Clock]);
+    expect(Explicit.inject).toEqual([Clock]);
+    const c = await start(mod('App', { providers: [Clock, Service, Explicit] }));
+    expect((c.get(Service) as Service).clock).toBe(c.get(Clock));
+  });
+
+  it('names an entry broken by a circular import', () => {
+    class Service {
+      constructor(readonly clock: unknown) {}
+    }
+    expect(() => {
+      registerInjects([[Service, [undefined as never]]]);
+    }).toThrow('dependency 0 of Service is not a token (is there a circular import?)');
   });
 });

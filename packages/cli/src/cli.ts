@@ -20,19 +20,23 @@ const USAGE = `Usage:
       a folder of packed @avijs tarballs (pnpm pack) to install instead of the registry.
       --avi-version defaults to this CLI's version.
 ${GENERATE_USAGE}
-  avi dev [--project tsconfig.json] [--entry dist/main.js] [--client src/api.gen.ts | --no-client] [--root file.ts#AppModule]
-      Compile, then recompile and restart on every change. Keeps src/api.gen.ts (when the
-      project has one) in step with the routes.
-  avi build [--project tsconfig.json] [--client src/api.gen.ts | --no-client] [--root file.ts#AppModule]
-      Update src/api.gen.ts, empty the output folder, and compile, so files deleted from
-      src do not linger in dist.
+  avi dev [--project tsconfig.json] [--entry dist/main.js] [--client src/api.gen.ts | --no-client]
+          [--inject src/inject.gen.ts | --no-inject] [--root file.ts#AppModule]
+      Compile, then recompile and restart on every change. Keeps src/api.gen.ts and
+      src/inject.gen.ts (when the project has them) in step with the code.
+  avi build [--project tsconfig.json] [--client ... | --no-client] [--inject ... | --no-inject]
+          [--root file.ts#AppModule]
+      Update the generated files, compile, and remove compiled files whose source is gone.
   avi check [--project tsconfig.json]
       Type-check every static inject list.
   avi manifest <entry.js> [--export AppModule] [--out avi.manifest.json]
       Describe the app's modules, providers and routes.
   avi client [--out src/api.gen.ts] [--project tsconfig.json] [--root file.ts#AppModule] [--check | --watch]
       Generate the typed Api for @avijs/client from the app's routes. --check fails when the
-      file is out of date, for CI; --watch updates it on every change.`;
+      file is out of date, for CI; --watch updates it on every change.
+  avi inject [--out src/inject.gen.ts] [--project tsconfig.json] [--check | --watch]
+      Infer the dependency lists of classes without static inject from their constructor
+      types, for src/inject.gen.ts. --check fails when the file is out of date.`;
 
 export async function main(argv: readonly string[]): Promise<number> {
   if (argv.includes('--help') || argv.includes('-h')) {
@@ -67,6 +71,7 @@ async function run(argv: readonly string[]): Promise<number> {
     case 'check':
     case 'manifest':
     case 'client':
+    case 'inject':
       return compile(argv);
     default:
       console.error(USAGE);
@@ -148,16 +153,19 @@ async function dev(args: readonly string[]): Promise<number> {
       entry: { type: 'string', default: 'dist/main.js' },
       client: { type: 'string' },
       'no-client': { type: 'boolean', default: false },
+      inject: { type: 'string' },
+      'no-inject': { type: 'boolean', default: false },
       root: { type: 'string' },
       'dry-run': { type: 'boolean', default: false },
     },
   });
 
-  const client = clientFile(values.project, values.client, values['no-client']);
+  const client = generatedFile(values.project, values.client, values['no-client'], 'api.gen.ts');
+  const inject = generatedFile(values.project, values.inject, values['no-inject'], 'inject.gen.ts');
   const run = ['--watch', '--watch-preserve-output', values.entry];
   if (values['dry-run']) {
     console.log(
-      `watch ${values.project}${client ? `, updating ${client} when routes change` : ''}`,
+      `watch ${values.project}${client ? `, updating ${client} when routes change` : ''}${inject ? `, updating ${inject} when constructors change` : ''}`,
     );
     console.log(['node', ...run].join(' '));
     return 0;
@@ -169,6 +177,8 @@ async function dev(args: readonly string[]): Promise<number> {
     const watcher = watchProject({
       project: values.project,
       ...(client ? { client: { out: client, root: values.root } } : {}),
+      ...(inject ? { inject: { out: inject } } : {}),
+      ...(inject ? { inject: { out: inject } } : {}),
       onBuild: (errors) => {
         if (errors > 0 || app) return;
         // development unless set: cluster() then runs in one process, which node --watch restarts.
@@ -209,22 +219,31 @@ function build(args: readonly string[]): number {
       project: { type: 'string', default: 'tsconfig.json' },
       client: { type: 'string' },
       'no-client': { type: 'boolean', default: false },
+      inject: { type: 'string' },
+      'no-inject': { type: 'boolean', default: false },
       root: { type: 'string' },
     },
   });
-  const client = clientFile(values.project, values.client, values['no-client']);
+  const client = generatedFile(values.project, values.client, values['no-client'], 'api.gen.ts');
+  const inject = generatedFile(values.project, values.inject, values['no-inject'], 'inject.gen.ts');
   const errors = buildProject({
     project: values.project,
     ...(client ? { client: { out: client, root: values.root } } : {}),
+    ...(inject ? { inject: { out: inject } } : {}),
   });
   return errors > 0 ? 1 : 0;
 }
 
-/** The client file to keep current: --client, else the project's src/api.gen.ts if it has one. */
-function clientFile(project: string, client: string | undefined, off: boolean): string | undefined {
+/** A generated file to keep current: the flag's, else the project's src/<name> if it has one. */
+function generatedFile(
+  project: string,
+  flag: string | undefined,
+  off: boolean,
+  name: string,
+): string | undefined {
   if (off) return undefined;
-  if (client) return client;
-  const file = path.posix.join(path.dirname(project).replaceAll('\\', '/'), 'src/api.gen.ts');
+  if (flag) return flag;
+  const file = path.posix.join(path.dirname(project).replaceAll('\\', '/'), 'src', name);
   return existsSync(file) ? file : undefined;
 }
 

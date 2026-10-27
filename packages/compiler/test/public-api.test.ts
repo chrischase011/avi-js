@@ -7,6 +7,7 @@ it('exposes only the reviewed runtime exports', () => {
     'buildProject',
     'checkInjectLists',
     'generateClient',
+    'generateInjects',
     'main',
     'serializeManifest',
     'watchProject',

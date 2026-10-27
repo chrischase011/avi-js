@@ -47,6 +47,7 @@ export class UsersController {
 ```ts
 @Injectable()
 export class UsersService {
+  // CONFIG is not named like its type Config, so this class lists what it needs.
   static inject = [Database, CONFIG] as const;
   constructor(
     private readonly db: Database,
@@ -59,7 +60,6 @@ const create = { body: CreateUser } satisfies RouteSchema;
 
 @Controller('/users')
 export class UsersController {
-  static inject = [UsersService] as const;
   constructor(private readonly users: UsersService) {}
 
   @Get('/:id', { schema: findOne })
@@ -82,9 +82,9 @@ request.
 
 | In NestJS                                       | In Avi.js                                                                        |
 | ----------------------------------------------- | -------------------------------------------------------------------------------- |
-| `reflect-metadata`, `emitDecoratorMetadata`     | Dependencies are listed in `static inject = [...] as const`                      |
+| `reflect-metadata`, `emitDecoratorMetadata`     | `avi dev` generates the lists from constructor types, or `static inject`         |
 | `experimentalDecorators: true`                  | Standard TC39 decorators; leave `experimentalDecorators` off                     |
-| `@Inject(TOKEN)` on a parameter                 | The token goes in `static inject`, in constructor order                          |
+| `@Inject(TOKEN)` on a parameter                 | A token named like the type is inferred; otherwise list it in `static inject`    |
 | String or symbol tokens                         | `createToken<Config>('CONFIG')`, typed                                           |
 | `@Param()`, `@Query()`, `@Body()`, `@Headers()` | `ctx.params`, `ctx.query`, `ctx.json()`, `ctx.headers`, or validated `ctx.input` |
 | `ValidationPipe` with DTO classes               | A route `schema` from any Standard Schema library                                |
@@ -108,8 +108,9 @@ request.
 These steps help if you want to rebuild a feature you know from NestJS in Avi.js:
 
 1. **Use standard decorators.** Leave `experimentalDecorators` and `emitDecoratorMetadata` off.
-2. **List each class's dependencies in `static inject`.** `avi check` confirms every list matches its
-   constructor and reports any mismatch with file and line.
+2. **Keep constructors as they are.** `avi dev` infers each class's dependencies into
+   `src/inject.gen.ts`, and warns (`AVI201`) about a parameter it cannot infer, such as a string
+   token: list that class's dependencies in `static inject`, which `avi check` confirms.
 3. **Read request data from `ctx`.** Start with `ctx.params['id']`, then add a route schema for typed
    `ctx.input`.
 4. **Use `reply()`** for status codes and headers.

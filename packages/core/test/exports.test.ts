@@ -41,6 +41,7 @@ describe('@avijs/core', () => {
       'describeApp',
       'jsonLogger',
       'logRequests',
+      'registerInjects',
       'reply',
       'route',
       'sse',

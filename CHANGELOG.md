@@ -3,6 +3,36 @@
 All notable changes are listed here. Avi.js follows [Semantic Versioning](https://semver.org); all
 packages share one version.
 
+## 1.0.0-rc.3 - 2026-10-27
+
+### Added
+
+- Dependency lists without `static inject`. `avi dev` and `avi build` read constructor types with
+  the TypeScript compiler they already run and keep the lists in `src/inject.gen.ts`, a generated
+  file like `api.gen.ts`, which the app module imports first. It is plain code, so any test runner
+  works, and it changes only when a constructor does. Classes, and tokens named like their type
+  (`PrismaClient`, `Config`, `createToken<Db>()` with `interface Db`), are inferred; anything
+  else gets a warning (AVI201). A `static inject` in the class wins, so both styles mix. New
+  modular projects use it and their classes list nothing.
+- `avi inject [--check | --watch]` writes the file once, checks it in CI, or watches without
+  compiling. `avi dev` and `avi build` take `--inject <file>` and `--no-inject`. `avi generate`
+  updates the file when it adds a class.
+- `registerInjects()` in core, what the generated file calls: it sets `static inject` on classes
+  that have none.
+
+### Changed
+
+- `@Injectable` and `@Controller` accept a class with constructor parameters and no `static inject`:
+  its list comes from `inject.gen.ts`. A written list is still type-checked against the
+  constructor. Startup still fails, now with how to fix it, when a class has no list at all.
+
+### Fixed
+
+- `avi build` never removed stale files when the project path ran through a link above the project,
+  such as macOS `/var` (a link to `/private/var`) or a Windows short name, as CI runners use. The
+  safety check compared whole paths; it now compares the path inside the project, and expected
+  outputs by their place in the output folder.
+
 ## 1.0.0-rc.2 - 2026-10-27
 
 Fixes from testing 1.0.0-rc.1: a correctness review, a security review, a new-user run of every

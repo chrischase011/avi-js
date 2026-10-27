@@ -3,8 +3,26 @@
 > **Status: Runnable.** Everything on this page works today. The compiler is optional: apps run
 > the same without it.
 
-`@avijs/compiler` adds two checks you can run in CI or before a deploy. It ships an `avi-compile`
-command.
+`@avijs/compiler` generates dependency lists and adds two checks you can run in CI or before a
+deploy. The `avi` CLI uses it, and it ships an `avi-compile` command of its own.
+
+## Generated dependency lists
+
+`avi dev` and `avi build` infer the dependency list of every class that has constructor parameters
+but no `static inject`, and keep them in `src/inject.gen.ts` ([chapter 3](03-modules-and-di.md#dependency-lists)).
+The file is regenerated only when a constructor changes. Without `avi dev`:
+
+```sh
+avi inject            # write src/inject.gen.ts once
+avi inject --watch    # update it on every save, without compiling
+avi inject --check    # in CI: fail when it is out of date
+```
+
+| Code   | Meaning                                                                                                  |
+| ------ | -------------------------------------------------------------------------------------------------------- |
+| AVI201 | A parameter's type has no token (a `string`, a union), or the class is not exported; add `static inject` |
+
+`avi generate` updates the file when it adds a class, so a new controller works right away.
 
 ## Checking `static inject` lists
 
