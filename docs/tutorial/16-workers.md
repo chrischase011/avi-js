@@ -9,6 +9,9 @@ them, and runs background workers that use the same modules and providers withou
 npm install @avijs/workers
 ```
 
+Install the same version as `@avijs/core`: with a release candidate, `npm install @avijs/workers@next`.
+Two copies of `@avijs/core` do not share their metadata (see [Stability](17-stability.md)).
+
 ## Every core: cluster()
 
 Wrap the code that creates and starts the app:
@@ -27,9 +30,9 @@ await cluster(async () => {
 ```
 
 ```text
-AVI.JS 0.5.0 · Application bootstrap
+AVI.JS 1.0.0 · Application bootstrap
 ...
-Avi.js 0.5.0 cluster: 8 workers on http://localhost:3000, ready in 211 ms
+Avi.js 1.0.0 cluster: 8 workers on http://localhost:3000, ready in 211 ms
 ```
 
 `cluster()` starts one worker process per CPU core (`workers: 'auto'`), and each one runs the

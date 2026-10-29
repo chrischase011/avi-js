@@ -210,13 +210,13 @@ authentication with guards and roles, and Prisma with SQLite.
 
 Checked in CI on every push:
 
-| Area       | Supported                                                           |
-| ---------- | ------------------------------------------------------------------- |
-| Node.js    | 22.12+, 24, 26                                                      |
-| Platforms  | Linux (Node 22, 24, 26), Windows and macOS (Node 24)                |
-| TypeScript | 6.0 to compile apps; published types also checked against 7.0       |
-| Modules    | ESM, and CommonJS through `require(esm)` (Node 22.12+)              |
-| Decorators | TC39 standard decorators; `experimentalDecorators` is not supported |
+| Area       | Supported                                                            |
+| ---------- | -------------------------------------------------------------------- |
+| Node.js    | 22.12+, 24, 26                                                       |
+| Platforms  | Linux (Node 22, 24, 26), Windows and macOS (Node 24)                 |
+| TypeScript | 5.8 or newer; CI compiles apps with 6.0 and checks types against 7.0 |
+| Modules    | ESM, and CommonJS through `require(esm)` (Node 22.12+)               |
+| Decorators | TC39 standard decorators; `experimentalDecorators` is not supported  |
 
 The **Package artifacts** job packs every package, installs the tarballs into fresh npm projects
 and checks ESM, CommonJS, TypeScript 6 and 7, and both `avi new` templates end to end. See

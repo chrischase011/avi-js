@@ -117,6 +117,23 @@ describe('providers', () => {
     expect(c.get(Pending)).toBe(promise);
   });
 
+  it('accepts a list that leaves out optional constructor parameters', async () => {
+    class Clock {
+      readonly now = Date.now;
+    }
+    class Audit {
+      static inject = [Clock] as const;
+      constructor(
+        readonly clock: Clock,
+        readonly label?: string,
+      ) {}
+    }
+    const c = await start(mod('App', { providers: [Clock, Audit] }));
+    const audit = c.get(Audit) as Audit;
+    expect(audit.clock).toBeInstanceOf(Clock);
+    expect(audit.label).toBeUndefined();
+  });
+
   it('rejects async transient factories', async () => {
     const T = createToken<number>('T');
     class User {
@@ -747,6 +764,9 @@ describe('registerInjects', () => {
       readonly ok = true;
     }
     expect(new Missing().ok).toBe(true);
+    // The list stayed queued: once the class exists, it applies.
+    resolveInjects();
+    expect((Missing as { inject?: unknown }).inject).toEqual([]);
   });
 
   it('names an entry broken by a circular import', () => {

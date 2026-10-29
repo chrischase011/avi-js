@@ -471,6 +471,7 @@ export class PostsModule {}
     expect(dry.out).toEqual([
       'CREATE src/modules/billing/billing.service.ts',
       'UPDATE src/app.module.ts',
+      'Dry run: nothing was written.',
     ]);
     expect(await read(dir, 'src/app.module.ts')).not.toContain('BillingService');
 
@@ -642,6 +643,11 @@ describe('avi usage mistakes', () => {
     expect(log).toHaveBeenLastCalledWith(expect.stringMatching(/^\d+\.\d+\.\d+/));
     expect(await main(['g', '--help'])).toBe(0);
     expect(String(log.mock.lastCall?.[0])).not.toContain('avi dev');
+    expect(await main(['inject', '--help'])).toBe(0);
+    expect(String(log.mock.lastCall?.[0])).toMatch(/^Usage:\n {2}avi inject /);
+    expect(String(log.mock.lastCall?.[0])).not.toContain('avi client');
+    expect(await main(['nope', '--help'])).toBe(0);
+    expect(String(log.mock.lastCall?.[0])).toContain('avi dev');
     expect(await main(['build', '--nope'])).toBe(2);
     expect(String(error.mock.calls[0]?.[0])).toContain("Unknown option '--nope'");
     log.mockRestore();

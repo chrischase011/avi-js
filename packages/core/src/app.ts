@@ -453,8 +453,8 @@ class Pipeline {
     let instance = this.#instances.get(cls);
     if (!instance) {
       const inject = injectOf(cls);
-      if (cls.length > inject.length) {
-        throw injectListError(cls.name, cls.length, cls.inject === undefined ? undefined : inject);
+      if (cls.inject === undefined && cls.length > 0) {
+        throw injectListError(cls.name, cls.length);
       }
       const Ctor = cls as unknown as new (...args: unknown[]) => unknown;
       instance = new Ctor(...inject.map(this.resolve));

@@ -82,6 +82,7 @@ class Plan {
     // New classes list no dependencies; give them theirs now, so the app starts before avi dev runs.
     if (this.inferInject && !dryRun) await updateInjects(root);
     for (const note of this.notes) console.log(note);
+    if (dryRun) console.log('Dry run: nothing was written.');
   }
 }
 

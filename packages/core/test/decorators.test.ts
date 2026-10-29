@@ -177,20 +177,34 @@ describe('misuse', () => {
     expect(() => createAvi().register(Plain)).toThrow('Plain is not a module: add @Module()');
   });
 
-  it('checks static inject length at runtime too, when the app starts', async () => {
-    // @ts-expect-error the compile-time check catches this first
+  it('needs a dependency list when the app starts, not when the module loads', async () => {
     @Controller()
     class NeedsDb {
-      static inject = [] as const;
       constructor(readonly db: unknown) {}
     }
-    // Read at startup, not when the module loads: a generated list may come later.
+    // A generated list may come later.
     const app = createAvi({ startupSummary: false }).register(
       defineModule({ controllers: [NeedsDb] }),
     );
-    await expect(app.init()).rejects.toThrow(
-      'NeedsDb takes 1 constructor argument but static inject lists 0',
+    await expect(app.init()).rejects.toThrow('NeedsDb has no dependency list for its 1');
+  });
+
+  it('accepts a list that leaves out optional parameters', async () => {
+    @Injectable()
+    class Clock {}
+    @Controller()
+    class Optional {
+      static inject = [Clock] as const;
+      constructor(
+        readonly clock: Clock,
+        readonly label?: string,
+      ) {}
+    }
+    const app = createAvi({ startupSummary: false }).register(
+      defineModule({ controllers: [Optional], providers: [Clock] }),
     );
+    await app.init();
+    await app.close();
   });
 });
 

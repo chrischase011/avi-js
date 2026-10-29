@@ -45,13 +45,7 @@ export async function main(argv: readonly string[]): Promise<number> {
     return 0;
   }
   if (argv.includes('--help') || argv.includes('-h')) {
-    const generating = argv[0] === 'generate' || argv[0] === 'g';
-    console.log(
-      generating
-        ? `Usage:
-${GENERATE_USAGE}`
-        : USAGE,
-    );
+    console.log(commandUsage(argv[0] === 'g' ? 'generate' : argv[0]) ?? USAGE);
     return 0;
   }
   try {
@@ -65,6 +59,14 @@ ${GENERATE_USAGE}`
     }
     throw error;
   }
+}
+
+/** The usage of one command, or undefined when there is no such command. */
+function commandUsage(command: string | undefined): string | undefined {
+  if (!command || command.startsWith('-')) return undefined;
+  const sections = USAGE.split(/\n(?= {2}avi )/).slice(1);
+  const own = sections.filter((section) => section.startsWith(`  avi ${command} `));
+  return own.length > 0 ? `Usage:\n${own.join('\n')}` : undefined;
 }
 
 async function run(argv: readonly string[]): Promise<number> {

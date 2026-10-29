@@ -25,7 +25,7 @@ first:
 
 ```ts
 // src/inject.gen.ts, generated: do not edit
-registerInjects([[UsersService, [Db, Config]]]);
+registerInjects(() => [[UsersService, [Db, Config]]]);
 ```
 
 It is plain code you can read and commit, so tests and other runners need no plugin, and it only

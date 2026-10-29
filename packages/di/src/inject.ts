@@ -19,11 +19,12 @@ export function registerInjects(entries: Entries | (() => Entries)): void {
 /** Applies lists registered as functions. Avi.js calls it before it reads `static inject`. */
 export function resolveInjects(): void {
   while (pending.length > 0) {
-    const next = pending.shift() as () => Entries;
+    const next = pending[0] as () => Entries;
     let entries: Entries;
     try {
       entries = next();
     } catch (error) {
+      // It stays queued, so the next app that starts reports the same reason.
       if (!(error instanceof ReferenceError)) throw error;
       throw new TypeError(
         `inject.gen.ts lists a class that is not created yet (${error.message}): declare it before the app starts`,
@@ -31,6 +32,7 @@ export function resolveInjects(): void {
       );
     }
     apply(entries);
+    pending.shift();
   }
 }
 
@@ -51,18 +53,11 @@ function apply(entries: Entries): void {
   }
 }
 
-/** Why a class cannot be built: it has no dependency list, or one shorter than its constructor. */
-export function injectListError(
-  name: string,
-  needed: number,
-  list: readonly unknown[] | undefined,
-  where?: string,
-): TypeError {
+/** Why a class cannot be built: its constructor takes arguments and it has no dependency list. */
+export function injectListError(name: string, needed: number, where?: string): TypeError {
   const args = `${String(needed)} constructor argument${needed === 1 ? '' : 's'}`;
   const at = where ? ` (at ${where})` : '';
   return new TypeError(
-    list === undefined
-      ? `${name} has no dependency list for its ${args}${at}: import inject.gen.ts before the app starts, as app.module.ts does, or add static inject. avi dev reports AVI201 when it cannot infer a list`
-      : `${name} takes ${args} but static inject lists ${String(list.length)}${at}`,
+    `${name} has no dependency list for its ${args}${at}: add import './inject.gen.js' before the app starts, as app.module.ts does, or add static inject. avi dev reports AVI201 when it cannot infer a list`,
   );
 }

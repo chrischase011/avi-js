@@ -89,8 +89,8 @@ export function controllerFromClass(cls: Class): ControllerDefinition {
     const given = (cls as { inject?: unknown }).inject;
     const list = given ?? [];
     if (!Array.isArray(list)) throw new TypeError(`${cls.name}.inject must be an array of tokens`);
-    if (cls.length > list.length) {
-      throw injectListError(cls.name, cls.length, given === undefined ? undefined : list);
+    if (given === undefined && cls.length > 0) {
+      throw injectListError(cls.name, cls.length);
     }
     return (inject = Object.freeze([...(list as Token[])]));
   };

@@ -61,13 +61,19 @@ class InjectGenerator {
   }
 
   run(): GeneratedInjects {
-    // Only files the app loads: importing any other file would run its code, such as a seed script.
-    const files = this.#loaded();
-    for (const source of files) {
-      if (path.resolve(source.fileName) === this.out) continue;
-      for (const statement of source.statements) {
-        if (ts.isClassDeclaration(statement)) this.#class(statement, source);
-      }
+    const devOnly = devOnlyPackages(this.program);
+    for (const source of this.program.getSourceFiles()) {
+      if (!this.#inProject(source) || path.resolve(source.fileName) === this.out) continue;
+      // Test files are not loaded by the app, and the generated file must not import them.
+      if (/\.(test|spec)\.[cm]?tsx?$/.test(source.fileName)) continue;
+      const classes = source.statements.filter(ts.isClassDeclaration);
+      if (classes.length === 0) continue;
+      // Importing a file runs its top level. Only import files that just declare things: never an
+      // entry point, a worker or a seed script, and nothing a production install may lack.
+      const reason = runsCode(source)
+        ? 'runs code when imported (an entry point or a script)'
+        : importsDevOnly(source, devOnly);
+      for (const node of classes) this.#class(node, source, reason);
     }
 
     this.#entries.sort((a, b) => a.order.localeCompare(b.order));
@@ -111,7 +117,7 @@ class InjectGenerator {
     };
   }
 
-  #class(node: ts.ClassDeclaration, source: ts.SourceFile): void {
+  #class(node: ts.ClassDeclaration, source: ts.SourceFile, unsafe: string | undefined): void {
     if (!node.name) return;
     const hasList = node.members.some(
       (member) =>
@@ -150,6 +156,15 @@ class InjectGenerator {
       return;
     }
 
+    if (unsafe) {
+      this.#report(
+        source,
+        node.name,
+        `${node.name.text} is in a file that ${unsafe}, so inject.gen.ts cannot import it: move the class to its own file, or add static inject`,
+        'AVI203',
+      );
+      return;
+    }
     const cls = this.#importClass(node, source);
     if (!cls) return;
     this.#entries.push({
@@ -205,42 +220,6 @@ class InjectGenerator {
         ? call.expression.text
         : undefined;
     return callee === 'createToken' || callee === 'defineConfig';
-  }
-
-  /** The project's files the app loads: value imports followed from its entry points. */
-  #loaded(): ts.SourceFile[] {
-    const project = this.program
-      .getSourceFiles()
-      .filter(
-        (source) => this.#inProject(source) && !/\.(test|spec)\.[cm]?tsx?$/.test(source.fileName),
-      );
-    const entries = project.filter((source) => startsApp(source));
-    if (entries.length === 0) {
-      const first = project[0];
-      if (first) {
-        this.#report(
-          first,
-          first,
-          'No app entry found (AviFactory.create, register, createAvi, runWorker or cluster): no dependency lists inferred',
-          'AVI202',
-        );
-      }
-      return [];
-    }
-    const seen = new Set<ts.SourceFile>(entries);
-    const queue = [...entries];
-    for (let source = queue.shift(); source; source = queue.shift()) {
-      for (const specifier of valueImports(source)) {
-        const file = this.#checker
-          .getSymbolAtLocation(specifier)
-          ?.declarations?.find(ts.isSourceFile);
-        if (file && !seen.has(file) && this.#inProject(file)) {
-          seen.add(file);
-          queue.push(file);
-        }
-      }
-    }
-    return [...seen];
   }
 
   #importClass(node: ts.ClassDeclaration, source: ts.SourceFile): string | undefined {
@@ -346,78 +325,93 @@ function isDecorated(node: ts.ClassDeclaration): boolean {
   return (ts.getDecorators(node) ?? []).length > 0;
 }
 
-/** Whether a file starts an app: `AviFactory.create`, `.register`, `createAvi`, `runWorker`, `cluster`. */
-function startsApp(source: ts.SourceFile): boolean {
-  let found = false;
-  const visit = (node: ts.Node): void => {
-    if (found) return;
-    if (ts.isCallExpression(node)) {
-      const callee = node.expression;
-      const name = ts.isIdentifier(callee)
-        ? callee.text
-        : ts.isPropertyAccessExpression(callee)
-          ? callee.name.text
-          : undefined;
-      const owner =
-        ts.isPropertyAccessExpression(callee) && ts.isIdentifier(callee.expression)
-          ? callee.expression.text
-          : undefined;
-      if (
-        name === 'createAvi' ||
-        name === 'runWorker' ||
-        name === 'cluster' ||
-        name === 'register' ||
-        (name === 'create' && owner === 'AviFactory')
-      ) {
-        found = true;
-        return;
-      }
+/** Whether a file does more than declare things when imported: a call, a loop, a top-level await. */
+function runsCode(source: ts.SourceFile): boolean {
+  const awaits = (node: ts.Node): boolean =>
+    ts.isAwaitExpression(node) ||
+    (!ts.isFunctionLike(node) && !ts.isClassLike(node) && ts.forEachChild(node, awaits) === true);
+  return source.statements.some((statement) => {
+    if (
+      ts.isImportDeclaration(statement) ||
+      ts.isImportEqualsDeclaration(statement) ||
+      ts.isExportDeclaration(statement) ||
+      ts.isClassDeclaration(statement) ||
+      ts.isFunctionDeclaration(statement) ||
+      ts.isInterfaceDeclaration(statement) ||
+      ts.isTypeAliasDeclaration(statement) ||
+      ts.isEnumDeclaration(statement) ||
+      ts.isModuleDeclaration(statement) ||
+      ts.isEmptyStatement(statement)
+    ) {
+      return false;
     }
-    ts.forEachChild(node, visit);
-  };
-  visit(source);
-  return found;
+    if (ts.isVariableStatement(statement) || ts.isExportAssignment(statement)) {
+      return awaits(statement);
+    }
+    // 'use strict' and other directives.
+    if (ts.isExpressionStatement(statement) && ts.isStringLiteral(statement.expression))
+      return false;
+    return true;
+  });
 }
 
-/** Module specifiers a file loads at runtime: imports and re-exports that are not type-only. */
-function valueImports(source: ts.SourceFile): ts.StringLiteral[] {
-  const found: ts.StringLiteral[] = [];
-  for (const statement of source.statements) {
-    if (ts.isImportDeclaration(statement) && ts.isStringLiteral(statement.moduleSpecifier)) {
-      const clause = statement.importClause;
-      if (clause?.phaseModifier === ts.SyntaxKind.TypeKeyword) continue;
-      const named = clause?.namedBindings;
-      const allTypes =
-        clause !== undefined &&
-        clause.name === undefined &&
-        named !== undefined &&
-        ts.isNamedImports(named) &&
-        named.elements.length > 0 &&
-        named.elements.every((element) => element.isTypeOnly);
-      if (!allTypes) found.push(statement.moduleSpecifier);
-    } else if (
-      ts.isExportDeclaration(statement) &&
-      !statement.isTypeOnly &&
-      statement.moduleSpecifier &&
-      ts.isStringLiteral(statement.moduleSpecifier)
-    ) {
-      found.push(statement.moduleSpecifier);
+/** Packages the project only has as devDependencies, from the package.json next to its tsconfig. */
+function devOnlyPackages(program: ts.Program): Set<string> {
+  const config = program.getCompilerOptions()['configFilePath'];
+  let dir = typeof config === 'string' ? path.dirname(config) : program.getCurrentDirectory();
+  for (;;) {
+    const file = path.join(dir, 'package.json');
+    if (ts.sys.fileExists(file)) {
+      try {
+        const pkg = JSON.parse(ts.sys.readFile(file) ?? '{}') as Record<
+          string,
+          Record<string, string> | undefined
+        >;
+        const runtime = new Set([
+          ...Object.keys(pkg['dependencies'] ?? {}),
+          ...Object.keys(pkg['peerDependencies'] ?? {}),
+          ...Object.keys(pkg['optionalDependencies'] ?? {}),
+        ]);
+        return new Set(
+          Object.keys(pkg['devDependencies'] ?? {}).filter((name) => !runtime.has(name)),
+        );
+      } catch {
+        return new Set();
+      }
     }
+    const parent = path.dirname(dir);
+    if (parent === dir) return new Set();
+    dir = parent;
   }
-  // import('...') loads too.
-  const visit = (node: ts.Node): void => {
-    if (
-      ts.isCallExpression(node) &&
-      node.expression.kind === ts.SyntaxKind.ImportKeyword &&
-      node.arguments[0] &&
-      ts.isStringLiteral(node.arguments[0])
-    ) {
-      found.push(node.arguments[0]);
-    }
-    ts.forEachChild(node, visit);
-  };
-  visit(source);
-  return found;
+}
+
+/** Why a file cannot be imported in production: it imports a package from devDependencies. */
+function importsDevOnly(source: ts.SourceFile, devOnly: ReadonlySet<string>): string | undefined {
+  for (const statement of source.statements) {
+    if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier))
+      continue;
+    const clause = statement.importClause;
+    // Type-only imports are erased.
+    if (clause && (clause.getText(source).startsWith('type ') || isTypeOnlyClause(clause)))
+      continue;
+    const specifier = statement.moduleSpecifier.text;
+    const name = specifier.startsWith('@')
+      ? specifier.split('/').slice(0, 2).join('/')
+      : specifier.split('/')[0];
+    if (name && devOnly.has(name)) return `imports ${name}, a devDependency`;
+  }
+  return undefined;
+}
+
+function isTypeOnlyClause(clause: ts.ImportClause): boolean {
+  const named = clause.namedBindings;
+  return (
+    clause.name === undefined &&
+    named !== undefined &&
+    ts.isNamedImports(named) &&
+    named.elements.length > 0 &&
+    named.elements.every((element) => element.isTypeOnly)
+  );
 }
 
 export const plural = (count: number, noun: string): string =>

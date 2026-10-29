@@ -4,5 +4,6 @@
     "noEmit": true,
     "customConditions": ["@avijs/source"]
   },
-  "include": ["packages/*/src", "packages/*/test"]
+  "include": ["packages/*/src", "packages/*/test"],
+  "exclude": ["packages/*/test/fixtures"]
 }

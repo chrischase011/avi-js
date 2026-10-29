@@ -137,8 +137,9 @@ export function normalizeProvider(provider: unknown, where: string): ProviderSpe
 
 function classSpec(token: Token, cls: Constructor, scope: Scope, where: string): ProviderSpec {
   const deps = checkInject(cls.inject, `${where} ${cls.name}.inject`);
-  if (cls.length > deps.length) {
-    throw injectListError(cls.name || 'Class', cls.length, cls.inject, where);
+  // A shorter list is fine: the parameters left out may be optional, which only types can tell.
+  if (cls.inject === undefined && cls.length > 0) {
+    throw injectListError(cls.name || 'Class', cls.length, where);
   }
   const Ctor = cls as unknown as new (...args: unknown[]) => unknown;
   return {

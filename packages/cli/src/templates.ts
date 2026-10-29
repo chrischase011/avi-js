@@ -91,7 +91,9 @@ An [Avi.js](https://github.com/chrischase011/avi-js) API (${template} template).
 npm install
 npm run dev     # compile and restart on change
 npm test        # compile and run the tests
+npm run build   # update the generated files and compile to dist/
 npm start       # run the compiled app
+npm run check   # type-check every static inject list
 npm run client  # update src/api.gen.ts, the typed API for @avijs/client (avi dev does it on save)
 \`\`\`
 

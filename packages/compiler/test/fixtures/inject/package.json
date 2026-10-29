@@ -1,0 +1,11 @@
+{
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@avijs/core": "*",
+    "valibot": "*"
+  },
+  "devDependencies": {
+    "@avijs/testing": "*"
+  }
+}

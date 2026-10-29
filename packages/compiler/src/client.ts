@@ -56,14 +56,35 @@ export function generateFrom(
 }
 
 /**
- * Formatters may rewrap a generated file; only the content counts. Whitespace and semicolons
- * outside strings, and trailing commas, are what formatters change; other commas are content.
+ * Formatters may rewrap a generated file; only the content counts. Compares the files token by
+ * token, so strings stay exact, and leaves out what formatters change: whitespace, semicolons and
+ * trailing commas.
  */
-export const sameContent = (a: string, b: string): boolean => squash(a) === squash(b);
-const squash = (text: string) =>
-  text
-    .replace(/'[^'\n]*'|"[^"\n]*"|[\s;]+/g, (match) => (/^['"]/.test(match) ? match : ''))
-    .replace(/,(?=[\])}])/g, '');
+export const sameContent = (a: string, b: string): boolean => {
+  const left = tokens(a);
+  const right = tokens(b);
+  return left.length === right.length && left.every((token, i) => token === right[i]);
+};
+
+function tokens(text: string): string[] {
+  const scanner = ts.createScanner(ts.ScriptTarget.Latest, true, ts.LanguageVariant.Standard, text);
+  const found: { kind: ts.SyntaxKind; text: string }[] = [];
+  for (let kind = scanner.scan(); kind !== ts.SyntaxKind.EndOfFileToken; kind = scanner.scan()) {
+    found.push({ kind, text: scanner.getTokenText() });
+  }
+  const closing = new Set([
+    ts.SyntaxKind.CloseBracketToken,
+    ts.SyntaxKind.CloseParenToken,
+    ts.SyntaxKind.CloseBraceToken,
+  ]);
+  return found
+    .filter(
+      ({ kind }, i) =>
+        kind !== ts.SyntaxKind.SemicolonToken &&
+        !(kind === ts.SyntaxKind.CommaToken && closing.has(found[i + 1]?.kind ?? kind)),
+    )
+    .map(({ text }) => text);
+}
 
 interface Found {
   readonly method: string;

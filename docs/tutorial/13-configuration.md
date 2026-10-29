@@ -92,11 +92,12 @@ directly. To register the provider yourself instead of importing the module, use
 The app does not start. The error lists every problem, by variable name:
 
 ```text
-ConfigError: Invalid configuration: DATABASE_URL: Invalid URL; LOG_LEVEL: Invalid type
+ConfigError: Invalid configuration: DATABASE_URL: Invalid URL: Received "[redacted]"; LOG_LEVEL: Invalid type
 ```
 
 Values are never included, even when the schema library quotes them in its message or a transform
-changed them first: anything in quotes is replaced by `"[redacted]"`. A schema that throws (a
+changed them first: a quoted value is replaced by `"[redacted]"`, while the options a schema
+expects (`"info" | "warn"`) stay. A schema that throws (a
 `JSON.parse` transform on bad input, say) reports `the schema threw while reading the variables`,
 without the original error, whose message may quote the value. So a mistyped secret cannot end up
 in your logs. `ConfigError` also has the problems as data, in `error.issues`.

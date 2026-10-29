@@ -1,11 +1,12 @@
 import { existsSync } from 'node:fs';
-import { cp, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { chmod, cp, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import ts from 'typescript';
 import { readProgram } from '../src/check.js';
+import { sameContent } from '../src/client.js';
 import {
   buildProject,
   checkInjectLists,
@@ -451,6 +452,30 @@ describe('buildProject', () => {
     expect(existsSync(path.join(root, 'dist/a.js'))).toBe(true);
   });
 
+  it('removes what avi dev compiled from a source deleted while it ran', async () => {
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    const config = await project('dist', 'export const a = 1;');
+    const root = path.dirname(config);
+    const ghost = path.join(root, 'src/ghost.test.ts');
+    const builds: (() => void)[] = [];
+    const nextBuild = () => new Promise<void>((resolve) => builds.push(resolve));
+    const first = nextBuild();
+    const watcher = watchProject({ project: config, onBuild: () => builds.shift()?.() });
+    try {
+      await first;
+      const added = nextBuild();
+      await writeFile(ghost, 'export const ghost = 1;');
+      await added;
+      expect(existsSync(path.join(root, 'dist/ghost.test.js'))).toBe(true);
+    } finally {
+      watcher.close();
+    }
+    await rm(ghost);
+    expect(buildProject({ project: config })).toBe(0);
+    expect(existsSync(path.join(root, 'dist/ghost.test.js'))).toBe(false);
+    expect(existsSync(path.join(root, 'dist/a.js'))).toBe(true);
+  });
+
   it('never cleans the project folder, a hidden folder or one reached through a link', async () => {
     // With exclude set, tsc no longer leaves the output folder out of the sources.
     const config = await project('.', 'export const a = 1;', []);
@@ -601,24 +626,48 @@ describe('generateInjects', { timeout: 60_000 }, () => {
     expect(result.source).toContain('registerInjects(() => [');
   });
 
-  it('warns about a DI class it cannot complete, and one it cannot import', () => {
+  it('warns about classes it cannot complete, cannot import, or must not import', () => {
     const found = generate().diagnostics.map((d) => [d.code, d.message]);
+    const runs = 'runs code when imported (an entry point or a script)';
     expect(found).toEqual([
-      // User is a schema named like its type, not a token.
+      // User is a schema and Product a plain object, each named like its type: not tokens.
       [
         'AVI201',
         'Cannot infer what to inject for `user` of Profiles: only classes and tokens named like their type can be inferred; add static inject',
       ],
-      // Product is an object with a description, not a token made by createToken.
       [
         'AVI201',
         'Cannot infer what to inject for `product` of Catalog: only classes and tokens named like their type can be inferred; add static inject',
+      ],
+      // A seed script, a service worker and a worker entry run code when imported.
+      [
+        'AVI203',
+        'Seeder is in a file that ' +
+          runs +
+          ', so inject.gen.ts cannot import it: move the class to its own file, or add static inject',
+      ],
+      [
+        'AVI203',
+        'Cache is in a file that ' +
+          runs +
+          ', so inject.gen.ts cannot import it: move the class to its own file, or add static inject',
+      ],
+      // A production install has no devDependencies.
+      [
+        'AVI203',
+        'FakeMailer is in a file that imports @avijs/testing, a devDependency, so inject.gen.ts cannot import it: move the class to its own file, or add static inject',
       ],
       [
         'AVI201',
         'Cannot infer what to inject for `label` of Partial: only classes and tokens named like their type can be inferred; add static inject',
       ],
       ['AVI201', 'Export Hidden so its dependency list can be registered, or add static inject'],
+      [
+        'AVI203',
+        'EmailJob is in a file that ' +
+          runs +
+          ', so inject.gen.ts cannot import it: move the class to its own file, or add static inject',
+      ],
     ]);
   });
 
@@ -628,5 +677,49 @@ describe('generateInjects', { timeout: 60_000 }, () => {
     const out = path.join(dir, 'src/inject.gen.ts');
     expect(await main(['inject', '--project', project, '--out', out, '--check'])).toBe(0);
     vi.restoreAllMocks();
+  });
+});
+
+describe('sameContent', () => {
+  it('ignores formatting only, never content', () => {
+    expect(
+      sameContent(
+        'registerInjects(() => [\n  [X, [A, B]],\n]);',
+        'registerInjects(()=>[[X,[A,B]]])',
+      ),
+    ).toBe(true);
+    expect(sameContent('[X, [A, B]]', '[X, [AB]]')).toBe(false);
+    expect(sameContent("'./my dir/x.js'", "'./mydir/x.js'")).toBe(false);
+    expect(sameContent('`a b`', '`ab`')).toBe(false);
+    expect(sameContent('"a \\"b c\\" d"', '"a \\"bc\\" d"')).toBe(false);
+    expect(sameContent("'a,]'", "'a]'")).toBe(false);
+  });
+});
+
+describe('buildProject write errors', () => {
+  let dir: string | undefined;
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    if (dir) {
+      await chmod(path.join(dir, 'dist/a.js'), 0o644).catch(() => undefined);
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('reports a file it cannot write like tsc, instead of crashing', async () => {
+    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    dir = await mkdtemp(path.join(tmpdir(), 'avi-readonly-'));
+    await mkdir(path.join(dir, 'src'));
+    await writeFile(path.join(dir, 'src/a.ts'), 'export const a = 1;');
+    const compilerOptions = { outDir: 'dist', rootDir: 'src', types: [], skipLibCheck: true };
+    await writeFile(
+      path.join(dir, 'tsconfig.json'),
+      JSON.stringify({ compilerOptions, include: ['src'] }),
+    );
+    const project = path.join(dir, 'tsconfig.json');
+    expect(buildProject({ project })).toBe(0);
+    await chmod(path.join(dir, 'dist/a.js'), 0o444);
+    expect(buildProject({ project })).toBeGreaterThan(0);
+    expect(write.mock.calls.map((call) => String(call[0])).join('')).toContain('TS5033');
   });
 });

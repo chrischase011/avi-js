@@ -3,6 +3,39 @@
 All notable changes are listed here. Avi.js follows [Semantic Versioning](https://semver.org); all
 packages share one version.
 
+## 1.0.0-rc.5 - 2026-10-29
+
+Fixes from testing 1.0.0-rc.4.
+
+### Fixed
+
+- `inject.gen.ts` imported other entry points: a worker or a seed script that `register`ed or
+  created an app was imported by the web app, so its code ran there, and a browser file calling
+  `navigator.serviceWorker.register` crashed it. rc.4 guessed entry points by name, which also
+  missed some (an app created in a helper, an aliased import). Now `inject.gen.ts` only imports
+  files that just declare things; a class in a file with top-level code, or one that imports a
+  devDependency, gets the new AVI203 warning instead. AVI202 is gone.
+- `avi build` threw a raw error when it could not write an output file; it now reports TS5033, as
+  `tsc` does.
+- A list function that failed because a class did not exist yet was dropped, so the next app
+  reported the wrong error; it stays queued and applies once the class exists.
+- `avi build` did not remove stale output after a folder was renamed by case only, on Windows
+  and macOS.
+- The up-to-date check took some different files for equal (template literals, escaped quotes,
+  commas inside strings); it compares tokens now.
+- A class with an optional constructor parameter failed to start: the runtime check compared the
+  list with the constructor's length, which counts optional parameters. A list may now leave them
+  out, as the type check already allowed. A class with no list at all still fails, and the error
+  now says to add `import './inject.gen.js'`.
+- Files compiled by `avi dev` were never cleaned, so a test deleted while it ran kept running in
+  `npm test`. `avi dev` now adds what it compiles to the list `avi build` cleans from.
+- A watcher could still write a generated file after `close()`.
+- `avi inject --help` and the other commands printed the full usage; they print their own now.
+- `avi g --dry-run` now ends with `Dry run: nothing was written.`
+- New projects' README lists `npm run build` and `npm run check`.
+- Docs: chapter 16 says to install `@avijs/workers` at the same version as `@avijs/core`, chapter
+  3 shows the generated file as it is, and the README gives TypeScript 5.8 as the minimum.
+
 ## 1.0.0-rc.4 - 2026-10-27
 
 Fixes from testing 1.0.0-rc.3: a correctness review of the new dependency lists, a new-user run of

@@ -18,14 +18,16 @@ avi inject --watch    # update it on every save, without compiling
 avi inject --check    # in CI: fail when it is out of date
 ```
 
-| Code   | Meaning                                                                                                  |
-| ------ | -------------------------------------------------------------------------------------------------------- |
-| AVI201 | A parameter's type has no token (a `string`, a union), or the class is not exported; add `static inject` |
-| AVI202 | No app entry point found, so no lists are inferred                                                       |
+| Code   | Meaning                                                                                                                   |
+| ------ | ------------------------------------------------------------------------------------------------------------------------- |
+| AVI201 | A parameter's type has no token (a `string`, a union), or the class is not exported; add `static inject`                  |
+| AVI203 | The class is in a file that runs code when imported (an entry point, a worker, a script), or that imports a devDependency |
 
-Only files the app loads are read: those the entry points (`AviFactory.create`, `register`,
-`createAvi`, `runWorker`, `cluster`) import, directly or not. A seed script the app never imports
-is never imported by `inject.gen.ts` either. Diagnostics name files by absolute path.
+`inject.gen.ts` imports the files whose classes it lists, so it only lists classes from files that
+just declare things: imports, exports, classes, functions, types and constants. A file with code at
+its top level, such as `main.ts`, a worker that calls `runWorker` or a seed script, would run that
+code inside your app, so its classes get AVI203: move such a class to its own file, or give it
+`static inject`. Diagnostics name files by absolute path.
 
 `avi generate` updates the file when it adds a class, so a new controller works right away.
 

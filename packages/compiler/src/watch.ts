@@ -4,6 +4,7 @@ import ts from 'typescript';
 import { formatDiagnostic, type Diagnostic } from './check.js';
 import { generateFrom, sameContent } from './client.js';
 import { INJECT_HEADER, generateInjectsFrom, plural } from './inject.js';
+import { recordOutputs } from './outputs.js';
 
 export interface WatchProjectOptions {
   /** Path to tsconfig.json. */
@@ -31,10 +32,20 @@ export interface ProjectWatcher {
  */
 export function watchProject(options: WatchProjectOptions): ProjectWatcher {
   const emit = options.emit ?? true;
+  // What each build emits goes on avi build's list, so it can remove outputs of deleted files.
+  const projectDir = path.dirname(path.resolve(options.project));
+  const emitted = new Set<string>();
+  const system: ts.System = {
+    ...ts.sys,
+    writeFile: (file, text, bom) => {
+      ts.sys.writeFile(file, text, bom);
+      emitted.add(path.resolve(file));
+    },
+  };
   const host = ts.createWatchCompilerHost(
     path.resolve(options.project),
     emit ? { preserveWatchOutput: true } : { noEmit: true },
-    ts.sys,
+    system,
     ts.createEmitAndSemanticDiagnosticsBuilderProgram,
     undefined,
     // Without emit the only output is the generated files'; tsc's status lines would be noise.
@@ -42,8 +53,11 @@ export function watchProject(options: WatchProjectOptions): ProjectWatcher {
   );
 
   let generatedErrors = 0;
+  // A file event can still start a build after close(); it must not write or report.
+  let closed = false;
   const status = host.onWatchStatusChange?.bind(host);
   host.onWatchStatusChange = (diagnostic, newLine, compilerOptions, errorCount) => {
+    if (closed) return;
     status?.(diagnostic, newLine, compilerOptions, errorCount);
     if (errorCount !== undefined) options.onBuild?.(errorCount + generatedErrors);
   };
@@ -51,6 +65,7 @@ export function watchProject(options: WatchProjectOptions): ProjectWatcher {
   const writers = generatedWriters(options);
   const build = host.afterProgramCreate?.bind(host);
   host.afterProgramCreate = (builder) => {
+    if (closed) return;
     const program = builder.getProgram();
     const results = writers.map((writer) => ({ out: writer.out, ...writer.write(program) }));
     generatedErrors = results.reduce((sum, result) => sum + result.errors, 0);
@@ -62,11 +77,16 @@ export function watchProject(options: WatchProjectOptions): ProjectWatcher {
     // report its stale errors. A file outside the program starts nothing, so build now.
     if (results.some((result) => result.written && program.getSourceFile(result.out))) return;
     build?.(builder);
+    if (emitted.size > 0) {
+      recordOutputs(program.getCompilerOptions().outDir, projectDir, emitted);
+      emitted.clear();
+    }
   };
 
   const watcher = ts.createWatchProgram(host);
   return {
     close: () => {
+      closed = true;
       watcher.close();
     },
   };
