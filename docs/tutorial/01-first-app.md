@@ -35,10 +35,10 @@ curl localhost:3000/
 curl localhost:3000/health
 # ok
 
-curl -i -X POST localhost:3000/users -H 'content-type: application/json' -d '{"name":"Grace"}'
+curl -i -X POST localhost:3000/users -H 'content-type: application/json' -d '{"name":"Joy"}'
 # HTTP/1.1 201 Created
 # location: /users/2
-# {"id":2,"name":"Grace"}
+# {"id":2,"name":"Joy"}
 ```
 
 Stop it with `Ctrl+C`. The app shuts down gracefully.

@@ -296,7 +296,7 @@ adds a separate root module; root modules only see each other's providers throug
 ```ts
 const app = createAvi().register({ imports: [GreetingModule] });
 await app.init();
-app.get(GreetingService).greet('Grace'); // typed as GreetingService
+app.get(GreetingService).greet('Joy'); // typed as GreetingService
 await app.close();
 ```
 

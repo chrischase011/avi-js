@@ -24,9 +24,9 @@ before(async () => {
 after(() => client.close());
 
 test('creates a user', async () => {
-  const res = await client.post('/users', { name: 'Grace' });
+  const res = await client.post('/users', { name: 'Joy' });
   assert.equal(res.status, 201);
-  assert.deepEqual(res.body, { id: 2, name: 'Grace' });
+  assert.deepEqual(res.body, { id: 2, name: 'Joy' });
 });
 ```
 
