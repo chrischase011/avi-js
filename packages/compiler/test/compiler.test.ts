@@ -360,7 +360,7 @@ describe('watchProject', { timeout: 60_000 }, () => {
       ),
     );
     await rebuilt;
-    expect(log).toHaveBeenCalledWith(`${out} updated: 6 dependency lists`);
+    expect(log).toHaveBeenCalledWith(`${out} updated: 7 dependency lists`);
     expect(await readFile(out, 'utf8')).toContain('[UsersController, [UsersService, Clock]],');
   });
 
@@ -660,9 +660,10 @@ describe('generateInjects', { timeout: 60_000 }, () => {
     // Explicit has static inject; Money takes a number and is not a DI class. Db is a constructor
     // and Mailer a token, each named like its type. The abstract Repo gets a list its subclass
     // inherits, WithOptional leaves its optional parameter out, and seed.ts, which the app never
-    // imports, is not imported either. Ticker's file calls the project's own `listen`, which starts
-    // nothing.
+    // imports, is not imported either. Audit's and Ticker's files call the project's own `listen`,
+    // through an interface and directly, which starts nothing.
     expect(result.classes).toEqual([
+      'Audit',
       'UsersRepo',
       'Ticker',
       'Repo',
@@ -695,17 +696,10 @@ describe('generateInjects', { timeout: 60_000 }, () => {
         'AVI201',
         'Cannot infer what to inject for `product` of Catalog: only classes and tokens named like their type can be inferred; add static inject',
       ],
-      // A cluster from Avi.js re-exported by a project file and renamed, and a `listen` the
-      // project only declares a type for.
+      // A cluster from Avi.js re-exported by a project file and renamed.
       [
         'AVI203',
         'Fleet is in a file that ' +
-          runs +
-          ', so inject.gen.ts cannot import it: move the class to its own file, or add static inject',
-      ],
-      [
-        'AVI203',
-        'Front is in a file that ' +
           runs +
           ', so inject.gen.ts cannot import it: move the class to its own file, or add static inject',
       ],

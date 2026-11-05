@@ -465,20 +465,13 @@ function origin(
 type Own = (source: ts.SourceFile) => boolean;
 
 /**
- * Implemented in the project's own code, as opposed to a library, a global, a `declare`, or an
- * interface the project only uses to type something else.
+ * Declared in the project's own code, as opposed to a library, a global or a `declare`. An
+ * interface of the project counts: its `listen` is usually an event bus the project implements.
  */
 function definedByProject(name: ts.Node, checker: ts.TypeChecker, own: Own): boolean {
   const declarations = checker.getSymbolAtLocation(name)?.declarations ?? [];
   return (
-    declarations.length > 0 &&
-    declarations.every(
-      (d) =>
-        own(d.getSourceFile()) &&
-        !isAmbient(d) &&
-        !ts.isMethodSignature(d) &&
-        !ts.isPropertySignature(d),
-    )
+    declarations.length > 0 && declarations.every((d) => own(d.getSourceFile()) && !isAmbient(d))
   );
 }
 

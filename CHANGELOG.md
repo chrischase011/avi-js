@@ -10,8 +10,10 @@ packages share one version.
 - AVI203 missed a devDependency reached through an `imports` entry with only an `"import"`
   condition: imports were resolved as `require` would. Each is now resolved as its file loads it.
 - AVI203 missed a cluster or worker started through `import * as workers`, through a project file
-  that re-exports it, or under another name (`import { cluster as boot }`), and a `listen` whose
-  only declaration is a method signature in one of the project's interfaces.
+  that re-exports it by name (`export { cluster } from '@avijs/workers'`), or under another name
+  (`import { cluster as boot }`). A re-export with `export *` is still not followed.
+- AVI203 took another package's export imported under the name `cluster` or `runWorker` for Avi.js's
+  (`import { createAvi as cluster } from '@avijs/core'`).
 - `avi build`, `avi check`, `avi client`, `avi inject` and `avi-compile` printed a stack trace for
   a tsconfig they cannot read. They now print `Cannot read file '…/nope.json'.` and exit with 1.
 - `avi dev` and `avi build` look up fewer modules on large projects.

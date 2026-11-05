@@ -2,6 +2,7 @@
 // Dependency lists inferred from constructor types. A `static inject` in a class wins.
 import { registerInjects } from '@avijs/core';
 import { EventEmitter } from 'node:events';
+import { Audit } from './bus.js';
 import { Clock } from './clock.js';
 import { Config } from './config.js';
 import { Db, Mailer, UsersRepo } from './db.js';
@@ -11,6 +12,7 @@ import { UsersController } from './users/users.controller.js';
 import { UsersService } from './users/users.service.js';
 
 registerInjects(() => [
+  [Audit, [Clock]],
   [UsersRepo, [Db, Mailer]],
   [Ticker, [Clock]],
   [Repo, [Clock]],
