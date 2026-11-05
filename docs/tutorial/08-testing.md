@@ -49,10 +49,10 @@ request; headers passed to a call still win. One per user keeps tests short:
 
 ```ts
 const shiela = client.withHeaders({ authorization: `Bearer ${await signIn('shiela')}` });
-const grace = client.withHeaders({ authorization: `Bearer ${await signIn('grace')}` });
+const joy = client.withHeaders({ authorization: `Bearer ${await signIn('joy')}` });
 
 assert.equal((await shiela.post('/teams', { name: 'Launch' })).status, 201);
-assert.equal((await grace.get('/teams/1')).status, 404); // not a member
+assert.equal((await joy.get('/teams/1')).status, 404); // not a member
 ```
 
 It keeps the `Api` type of a [typed client](15-typed-client.md#typed-tests), so
