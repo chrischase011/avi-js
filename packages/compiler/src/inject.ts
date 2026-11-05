@@ -324,14 +324,27 @@ class InjectGenerator {
         reasons.set(file, direct);
         queue.push(file);
       }
-      // Relative imports, `paths` aliases and `#imports` alike: whatever resolves to a project file.
-      for (const specifier of runtimeSpecifiers(source)) {
-        const resolved = ts.resolveModuleName(specifier, source.fileName, options, ts.sys, cache)
-          .resolvedModule?.resolvedFileName;
+      // Relative imports, `paths` aliases and `#imports` alike: whatever resolves to a project
+      // file. Each is resolved as the file loads it: `import` or `require` conditions.
+      for (const literal of runtimeSpecifiers(source)) {
+        const mode = ts.getModeForUsageLocation(source, literal, options);
+        const resolved = ts.resolveModuleName(
+          literal.text,
+          source.fileName,
+          options,
+          ts.sys,
+          cache,
+          undefined,
+          mode,
+        ).resolvedModule?.resolvedFileName;
         const target = resolved && this.program.getSourceFile(resolved);
         if (!target || !this.#inProject(target)) continue;
         const to = path.resolve(target.fileName);
-        if (to !== this.out) importers.set(to, [...(importers.get(to) ?? []), { file, specifier }]);
+        if (to === this.out) continue;
+        const list = importers.get(to);
+        const edge = { file, specifier: literal.text };
+        if (list) list.push(edge);
+        else importers.set(to, [edge]);
       }
     }
     // Breadth first, so import cycles end and the shortest chain is the one named.
@@ -396,28 +409,76 @@ function starts(node: ts.Node, checker: ts.TypeChecker, own: Own): boolean {
   if (!ts.isCallExpression(node)) return false;
   const callee = node.expression;
   if (ts.isPropertyAccessExpression(callee)) {
+    // `workers.cluster(...)` through `import * as workers`.
+    const namespace = ts.isIdentifier(callee.expression)
+      ? origin(callee.expression, checker)
+      : undefined;
+    const from = STARTERS[callee.name.text];
+    if (namespace?.name === '*' && from && namespace.modules.some((m) => from.test(m))) {
+      return true;
+    }
     return callee.name.text === 'listen' && !definedByProject(callee.name, checker, own);
   }
   if (!ts.isIdentifier(callee)) return false;
-  const from = STARTERS[callee.text];
-  if (!from) return false;
-  const symbol = checker.getSymbolAtLocation(callee);
-  const imported = symbol?.declarations?.find(ts.isImportSpecifier);
+  const imported = origin(callee, checker);
   if (imported) {
-    const specifier = imported.parent.parent.parent.moduleSpecifier;
-    return ts.isStringLiteral(specifier) && from.test(specifier.text);
+    const from = STARTERS[imported.name];
+    return from !== undefined && imported.modules.some((m) => from.test(m));
   }
   // A global such as setInterval, or a name nothing declares.
-  return !definedByProject(callee, checker, own);
+  return STARTERS[callee.text] !== undefined && !definedByProject(callee, checker, own);
+}
+
+/**
+ * Where an imported name comes from: its name there (`*` for a namespace) and every module on the
+ * way, following re-exports through the project's own files.
+ */
+function origin(
+  id: ts.Identifier,
+  checker: ts.TypeChecker,
+): { name: string; modules: string[] } | undefined {
+  let symbol = checker.getSymbolAtLocation(id);
+  let name = id.text;
+  const modules: string[] = [];
+  for (let hops = 0; symbol && hops < 20; hops++) {
+    const d = symbol.declarations?.[0];
+    let specifier: ts.Expression | undefined;
+    if (d && ts.isImportSpecifier(d)) {
+      name = (d.propertyName ?? d.name).text;
+      specifier = d.parent.parent.parent.moduleSpecifier;
+    } else if (d && ts.isExportSpecifier(d)) {
+      name = (d.propertyName ?? d.name).text;
+      specifier = d.parent.parent.moduleSpecifier;
+    } else if (d && ts.isNamespaceImport(d)) {
+      name = '*';
+      specifier = d.parent.parent.moduleSpecifier;
+    } else {
+      break;
+    }
+    if (specifier && ts.isStringLiteral(specifier)) modules.push(specifier.text);
+    if ((symbol.flags & ts.SymbolFlags.Alias) === 0) break;
+    symbol = checker.getImmediateAliasedSymbol(symbol);
+  }
+  return modules.length > 0 ? { name, modules } : undefined;
 }
 
 type Own = (source: ts.SourceFile) => boolean;
 
-/** Declared in the project's own code, as opposed to a library, a global or a `declare`. */
+/**
+ * Implemented in the project's own code, as opposed to a library, a global, a `declare`, or an
+ * interface the project only uses to type something else.
+ */
 function definedByProject(name: ts.Node, checker: ts.TypeChecker, own: Own): boolean {
   const declarations = checker.getSymbolAtLocation(name)?.declarations ?? [];
   return (
-    declarations.length > 0 && declarations.every((d) => own(d.getSourceFile()) && !isAmbient(d))
+    declarations.length > 0 &&
+    declarations.every(
+      (d) =>
+        own(d.getSourceFile()) &&
+        !isAmbient(d) &&
+        !ts.isMethodSignature(d) &&
+        !ts.isPropertySignature(d),
+    )
   );
 }
 
@@ -498,7 +559,7 @@ function devOnlyPackages(program: ts.Program): Set<string> {
 
 /** Why a file cannot be imported in production: it imports a package from devDependencies. */
 function importsDevOnly(source: ts.SourceFile, devOnly: ReadonlySet<string>): string | undefined {
-  for (const specifier of runtimeSpecifiers(source)) {
+  for (const { text: specifier } of runtimeSpecifiers(source)) {
     const name = specifier.startsWith('@')
       ? specifier.split('/').slice(0, 2).join('/')
       : specifier.split('/')[0];
@@ -508,8 +569,8 @@ function importsDevOnly(source: ts.SourceFile, devOnly: ReadonlySet<string>): st
 }
 
 /** Modules a file loads at runtime: imports and re-exports, without type-only ones. */
-function runtimeSpecifiers(source: ts.SourceFile): string[] {
-  const specifiers: string[] = [];
+function runtimeSpecifiers(source: ts.SourceFile): ts.StringLiteral[] {
+  const specifiers: ts.StringLiteral[] = [];
   for (const statement of source.statements) {
     if (ts.isImportDeclaration(statement)) {
       const clause = statement.importClause;
@@ -527,7 +588,7 @@ function runtimeSpecifiers(source: ts.SourceFile): string[] {
       continue;
     }
     if (statement.moduleSpecifier && ts.isStringLiteral(statement.moduleSpecifier)) {
-      specifiers.push(statement.moduleSpecifier.text);
+      specifiers.push(statement.moduleSpecifier);
     }
   }
   return specifiers;

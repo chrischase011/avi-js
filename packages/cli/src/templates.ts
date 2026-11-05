@@ -295,9 +295,9 @@ test('lists users', async () => {
 });
 
 test('creates a user', async () => {
-  const res = await client.post('/users', { name: 'Grace' });
+  const res = await client.post('/users', { name: 'Joy' });
   assert.equal(res.status, 201);
-  assert.deepEqual(res.body, { id: 2, name: 'Grace' });
+  assert.deepEqual(res.body, { id: 2, name: 'Joy' });
 });
 
 test('rejects a user without a name', async () => {
@@ -420,9 +420,9 @@ test('lists users', async () => {
 });
 
 test('creates a user', async () => {
-  const res = await client.post('/users', { name: 'Grace' });
+  const res = await client.post('/users', { name: 'Joy' });
   assert.equal(res.status, 201);
-  assert.deepEqual(res.body, { id: 2, name: 'Grace' });
+  assert.deepEqual(res.body, { id: 2, name: 'Joy' });
 });
 
 test('answers 404 for an unknown user', async () => {
@@ -558,9 +558,9 @@ test('lists users', async () => {
 });
 
 test('creates a user', async () => {
-  const res = await client.post('/users', { name: '  Grace  ', role: 'admin' });
+  const res = await client.post('/users', { name: '  Joy  ', role: 'admin' });
   assert.equal(res.status, 201);
-  assert.deepEqual(res.body, { id: 2, name: 'Grace' });
+  assert.deepEqual(res.body, { id: 2, name: 'Joy' });
 });
 
 ${REJECTS_NAMELESS}`,
@@ -655,9 +655,9 @@ test('lists users', async () => {
 });
 
 test('creates a user', async () => {
-  const res = await client.post('/users', { name: '  Grace  ', role: 'admin' });
+  const res = await client.post('/users', { name: '  Joy  ', role: 'admin' });
   assert.equal(res.status, 201);
-  assert.deepEqual(res.body, { id: 2, name: 'Grace' });
+  assert.deepEqual(res.body, { id: 2, name: 'Joy' });
 });
 
 test('answers 404 for an unknown user', async () => {

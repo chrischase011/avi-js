@@ -19,6 +19,17 @@ const USAGE = `Usage:
       Infer dependency lists from constructor types, for classes without static inject.`;
 
 export async function main(argv: readonly string[]): Promise<number> {
+  try {
+    return await run(argv);
+  } catch (error) {
+    // A tsconfig that cannot be read is a usage mistake: say why, without a stack trace.
+    if ((error as { code?: unknown }).code !== 'ERR_AVI_PROJECT') throw error;
+    console.error((error as Error).message);
+    return 1;
+  }
+}
+
+async function run(argv: readonly string[]): Promise<number> {
   const [command, ...rest] = argv;
   const { values, positionals } = parseArgs({
     args: [...rest],

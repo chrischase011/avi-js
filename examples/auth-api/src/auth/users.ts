@@ -34,7 +34,7 @@ export class UsersService {
   readonly #users = [
     stored(1, 'shiela', 'superadmin', 'my-love-forever'),
     stored(2, 'ada', 'admin', 'analytical-engine'),
-    stored(3, 'grace', 'member', 'cobol-forever'),
+    stored(3, 'joy', 'member', 'joy-to-the-world'),
   ];
 
   verify(username: string, password: string): User | undefined {

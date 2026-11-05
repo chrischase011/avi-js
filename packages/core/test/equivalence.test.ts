@@ -265,13 +265,13 @@ describe.each([
 
   it('injects services from imported modules', async () => {
     const { url } = await serve(build);
-    expect(await (await fetch(`${url}/greet/Grace`)).json()).toEqual({ message: 'Hello, Grace!' });
+    expect(await (await fetch(`${url}/greet/Joy`)).json()).toEqual({ message: 'Hello, Joy!' });
   });
 
   it('handles bodies, status codes and errors the same way', async () => {
     const { url } = await serve(build);
 
-    const created = await fetch(`${url}/users`, json({ name: 'Grace' }));
+    const created = await fetch(`${url}/users`, json({ name: 'Joy' }));
     expect(created.status).toBe(201);
     expect(created.headers.get('location')).toBe('/api/users/2');
 

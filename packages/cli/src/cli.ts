@@ -75,6 +75,11 @@ export async function main(argv: readonly string[]): Promise<number> {
       console.error(`${(error as Error).message}\n\n${USAGE}`);
       return 2;
     }
+    // A tsconfig that cannot be read.
+    if (code === 'ERR_AVI_PROJECT') {
+      console.error((error as Error).message);
+      return 1;
+    }
     throw error;
   }
 }

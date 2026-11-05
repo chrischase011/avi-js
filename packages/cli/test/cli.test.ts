@@ -653,6 +653,11 @@ describe('avi usage mistakes', () => {
     expect(String(error.mock.lastCall?.[0])).toMatch(/^Unknown command "nope"\.\n\nUsage:/);
     expect(await main(['build', '--nope'])).toBe(2);
     expect(String(error.mock.lastCall?.[0])).toContain("Unknown option '--nope'");
+    // A missing tsconfig: one line, no stack trace.
+    for (const command of ['build', 'check', 'inject']) {
+      expect(await main([command, '-p', path.join(workdir, 'nope.json')])).toBe(1);
+      expect(String(error.mock.lastCall?.[0])).toMatch(/^Cannot read file .*nope\.json/);
+    }
     log.mockRestore();
     error.mockRestore();
   });

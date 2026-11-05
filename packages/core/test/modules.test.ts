@@ -101,7 +101,7 @@ describe('modules and DI over HTTP', () => {
     app = instance;
 
     const service = instance.get(GreetingService);
-    expect(service.greet('Grace')).toBe('Hello, Grace!');
+    expect(service.greet('Joy')).toBe('Hello, Joy!');
     expect(instance.get(GreetingService)).toBe(service);
     expect(() => instance.get(GreeterConfig)).toThrow('not visible to the root modules');
   });

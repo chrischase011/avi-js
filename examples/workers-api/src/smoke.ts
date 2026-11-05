@@ -57,7 +57,7 @@ try {
   }
   assert.equal(pids.size, 2, 'both workers answer');
 
-  for (const to of ['shiela@example.com', 'ada@example.com', 'grace@example.com']) {
+  for (const to of ['shiela@example.com', 'ada@example.com', 'joy@example.com']) {
     const res = await call('POST', `${base}/emails`, JSON.stringify({ to, subject: 'Welcome' }));
     assert.equal(res.status, 202);
   }

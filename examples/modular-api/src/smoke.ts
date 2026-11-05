@@ -15,7 +15,7 @@ try {
   const created = await fetch(`${url}/users`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ name: 'Grace' }),
+    body: JSON.stringify({ name: 'Joy' }),
   });
   assert.equal(created.status, 201);
   assert.equal(created.headers.get('location'), '/users/2');

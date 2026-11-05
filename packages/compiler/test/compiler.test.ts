@@ -695,6 +695,22 @@ describe('generateInjects', { timeout: 60_000 }, () => {
         'AVI201',
         'Cannot infer what to inject for `product` of Catalog: only classes and tokens named like their type can be inferred; add static inject',
       ],
+      // A cluster from Avi.js re-exported by a project file and renamed, and a `listen` the
+      // project only declares a type for.
+      [
+        'AVI203',
+        'Fleet is in a file that ' +
+          runs +
+          ', so inject.gen.ts cannot import it: move the class to its own file, or add static inject',
+      ],
+      [
+        'AVI203',
+        'Front is in a file that ' +
+          runs +
+          ', so inject.gen.ts cannot import it: move the class to its own file, or add static inject',
+      ],
+      // An `imports` entry that only an ES module can resolve.
+      ['AVI203', `Hashed ${dev('imports #lib/dev.js, which imports ')}`],
       // A seed script, a service worker and a worker entry run code when imported.
       [
         'AVI203',
@@ -706,6 +722,13 @@ describe('generateInjects', { timeout: 60_000 }, () => {
       [
         'AVI203',
         'Probe is in a file that ' +
+          runs +
+          ', so inject.gen.ts cannot import it: move the class to its own file, or add static inject',
+      ],
+      // A cluster through a namespace import.
+      [
+        'AVI203',
+        'Spawner is in a file that ' +
           runs +
           ', so inject.gen.ts cannot import it: move the class to its own file, or add static inject',
       ],

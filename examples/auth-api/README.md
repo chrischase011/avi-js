@@ -9,7 +9,7 @@ Sign-in, protected routes and roles, written with the explicit API (no decorator
 | `GET /admin/stats` | signed in, role `superadmin` or `admin` | `{ users }`                                  |
 
 Demo users: `shiela` / `my-love-forever` (superadmin), `ada` / `analytical-engine` (admin) and
-`grace` / `cobol-forever` (member).
+`joy` / `joy-to-the-world` (member).
 
 What it shows:
 

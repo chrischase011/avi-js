@@ -7,5 +7,10 @@
   },
   "devDependencies": {
     "@avijs/testing": "*"
+  },
+  "imports": {
+    "#lib/*": {
+      "import": "./src/lib/*"
+    }
   }
 }

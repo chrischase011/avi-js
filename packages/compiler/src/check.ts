@@ -42,11 +42,16 @@ export function readConfig(project: string): ts.ParsedCommandLine {
   const config = ts.getParsedCommandLineOfConfigFile(path.resolve(project), undefined, {
     ...ts.sys,
     onUnRecoverableConfigFileDiagnostic: (diagnostic) => {
-      throw new Error(ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'));
+      throw projectError(ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'));
     },
   });
-  if (!config) throw new Error(`Cannot read ${project}`);
+  if (!config) throw projectError(`Cannot read ${project}`);
   return config;
+}
+
+/** A tsconfig that cannot be read: the CLIs print the message, without a stack trace. */
+function projectError(message: string): Error {
+  return Object.assign(new Error(message), { code: 'ERR_AVI_PROJECT' });
 }
 
 /** The project's program, and its own files (absolute paths). */

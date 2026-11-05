@@ -172,7 +172,7 @@ describe('withValidation', () => {
       },
       (ctx) => ctx.input,
     );
-    expect((await fetch(url, post({ name: 'grace' }))).status).toBe(200);
+    expect((await fetch(url, post({ name: 'joy' }))).status).toBe(200);
     expect(await (await fetch(url, post({ name: 'ada' }))).json()).toMatchObject({
       details: { issues: [{ in: 'body', path: ['name'], message: 'name is taken' }] },
     });
@@ -193,12 +193,12 @@ describe('response schemas', () => {
 
   it('keeps status and headers from reply()', async () => {
     const url = await serve('GET', '/me', { response: User }, () =>
-      reply({ id: 2, name: 'Grace', internal: true }, { status: 201, headers: { 'x-id': '2' } }),
+      reply({ id: 2, name: 'Joy', internal: true }, { status: 201, headers: { 'x-id': '2' } }),
     );
     const res = await fetch(`${url}/me`);
     expect(res.status).toBe(201);
     expect(res.headers.get('x-id')).toBe('2');
-    expect(await res.json()).toEqual({ id: 2, name: 'Grace' });
+    expect(await res.json()).toEqual({ id: 2, name: 'Joy' });
   });
 
   it('turns a mismatch into a logged 500', async () => {

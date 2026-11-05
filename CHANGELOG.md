@@ -3,6 +3,24 @@
 All notable changes are listed here. Avi.js follows [Semantic Versioning](https://semver.org); all
 packages share one version.
 
+## 1.0.2 - 2026-11-05
+
+### Fixed
+
+- AVI203 missed a devDependency reached through an `imports` entry with only an `"import"`
+  condition: imports were resolved as `require` would. Each is now resolved as its file loads it.
+- AVI203 missed a cluster or worker started through `import * as workers`, through a project file
+  that re-exports it, or under another name (`import { cluster as boot }`), and a `listen` whose
+  only declaration is a method signature in one of the project's interfaces.
+- `avi build`, `avi check`, `avi client`, `avi inject` and `avi-compile` printed a stack trace for
+  a tsconfig they cannot read. They now print `Cannot read file '…/nope.json'.` and exit with 1.
+- `avi dev` and `avi build` look up fewer modules on large projects.
+
+### Changed
+
+- New projects' tests, the examples and the docs use Joy instead of Grace as a sample name. The
+  auth-api example's member signs in as `joy` / `joy-to-the-world`.
+
 ## 1.0.1 - 2026-11-05
 
 ### Fixed

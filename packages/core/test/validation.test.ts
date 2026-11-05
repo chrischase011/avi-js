@@ -168,9 +168,9 @@ describe('decorators with schemas', () => {
     expect(await (await fetch(`${url}/users/5`)).json()).toEqual({ id: 5, raw: '5' });
     expect((await fetch(`${url}/users/x`)).status).toBe(400);
 
-    const created = await fetch(`${url}/users`, json('POST', { name: 'Grace' }));
+    const created = await fetch(`${url}/users`, json('POST', { name: 'Joy' }));
     expect(created.status).toBe(201);
-    expect(await created.json()).toEqual({ id: 2, name: 'Grace' });
+    expect(await created.json()).toEqual({ id: 2, name: 'Joy' });
     expect((await fetch(`${url}/users`, json('POST', { name: '' }))).status).toBe(400);
   });
 

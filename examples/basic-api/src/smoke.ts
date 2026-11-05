@@ -15,7 +15,7 @@ try {
   const created = await fetch(`${url}/users`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ name: 'Grace' }),
+    body: JSON.stringify({ name: 'Joy' }),
   });
   assert.equal(created.status, 201);
   assert.equal(created.headers.get('location'), '/users/2');
@@ -27,7 +27,7 @@ try {
   });
   assert.equal(invalid.status, 400);
 
-  assert.deepEqual(await (await fetch(`${url}/users/2`)).json(), { id: 2, name: 'Grace' });
+  assert.deepEqual(await (await fetch(`${url}/users/2`)).json(), { id: 2, name: 'Joy' });
   assert.equal((await fetch(`${url}/users/99`)).status, 404);
 
   const wrongMethod = await fetch(`${url}/users`, { method: 'DELETE' });
