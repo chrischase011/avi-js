@@ -26,10 +26,12 @@ avi inject --check    # in CI: fail when it is out of date
 `inject.gen.ts` imports the files whose classes it lists, so it only lists classes from files that
 just declare things: imports, exports, classes, functions, types and constants. A file with code at
 its top level, such as `main.ts`, a worker that calls `runWorker` or a seed script, would run that
-code inside your app, so its classes get AVI203. So does a constant that starts something, such as
-`export const server = app.listen(3000)`, and a file that imports or re-exports a devDependency,
-directly or through another file of yours: a production install does not have it. Move such a
-class to its own file, or give it `static inject`. Diagnostics name files by absolute path.
+code inside your app, so its classes get AVI203. So does a constant that starts a server, a worker
+or a timer, such as `export const server = app.listen(3000)` or `setInterval(...)` (a `listen`
+method of your own, such as an event bus's, does not count), and a file that imports or re-exports
+a devDependency, directly or through other files of yours, by relative path or `paths` alias: a
+production install does not have it. Move such a class to its own file, or give it
+`static inject`. Diagnostics name files by absolute path.
 
 `avi generate` updates the file when it adds a class, so a new controller works right away.
 

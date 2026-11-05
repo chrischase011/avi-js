@@ -72,7 +72,7 @@ export function removeStale(
   if (!folder) return;
   const { out, key } = folder;
   const id = projectId(folder, project);
-  const lists = readMarker(out, id);
+  const lists = readMarker(out);
   const current = relativeTo(folder, written).sort();
   // Files another tsconfig compiled here stay.
   const keep = new Set(current.map(key));
@@ -112,7 +112,7 @@ export function recordOutputs(
   const folder = outputFolder(outDir, path.dirname(path.resolve(project)));
   if (!folder) return;
   const id = projectId(folder, project);
-  const lists = readMarker(folder.out, id);
+  const lists = readMarker(folder.out);
   const files = new Map((lists.get(id) ?? []).map((file) => [folder.key(file), file]));
   const before = files.size;
   for (const file of relativeTo(folder, written)) files.set(folder.key(file), file);
@@ -135,20 +135,20 @@ function writeMarker(out: string, lists: Map<string, string[]>): void {
   );
 }
 
-/** The lists by tsconfig. A list from before 1.0.0-rc.6 belongs to `id`, the one building now. */
-function readMarker(out: string, id: string): Map<string, string[]> {
+/**
+ * The lists by tsconfig. A list from before 1.0.0-rc.6 does not say which tsconfig wrote it, so
+ * nothing on it is removed; the build replaces it with its own.
+ */
+function readMarker(out: string): Map<string, string[]> {
   const strings = (value: unknown): string[] =>
     Array.isArray(value) ? value.filter((file): file is string => typeof file === 'string') : [];
   const lists = new Map<string, string[]>();
   try {
     const parsed = JSON.parse(readFileSync(path.join(out, MARKER), 'utf8')) as {
-      files?: unknown;
       projects?: unknown;
     };
     if (parsed.projects && typeof parsed.projects === 'object') {
       for (const [name, files] of Object.entries(parsed.projects)) lists.set(name, strings(files));
-    } else if (parsed.files !== undefined) {
-      lists.set(id, strings(parsed.files));
     }
   } catch {
     // No list yet, or one that cannot be read: nothing to remove.

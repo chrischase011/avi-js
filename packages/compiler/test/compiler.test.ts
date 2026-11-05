@@ -360,7 +360,7 @@ describe('watchProject', { timeout: 60_000 }, () => {
       ),
     );
     await rebuilt;
-    expect(log).toHaveBeenCalledWith(`${out} updated: 5 dependency lists`);
+    expect(log).toHaveBeenCalledWith(`${out} updated: 6 dependency lists`);
     expect(await readFile(out, 'utf8')).toContain('[UsersController, [UsersService, Clock]],');
   });
 
@@ -483,15 +483,21 @@ describe('buildProject', () => {
     expect(existsSync(path.join(root, 'dist/worker/main.js'))).toBe(true);
   });
 
-  it('reads the list an earlier version wrote', async () => {
+  it('replaces a list from before rc.6 without removing what it names', async () => {
     const config = await project('dist', 'export const a = 1;');
     const root = path.dirname(config);
     await mkdir(path.join(root, 'dist'));
-    await writeFile(path.join(root, 'dist/gone.js'), '');
-    await writeFile(path.join(root, 'dist/.avi-build'), JSON.stringify({ files: ['gone.js'] }));
+    // It may be another tsconfig's: the old list does not say.
+    await writeFile(path.join(root, 'dist/other.js'), '');
+    await writeFile(path.join(root, 'dist/.avi-build'), JSON.stringify({ files: ['other.js'] }));
     expect(buildProject({ project: config })).toBe(0);
-    expect(existsSync(path.join(root, 'dist/gone.js'))).toBe(false);
-    expect(existsSync(path.join(root, 'dist/a.js'))).toBe(true);
+    expect(existsSync(path.join(root, 'dist/other.js'))).toBe(true);
+    const marker = JSON.parse(await readFile(path.join(root, 'dist/.avi-build'), 'utf8')) as {
+      files?: unknown;
+      projects: Record<string, string[]>;
+    };
+    expect(marker.files).toBeUndefined();
+    expect(Object.values(marker.projects)).toEqual([['a.js']]);
   });
 
   it('removes what avi dev compiled from a source deleted while it ran', async () => {
@@ -654,9 +660,11 @@ describe('generateInjects', { timeout: 60_000 }, () => {
     // Explicit has static inject; Money takes a number and is not a DI class. Db is a constructor
     // and Mailer a token, each named like its type. The abstract Repo gets a list its subclass
     // inherits, WithOptional leaves its optional parameter out, and seed.ts, which the app never
-    // imports, is not imported either.
+    // imports, is not imported either. Ticker's file calls the project's own `listen`, which starts
+    // nothing.
     expect(result.classes).toEqual([
       'UsersRepo',
+      'Ticker',
       'Repo',
       'WithOptional',
       'UsersController',
@@ -671,7 +679,13 @@ describe('generateInjects', { timeout: 60_000 }, () => {
   it('warns about classes it cannot complete, cannot import, or must not import', () => {
     const found = generate().diagnostics.map((d) => [d.code, d.message]);
     const runs = 'runs code when imported (an entry point or a script)';
+    const dev = (chain: string) =>
+      `is in a file that ${chain}@avijs/testing, a devDependency, so inject.gen.ts cannot import it: move the class to its own file, or add static inject`;
     expect(found).toEqual([
+      // Through a `paths` alias, and through an import cycle.
+      ['AVI203', `Aliased ${dev('imports @/testing/fakes.js, which imports ')}`],
+      ['AVI203', `LoopA ${dev('imports ./b.js, which imports ./c.js, which imports ')}`],
+      ['AVI203', `LoopB ${dev('imports ./c.js, which imports ')}`],
       // User is a schema and Product a plain object, each named like its type: not tokens.
       [
         'AVI201',
@@ -713,6 +727,13 @@ describe('generateInjects', { timeout: 60_000 }, () => {
       [
         'AVI203',
         'FakeClock is in a file that imports ./fakes.js, which imports @avijs/testing, a devDependency, so inject.gen.ts cannot import it: move the class to its own file, or add static inject',
+      ],
+      // A timer started at the top level.
+      [
+        'AVI203',
+        'Poller is in a file that ' +
+          runs +
+          ', so inject.gen.ts cannot import it: move the class to its own file, or add static inject',
       ],
       [
         'AVI201',

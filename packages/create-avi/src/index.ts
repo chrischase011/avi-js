@@ -3,6 +3,13 @@ import { stdin, stdout } from 'node:process';
 import { createInterface } from 'node:readline/promises';
 import { parseArgs } from 'node:util';
 
+const USAGE = `Usage:
+  npm create avi@latest [name] -- [--template modular|minimal] [--validator valibot|zod|none] [--dir .]
+      Create an Avi.js project. Without a name, it asks for the name, the template and the
+      validation library. The modular template (default) uses modules and decorators; minimal
+      uses plain routes and services. Valibot is the default validator; none keeps handwritten
+      checks.`;
+
 /** Asks a question and returns the answer, or `fallback` for an empty one. */
 export type Ask = (question: string, fallback: string) => Promise<string>;
 
@@ -29,7 +36,11 @@ export async function create(
     },
   });
 
-  if (positionals.length === 0 && ask && !values.help && !args.includes('-h')) {
+  if (values.help || args.includes('-h')) {
+    console.log(USAGE);
+    return 0;
+  }
+  if (positionals.length === 0 && ask) {
     args.unshift(await ask('Project name', 'my-avi-app'));
     if (values.template === undefined) {
       args.push('--template', await ask('Template, modular or minimal', 'modular'));

@@ -5,12 +5,14 @@ import { EventEmitter } from 'node:events';
 import { Clock } from './clock.js';
 import { Config } from './config.js';
 import { Db, Mailer, UsersRepo } from './db.js';
+import { Ticker } from './events.js';
 import { Repo, WithOptional } from './repo.js';
 import { UsersController } from './users/users.controller.js';
 import { UsersService } from './users/users.service.js';
 
 registerInjects(() => [
   [UsersRepo, [Db, Mailer]],
+  [Ticker, [Clock]],
   [Repo, [Clock]],
   [WithOptional, [Clock]],
   [UsersController, [UsersService]],

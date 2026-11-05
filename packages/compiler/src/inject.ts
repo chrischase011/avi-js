@@ -61,20 +61,12 @@ class InjectGenerator {
   }
 
   run(): GeneratedInjects {
-    const devOnly = devOnlyPackages(this.program);
-    const reasons = new Map<string, string | undefined>();
-    // A devDependency, imported directly or through local files. Code that runs in an imported
-    // file is fine: the app loads that file anyway.
-    const needsDev = (source: ts.SourceFile): string | undefined => {
-      const file = path.resolve(source.fileName);
-      if (reasons.has(file)) return reasons.get(file);
-      reasons.set(file, undefined);
-      const reason = importsDevOnly(source, devOnly) ?? this.#viaImport(source, needsDev);
-      reasons.set(file, reason);
-      return reason;
-    };
+    const needsDev = this.#devReasons(devOnlyPackages(this.program));
+    const own = (source: ts.SourceFile) => this.#inProject(source);
     const unsafe = (source: ts.SourceFile): string | undefined =>
-      runsCode(source) ? 'runs code when imported (an entry point or a script)' : needsDev(source);
+      runsCode(source, this.#checker, own)
+        ? 'runs code when imported (an entry point or a script)'
+        : needsDev.get(path.resolve(source.fileName));
     for (const source of this.program.getSourceFiles()) {
       if (!this.#inProject(source) || path.resolve(source.fileName) === this.out) continue;
       // Test files are not loaded by the app, and the generated file must not import them.
@@ -310,23 +302,49 @@ class InjectGenerator {
     return !source.isDeclarationFile && this.roots.has(path.resolve(source.fileName));
   }
 
-  #viaImport(
-    source: ts.SourceFile,
-    unsafe: (source: ts.SourceFile) => string | undefined,
-  ): string | undefined {
+  /**
+   * Why each project file needs a devDependency: it imports one, or imports a project file that
+   * does. Code that runs in an imported file is fine: the app loads that file anyway.
+   */
+  #devReasons(devOnly: ReadonlySet<string>): Map<string, string> {
     const options = this.program.getCompilerOptions();
-    for (const specifier of runtimeSpecifiers(source)) {
-      if (!specifier.startsWith('.')) continue;
-      const resolved = ts.resolveModuleName(specifier, source.fileName, options, ts.sys)
-        .resolvedModule?.resolvedFileName;
-      const target = resolved && this.program.getSourceFile(resolved);
-      if (!target || !this.#inProject(target) || path.resolve(target.fileName) === this.out) {
-        continue;
+    const cache = ts.createModuleResolutionCache(
+      this.program.getCurrentDirectory(),
+      (file) => (ts.sys.useCaseSensitiveFileNames ? file : file.toLowerCase()),
+      options,
+    );
+    const reasons = new Map<string, string>();
+    const importers = new Map<string, { file: string; specifier: string }[]>();
+    const queue: string[] = [];
+    for (const source of this.program.getSourceFiles()) {
+      const file = path.resolve(source.fileName);
+      if (!this.#inProject(source) || file === this.out) continue;
+      const direct = importsDevOnly(source, devOnly);
+      if (direct) {
+        reasons.set(file, direct);
+        queue.push(file);
       }
-      const reason = unsafe(target);
-      if (reason) return `imports ${specifier}, which ${reason}`;
+      // Relative imports, `paths` aliases and `#imports` alike: whatever resolves to a project file.
+      for (const specifier of runtimeSpecifiers(source)) {
+        const resolved = ts.resolveModuleName(specifier, source.fileName, options, ts.sys, cache)
+          .resolvedModule?.resolvedFileName;
+        const target = resolved && this.program.getSourceFile(resolved);
+        if (!target || !this.#inProject(target)) continue;
+        const to = path.resolve(target.fileName);
+        if (to !== this.out) importers.set(to, [...(importers.get(to) ?? []), { file, specifier }]);
+      }
     }
-    return undefined;
+    // Breadth first, so import cycles end and the shortest chain is the one named.
+    // A for-of also visits what the loop appends.
+    for (const file of queue) {
+      const reason = reasons.get(file) as string;
+      for (const { file: by, specifier } of importers.get(file) ?? []) {
+        if (reasons.has(by)) continue;
+        reasons.set(by, `imports ${specifier}, which ${reason}`);
+        queue.push(by);
+      }
+    }
+    return reasons;
   }
 
   #report(source: ts.SourceFile, at: ts.Node, message: string, code = 'AVI201'): void {
@@ -355,34 +373,73 @@ function isDecorated(node: ts.ClassDeclaration): boolean {
   return (ts.getDecorators(node) ?? []).length > 0;
 }
 
-// Calls that start a server, a worker or a cluster when a file is imported.
-const STARTERS = new Set(['listen', 'runWorker', 'cluster']);
+// Functions that start a worker, a cluster or a timer, by the module they are imported from.
+const STARTERS: Record<string, RegExp> = {
+  runWorker: /^@avijs\//,
+  cluster: /^@avijs\//,
+  setInterval: /^(node:)?timers/,
+  setTimeout: /^(node:)?timers/,
+};
 
-function starts(node: ts.Node): boolean {
-  if (ts.isCallExpression(node)) {
+/**
+ * Whether a call or `new` starts something: a server's `listen`, a worker, a cluster, a timer.
+ * A function or method the project defines itself, such as an event bus's `listen`, does not.
+ */
+function starts(node: ts.Node, checker: ts.TypeChecker, own: Own): boolean {
+  if (ts.isNewExpression(node)) {
     const callee = node.expression;
-    const name = ts.isIdentifier(callee)
-      ? callee.text
-      : ts.isPropertyAccessExpression(callee)
-        ? callee.name.text
-        : undefined;
-    if (name !== undefined && STARTERS.has(name)) return true;
+    return (
+      (ts.isIdentifier(callee) && callee.text === 'Worker') ||
+      (ts.isPropertyAccessExpression(callee) && callee.name.text === 'Worker')
+    );
   }
+  if (!ts.isCallExpression(node)) return false;
+  const callee = node.expression;
+  if (ts.isPropertyAccessExpression(callee)) {
+    return callee.name.text === 'listen' && !definedByProject(callee.name, checker, own);
+  }
+  if (!ts.isIdentifier(callee)) return false;
+  const from = STARTERS[callee.text];
+  if (!from) return false;
+  const symbol = checker.getSymbolAtLocation(callee);
+  const imported = symbol?.declarations?.find(ts.isImportSpecifier);
+  if (imported) {
+    const specifier = imported.parent.parent.parent.moduleSpecifier;
+    return ts.isStringLiteral(specifier) && from.test(specifier.text);
+  }
+  // A global such as setInterval, or a name nothing declares.
+  return !definedByProject(callee, checker, own);
+}
+
+type Own = (source: ts.SourceFile) => boolean;
+
+/** Declared in the project's own code, as opposed to a library, a global or a `declare`. */
+function definedByProject(name: ts.Node, checker: ts.TypeChecker, own: Own): boolean {
+  const declarations = checker.getSymbolAtLocation(name)?.declarations ?? [];
   return (
-    ts.isNewExpression(node) &&
-    ts.isIdentifier(node.expression) &&
-    node.expression.text === 'Worker'
+    declarations.length > 0 && declarations.every((d) => own(d.getSourceFile()) && !isAmbient(d))
   );
+}
+
+/** Inside a `declare`: a type only, with no code behind it in this project. */
+function isAmbient(node: ts.Node): boolean {
+  let current = node;
+  while (!ts.isSourceFile(current)) {
+    const modifiers = ts.canHaveModifiers(current) ? ts.getModifiers(current) : undefined;
+    if (modifiers?.some((m) => m.kind === ts.SyntaxKind.DeclareKeyword)) return true;
+    current = current.parent;
+  }
+  return false;
 }
 
 /**
  * Whether a file does more than declare things when imported: a call statement, a loop, a
- * top-level await, or a value that starts a server or worker.
+ * top-level await, or a value that starts a server, worker or timer.
  */
-function runsCode(source: ts.SourceFile): boolean {
+function runsCode(source: ts.SourceFile, checker: ts.TypeChecker, own: Own): boolean {
   const awaits = (node: ts.Node): boolean =>
     ts.isAwaitExpression(node) ||
-    starts(node) ||
+    starts(node, checker, own) ||
     (!ts.isFunctionLike(node) && !ts.isClassLike(node) && ts.forEachChild(node, awaits) === true);
   return source.statements.some((statement) => {
     if (

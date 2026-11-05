@@ -3,6 +3,25 @@
 All notable changes are listed here. Avi.js follows [Semantic Versioning](https://semver.org); all
 packages share one version.
 
+## 1.0.1 - 2026-11-05
+
+### Fixed
+
+- AVI203 missed a devDependency reached through an import cycle or a `paths` alias, so
+  `inject.gen.ts` could import a file a production install cannot load. It now follows every
+  import that resolves to a project file.
+- AVI203 flagged a class next to a top-level call of the project's own `listen`, such as an event
+  bus's, so the class got no list and failed at startup. It now looks at what a call resolves to:
+  `runWorker` and `cluster` count when imported from Avi.js, `listen` unless the project defines
+  it, and `setInterval` and `setTimeout` now count too.
+- The first `avi build` after upgrading to 1.0.0 could remove another tsconfig's output, read from
+  the list earlier versions wrote. That list now only gets replaced: nothing on it is removed.
+- `avi build`, `avi dev`, `avi check`, `avi client`, `avi inject` and `avi-compile` take `-p` for
+  `--project`.
+- `avi bogus` and `avi bogus --help` say `Unknown command "bogus"` and exit with 2, and
+  `avi g widget foo` says `Unknown kind "widget"`.
+- `npm create avi -- --help` described `avi new`; it now prints its own usage.
+
 ## 1.0.0 - 2026-11-05
 
 The first stable release. The code is 1.0.0-rc.6's;

@@ -233,7 +233,7 @@ describe.each(TEMPLATES.flatMap((t) => VALIDATORS.map((v) => [t, v] as const)))(
 
     it('passes avi check', async () => {
       const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
-      const code = await main(['check', '--project', path.join(project, 'tsconfig.json')]);
+      const code = await main(['check', '-p', path.join(project, 'tsconfig.json')]);
       log.mockRestore();
       expect(code).toBe(0);
     }, 60_000);
@@ -260,7 +260,7 @@ describe.each(TEMPLATES.flatMap((t) => VALIDATORS.map((v) => [t, v] as const)))(
         const header = shipped.split('\n').slice(0, 3).join('\n');
         await writeFile(file, `${header}\n\nregisterInjects([]);\n`);
         const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
-        expect(await main(['build', '--project', path.join(project, 'tsconfig.json')])).toBe(0);
+        expect(await main(['build', '-p', path.join(project, 'tsconfig.json')])).toBe(0);
         log.mockRestore();
         expect(await readFile(file, 'utf8')).toBe(shipped);
       },
@@ -350,6 +350,9 @@ describe('avi', () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     expect(await main(['help'])).toBe(0);
     expect(await main(['unknown'])).toBe(2);
+    expect(String(error.mock.lastCall?.[0])).toMatch(/^Unknown command "unknown"\./);
+    expect(await main(['g', 'widget', 'foo'])).toBe(2);
+    expect(String(error.mock.lastCall?.[0])).toMatch(/^Unknown kind "widget"\./);
     error.mockRestore();
   });
 });
@@ -646,10 +649,10 @@ describe('avi usage mistakes', () => {
     expect(await main(['inject', '--help'])).toBe(0);
     expect(String(log.mock.lastCall?.[0])).toMatch(/^Usage:\n {2}avi inject /);
     expect(String(log.mock.lastCall?.[0])).not.toContain('avi client');
-    expect(await main(['nope', '--help'])).toBe(0);
-    expect(String(log.mock.lastCall?.[0])).toContain('avi dev');
+    expect(await main(['nope', '--help'])).toBe(2);
+    expect(String(error.mock.lastCall?.[0])).toMatch(/^Unknown command "nope"\.\n\nUsage:/);
     expect(await main(['build', '--nope'])).toBe(2);
-    expect(String(error.mock.calls[0]?.[0])).toContain("Unknown option '--nope'");
+    expect(String(error.mock.lastCall?.[0])).toContain("Unknown option '--nope'");
     log.mockRestore();
     error.mockRestore();
   });

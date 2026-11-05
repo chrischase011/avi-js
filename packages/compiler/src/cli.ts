@@ -8,14 +8,14 @@ import { INJECT_HEADER, generateInjects, plural } from './inject.js';
 import { GENERATED, watchProject, type WatchProjectOptions } from './watch.js';
 
 const USAGE = `Usage:
-  avi-compile check [--project tsconfig.json]
+  avi-compile check [-p|--project tsconfig.json]
       Type-check every static inject list against its constructor.
   avi-compile manifest <entry.js> [--export AppModule] [--out avi.manifest.json]
       Describe the app's modules, providers and routes without starting it.
-  avi-compile client [--project tsconfig.json] [--out src/api.gen.ts] [--root file.ts#AppModule] [--check | --watch]
+  avi-compile client [-p|--project tsconfig.json] [--out src/api.gen.ts] [--root file.ts#AppModule] [--check | --watch]
       Generate the Api type for @avijs/client. --check fails if the file is out of date;
       --watch updates it whenever routes change.
-  avi-compile inject [--project tsconfig.json] [--out src/inject.gen.ts] [--check | --watch]
+  avi-compile inject [-p|--project tsconfig.json] [--out src/inject.gen.ts] [--check | --watch]
       Infer dependency lists from constructor types, for classes without static inject.`;
 
 export async function main(argv: readonly string[]): Promise<number> {
@@ -24,7 +24,7 @@ export async function main(argv: readonly string[]): Promise<number> {
     args: [...rest],
     allowPositionals: true,
     options: {
-      project: { type: 'string', default: 'tsconfig.json' },
+      project: { type: 'string', short: 'p', default: 'tsconfig.json' },
       export: { type: 'string', default: 'AppModule' },
       out: { type: 'string' },
       root: { type: 'string' },

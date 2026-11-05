@@ -23,6 +23,16 @@ const name = async (project: string) =>
     .name;
 
 describe('create', () => {
+  it('prints its own usage for --help, without asking', async () => {
+    const ask = vi.fn();
+    expect(await create(['--help'], ask)).toBe(0);
+    expect(await create(['-h'], ask)).toBe(0);
+    expect(ask).not.toHaveBeenCalled();
+    const text = String(vi.mocked(console.log).mock.lastCall?.[0]);
+    expect(text).toContain('npm create avi@latest [name] --');
+    expect(text).not.toContain('avi new');
+  });
+
   it('creates a project from arguments without asking', async () => {
     const ask = vi.fn();
     expect(await create(['my-app', '--template', 'minimal', '--dir', dir], ask)).toBe(0);

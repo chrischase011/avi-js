@@ -20,32 +20,50 @@ const USAGE = `Usage:
       a folder of packed @avijs tarballs (pnpm pack) to install instead of the registry.
       --avi-version defaults to this CLI's version.
 ${GENERATE_USAGE}
-  avi dev [--project tsconfig.json] [--entry dist/main.js] [--client src/api.gen.ts | --no-client]
+  avi dev [-p|--project tsconfig.json] [--entry dist/main.js] [--client src/api.gen.ts | --no-client]
           [--inject src/inject.gen.ts | --no-inject] [--root file.ts#AppModule]
       Compile, then recompile and restart on every change. Keeps src/api.gen.ts and
       src/inject.gen.ts (when the project has them) in step with the code.
-  avi build [--project tsconfig.json] [--client ... | --no-client] [--inject ... | --no-inject]
+  avi build [-p|--project tsconfig.json] [--client ... | --no-client] [--inject ... | --no-inject]
           [--root file.ts#AppModule]
       Update the generated files, compile, and remove compiled files whose source is gone.
-  avi check [--project tsconfig.json]
+  avi check [-p|--project tsconfig.json]
       Type-check every static inject list.
   avi manifest <entry.js> [--export AppModule] [--out avi.manifest.json]
       Describe the app's modules, providers and routes.
-  avi client [--out src/api.gen.ts] [--project tsconfig.json] [--root file.ts#AppModule] [--check | --watch]
+  avi client [--out src/api.gen.ts] [-p|--project tsconfig.json] [--root file.ts#AppModule] [--check | --watch]
       Generate the typed Api for @avijs/client from the app's routes. --check fails when the
       file is out of date, for CI; --watch updates it on every change.
-  avi inject [--out src/inject.gen.ts] [--project tsconfig.json] [--check | --watch]
+  avi inject [--out src/inject.gen.ts] [-p|--project tsconfig.json] [--check | --watch]
       Infer the dependency lists of classes without static inject from their constructor
       types, for src/inject.gen.ts. --check fails when the file is out of date.
   avi --version`;
+
+const COMMANDS = new Set([
+  'new',
+  'generate',
+  'g',
+  'dev',
+  'build',
+  'check',
+  'manifest',
+  'client',
+  'inject',
+  'help',
+]);
 
 export async function main(argv: readonly string[]): Promise<number> {
   if (argv[0] === '--version' || argv[0] === '-v') {
     console.log(version);
     return 0;
   }
+  const command = argv[0];
+  if (command !== undefined && !command.startsWith('-') && !COMMANDS.has(command)) {
+    console.error(`Unknown command "${command}".\n\n${USAGE}`);
+    return 2;
+  }
   if (argv.includes('--help') || argv.includes('-h')) {
-    console.log(commandUsage(argv[0] === 'g' ? 'generate' : argv[0]) ?? USAGE);
+    console.log(commandUsage(command === 'g' ? 'generate' : command) ?? USAGE);
     return 0;
   }
   try {
@@ -162,7 +180,7 @@ async function dev(args: readonly string[]): Promise<number> {
   const { values } = parseArgs({
     args: [...args],
     options: {
-      project: { type: 'string', default: 'tsconfig.json' },
+      project: { type: 'string', short: 'p', default: 'tsconfig.json' },
       entry: { type: 'string', default: 'dist/main.js' },
       client: { type: 'string' },
       'no-client': { type: 'boolean', default: false },
@@ -228,7 +246,7 @@ function build(args: readonly string[]): number {
   const { values } = parseArgs({
     args: [...args],
     options: {
-      project: { type: 'string', default: 'tsconfig.json' },
+      project: { type: 'string', short: 'p', default: 'tsconfig.json' },
       client: { type: 'string' },
       'no-client': { type: 'boolean', default: false },
       inject: { type: 'string' },

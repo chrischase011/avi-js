@@ -101,7 +101,11 @@ export async function generate(args: readonly string[]): Promise<number> {
   const [kindArg, target] = positionals;
   const kind = kindArg === undefined ? undefined : KINDS[kindArg];
   if (!kind || !target) {
-    console.error(`Usage:\n${GENERATE_USAGE}`);
+    const unknown =
+      kindArg !== undefined && !kind
+        ? `Unknown kind "${kindArg}". Use module, controller, service or resource.\n\n`
+        : '';
+    console.error(`${unknown}Usage:\n${GENERATE_USAGE}`);
     return 2;
   }
   const segments = target.split('/').filter(Boolean);
