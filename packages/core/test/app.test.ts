@@ -201,7 +201,11 @@ describe('sse', () => {
     });
     const url = await serve(createAvi().register({ controllers: [Decorated, explicit] }));
 
-    expect(await (await fetch(`${url}/a`)).text()).toBe('event: from\ndata: decorator\n\n');
-    expect(await (await fetch(`${url}/b`)).text()).toBe('event: from\ndata: explicit\n\n');
+    expect(await (await fetch(`${url}/a`)).text()).toBe(
+      ': open\n\nevent: from\ndata: decorator\n\n',
+    );
+    expect(await (await fetch(`${url}/b`)).text()).toBe(
+      ': open\n\nevent: from\ndata: explicit\n\n',
+    );
   });
 });

@@ -7,7 +7,7 @@ export type {
   RequestScope,
 } from './container.js';
 export { defineFactory } from './provider.js';
-export { injectListError, registerInjects, resolveInjects } from './inject.js';
+export { checkInjectList, injectListError, registerInjects, resolveInjects } from './inject.js';
 export type {
   ClassProvider,
   FactoryProvider,

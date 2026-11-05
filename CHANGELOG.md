@@ -3,6 +3,29 @@
 All notable changes are listed here. Avi.js follows [Semantic Versioning](https://semver.org); all
 packages share one version.
 
+## 1.0.0-rc.6 - 2026-11-05
+
+Fixes from testing 1.0.0-rc.5.
+
+### Fixed
+
+- A class that inherits `static inject` but whose constructor takes more arguments got
+  `undefined` for the extra ones. The app now fails to start with
+  `Child inherits a dependency list for 1 constructor argument from Base, but takes 2`. A
+  shorter list of the class's own still passes, since the parameters left out may be optional.
+  New in the di package: `checkInjectList`.
+- `inject.gen.ts` imported files it must not: a file whose exported value starts a server or worker
+  (`export const server = app.listen(3000)`), a file that re-exports a devDependency, and a file
+  that reaches a devDependency through another file of the project. Their classes now get AVI203.
+- `sse()` sent no headers until the source's first event, so `fetch`, `api.events()` and
+  `EventSource` connected late on a quiet stream. A stream now starts with the comment `: open`.
+- `avi build` deleted another tsconfig's output when two shared an `outDir`, so
+  `avi build -p tsconfig.server.json && avi build -p tsconfig.worker.json` left only the worker.
+  `.avi-build` now keeps one list per tsconfig, and reads the list earlier versions wrote.
+- Docs: chapter 10 describes the runtime list check and the AVI203 cases as they are; chapter 16
+  shows calling `handle.restart()` only in the primary, and says Windows may not spread
+  connections evenly.
+
 ## 1.0.0-rc.5 - 2026-10-29
 
 Fixes from testing 1.0.0-rc.4.

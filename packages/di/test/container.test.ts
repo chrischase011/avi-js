@@ -134,6 +134,40 @@ describe('providers', () => {
     expect(audit.label).toBeUndefined();
   });
 
+  it('rejects an inherited list shorter than the constructor', () => {
+    class Clock {
+      readonly now = Date.now;
+    }
+    class Base {
+      static inject = [Clock] as const;
+      constructor(readonly clock: Clock) {}
+    }
+    class Child extends Base {
+      constructor(
+        clock: Clock,
+        readonly label: string,
+      ) {
+        super(clock);
+      }
+    }
+    expect(() => new Container([mod('App', { providers: [Clock, Child] })])).toThrow(
+      'Child inherits a dependency list for 1 constructor argument from Base, but takes 2',
+    );
+  });
+
+  it('accepts an inherited list when the constructor takes no more', async () => {
+    class Clock {
+      readonly now = Date.now;
+    }
+    class Base {
+      static inject = [Clock] as const;
+      constructor(readonly clock: Clock) {}
+    }
+    class Child extends Base {}
+    const c = await start(mod('App', { providers: [Clock, Child] }));
+    expect((c.get(Child) as Child).clock).toBeInstanceOf(Clock);
+  });
+
   it('rejects async transient factories', async () => {
     const T = createToken<number>('T');
     class User {

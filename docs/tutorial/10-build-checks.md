@@ -26,15 +26,19 @@ avi inject --check    # in CI: fail when it is out of date
 `inject.gen.ts` imports the files whose classes it lists, so it only lists classes from files that
 just declare things: imports, exports, classes, functions, types and constants. A file with code at
 its top level, such as `main.ts`, a worker that calls `runWorker` or a seed script, would run that
-code inside your app, so its classes get AVI203: move such a class to its own file, or give it
-`static inject`. Diagnostics name files by absolute path.
+code inside your app, so its classes get AVI203. So does a constant that starts something, such as
+`export const server = app.listen(3000)`, and a file that imports or re-exports a devDependency,
+directly or through another file of yours: a production install does not have it. Move such a
+class to its own file, or give it `static inject`. Diagnostics name files by absolute path.
 
 `avi generate` updates the file when it adds a class, so a new controller works right away.
 
 ## Checking `static inject` lists
 
 With `@Injectable` or `@Controller`, TypeScript already checks that `static inject` matches the
-constructor. Plain classes only get a runtime check of the argument count. `avi-compile check`
+constructor. Plain classes only get a runtime check when the app starts: it fails when a class
+takes arguments but has no list, or inherits a list shorter than its own constructor. A shorter
+list of its own passes, since the parameters left out may be optional. `avi-compile check`
 type-checks every `static inject` in a project, decorated or not:
 
 ```sh

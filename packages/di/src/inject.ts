@@ -53,6 +53,29 @@ function apply(entries: Entries): void {
   }
 }
 
+/**
+ * Throws when a class cannot be built from its list: it has none and takes arguments, or it
+ * inherits a list that is shorter than its own constructor. Its own shorter list is allowed,
+ * since the parameters left out may be optional.
+ */
+export function checkInjectList(cls: Class, where?: string): void {
+  const list = (cls as { inject?: unknown }).inject;
+  const name = cls.name || 'Class';
+  if (list === undefined) {
+    if (cls.length > 0) throw injectListError(name, cls.length, where);
+    return;
+  }
+  if (Object.hasOwn(cls, 'inject') || !Array.isArray(list) || cls.length <= list.length) return;
+  let owner: object | null = Object.getPrototypeOf(cls) as object | null;
+  while (owner && !Object.hasOwn(owner, 'inject')) owner = Object.getPrototypeOf(owner) as object;
+  const from = typeof owner === 'function' && owner.name !== '' ? owner.name : 'its parent';
+  const n = list.length;
+  const at = where ? ` (at ${where})` : '';
+  throw new TypeError(
+    `${name} inherits a dependency list for ${String(n)} constructor argument${n === 1 ? '' : 's'} from ${from}, but takes ${String(cls.length)}${at}: add static inject to ${name}, or run avi dev to infer it`,
+  );
+}
+
 /** Why a class cannot be built: its constructor takes arguments and it has no dependency list. */
 export function injectListError(name: string, needed: number, where?: string): TypeError {
   const args = `${String(needed)} constructor argument${needed === 1 ? '' : 's'}`;

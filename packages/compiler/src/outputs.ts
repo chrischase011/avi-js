@@ -65,15 +65,21 @@ function relativeTo(folder: OutputFolder, written: Iterable<string>): string[] {
  */
 export function removeStale(
   outDir: string | undefined,
-  projectDir: string,
+  project: string,
   written: Iterable<string>,
 ): void {
-  const folder = outputFolder(outDir, projectDir);
+  const folder = outputFolder(outDir, path.dirname(path.resolve(project)));
   if (!folder) return;
   const { out, key } = folder;
+  const id = projectId(folder, project);
+  const lists = readMarker(out, id);
   const current = relativeTo(folder, written).sort();
+  // Files another tsconfig compiled here stay.
   const keep = new Set(current.map(key));
-  for (const relative of readMarker(out)) {
+  for (const [other, files] of lists) {
+    if (other !== id) for (const file of files) keep.add(key(file));
+  }
+  for (const relative of lists.get(id) ?? []) {
     if (keep.has(key(relative)) || !OUTPUT.test(relative)) continue;
     const file = path.resolve(out, relative);
     const within = path.relative(out, file);
@@ -90,7 +96,8 @@ export function removeStale(
     rmSync(file);
     removeEmptyDirs(path.dirname(file), out);
   }
-  writeMarker(out, current);
+  lists.set(id, current);
+  writeMarker(out, lists);
 }
 
 /**
@@ -99,36 +106,54 @@ export function removeStale(
  */
 export function recordOutputs(
   outDir: string | undefined,
-  projectDir: string,
+  project: string,
   written: Iterable<string>,
 ): void {
-  const folder = outputFolder(outDir, projectDir);
+  const folder = outputFolder(outDir, path.dirname(path.resolve(project)));
   if (!folder) return;
-  const files = new Map(readMarker(folder.out).map((file) => [folder.key(file), file]));
+  const id = projectId(folder, project);
+  const lists = readMarker(folder.out, id);
+  const files = new Map((lists.get(id) ?? []).map((file) => [folder.key(file), file]));
   const before = files.size;
   for (const file of relativeTo(folder, written)) files.set(folder.key(file), file);
   if (files.size === before && existsSync(path.join(folder.out, MARKER))) return;
-  writeMarker(folder.out, [...files.values()].sort());
+  lists.set(id, [...files.values()].sort());
+  writeMarker(folder.out, lists);
 }
 
-function writeMarker(out: string, files: string[]): void {
+/** A tsconfig's key in the list: its path from the output folder, so the project can move. */
+function projectId(folder: OutputFolder, project: string): string {
+  const relative = path.relative(folder.configured, path.resolve(project));
+  return folder.key(relative.split(path.sep).join('/'));
+}
+
+function writeMarker(out: string, lists: Map<string, string[]>): void {
+  const projects = Object.fromEntries([...lists].sort(([a], [b]) => a.localeCompare(b)));
   writeFileSync(
     path.join(out, MARKER),
-    `${JSON.stringify({ note: 'Written by avi build and avi dev: the files they compiled here, so the next build can remove the ones whose source is gone.', files }, null, 2)}\n`,
+    `${JSON.stringify({ note: 'Written by avi build and avi dev: the files each tsconfig compiled here, so the next build can remove the ones whose source is gone.', projects }, null, 2)}\n`,
   );
 }
 
-function readMarker(out: string): string[] {
+/** The lists by tsconfig. A list from before 1.0.0-rc.6 belongs to `id`, the one building now. */
+function readMarker(out: string, id: string): Map<string, string[]> {
+  const strings = (value: unknown): string[] =>
+    Array.isArray(value) ? value.filter((file): file is string => typeof file === 'string') : [];
+  const lists = new Map<string, string[]>();
   try {
     const parsed = JSON.parse(readFileSync(path.join(out, MARKER), 'utf8')) as {
       files?: unknown;
+      projects?: unknown;
     };
-    return Array.isArray(parsed.files)
-      ? parsed.files.filter((file): file is string => typeof file === 'string')
-      : [];
+    if (parsed.projects && typeof parsed.projects === 'object') {
+      for (const [name, files] of Object.entries(parsed.projects)) lists.set(name, strings(files));
+    } else if (parsed.files !== undefined) {
+      lists.set(id, strings(parsed.files));
+    }
   } catch {
-    return [];
+    // No list yet, or one that cannot be read: nothing to remove.
   }
+  return lists;
 }
 
 function removeEmptyDirs(dir: string, stop: string): void {

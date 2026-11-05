@@ -37,7 +37,8 @@ Avi.js 1.0.0 cluster: 8 workers on http://localhost:3000, ready in 211 ms
 
 `cluster()` starts one worker process per CPU core (`workers: 'auto'`), and each one runs the
 function: all of them listen on the same port, and Node.js shares incoming connections between
-them. The first process, the primary, only manages the workers. It never calls your function, so
+them. On Windows, Node.js leaves that to the operating system, which may give most connections to
+one worker. The first process, the primary, only manages the workers. It never calls your function, so
 it opens no database connections of its own. The first worker prints the startup summary; the
 primary prints one line once every worker is ready.
 
@@ -56,7 +57,15 @@ const handle = await cluster(start, {
   maxRestarts: 5, // crashes within restartWindow before giving up
   restartWindow: 10_000,
 });
-await handle.restart(); // e.g. after a deploy
+```
+
+Every worker also runs `main.ts`, and its `cluster()` resolves too, but only the primary can
+restart workers. Check where you are first:
+
+```ts
+import { isPrimary } from 'node:cluster';
+
+if (isPrimary) await handle.restart(); // e.g. after a deploy
 ```
 
 With `workers: 1`, or `NODE_ENV=development`, the function runs in the same process, so debuggers

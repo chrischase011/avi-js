@@ -1,5 +1,5 @@
 // Decorated classes map to the same definitions the explicit API produces.
-import { injectListError, resolveInjects, type Class, type Scope, type Token } from '@avijs/di';
+import { checkInjectList, resolveInjects, type Class, type Scope, type Token } from '@avijs/di';
 import type { HttpMethod } from '@avijs/http';
 import type { RouteSchema } from '@avijs/validation';
 import type { ControllerDefinition } from './controller.js';
@@ -89,9 +89,7 @@ export function controllerFromClass(cls: Class): ControllerDefinition {
     const given = (cls as { inject?: unknown }).inject;
     const list = given ?? [];
     if (!Array.isArray(list)) throw new TypeError(`${cls.name}.inject must be an array of tokens`);
-    if (given === undefined && cls.length > 0) {
-      throw injectListError(cls.name, cls.length);
-    }
+    checkInjectList(cls);
     return (inject = Object.freeze([...(list as Token[])]));
   };
 

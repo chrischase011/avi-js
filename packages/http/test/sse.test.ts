@@ -35,10 +35,25 @@ describe('sse', () => {
     expect(headers.get('cache-control')).toBe('no-cache');
     expect(headers.get('x-accel-buffering')).toBe('no');
     expect(text).toBe(
-      'data: hello\n\n' +
+      ': open\n\n' +
+        'data: hello\n\n' +
         'event: progress\nid: 7\nretry: 2000\ndata: {"step":1}\n\n' +
         'data: line one\ndata: line two\ndata: line three\n\n',
     );
+  });
+
+  it('sends the headers before the source has an event', async () => {
+    const never = deferred();
+    const { url } = await serve(async function* () {
+      await never.promise;
+      yield 'late';
+    });
+
+    const client = new AbortController();
+    const res = await fetch(`${url}/events`, { signal: client.signal });
+    expect(res.headers.get('content-type')).toBe('text/event-stream; charset=utf-8');
+    client.abort();
+    never.resolve();
   });
 
   it('sends heartbeat comments while the source is idle', async () => {
@@ -51,7 +66,7 @@ describe('sse', () => {
     );
 
     const { text } = await readAll(`${url}/events`);
-    expect(text).toMatch(/^(: ping\n\n)+data: done\n\n$/);
+    expect(text).toMatch(/^: open\n\n(: ping\n\n)+data: done\n\n$/);
   });
 
   it('aborts the signal and runs finally when the client leaves', async () => {
@@ -74,7 +89,11 @@ describe('sse', () => {
     const client = new AbortController();
     const res = await fetch(`${url}/events`, { signal: client.signal });
     const reader = (res.body as ReadableStream<Uint8Array>).getReader();
-    expect(new TextDecoder().decode((await reader.read()).value)).toBe('data: first\n\n');
+    let text = '';
+    while (!text.includes('data: first')) {
+      text += new TextDecoder().decode((await reader.read()).value);
+    }
+    expect(text).toBe(': open\n\ndata: first\n\n');
     client.abort();
 
     await cleaned.promise;

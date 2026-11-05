@@ -1,4 +1,4 @@
-import { Container, injectListError, type Provider, type Token, type TokenType } from '@avijs/di';
+import { Container, checkInjectList, type Provider, type Token, type TokenType } from '@avijs/di';
 import {
   HttpServer,
   Router,
@@ -453,9 +453,7 @@ class Pipeline {
     let instance = this.#instances.get(cls);
     if (!instance) {
       const inject = injectOf(cls);
-      if (cls.inject === undefined && cls.length > 0) {
-        throw injectListError(cls.name, cls.length);
-      }
+      checkInjectList(cls);
       const Ctor = cls as unknown as new (...args: unknown[]) => unknown;
       instance = new Ctor(...inject.map(this.resolve));
       this.#instances.set(cls, instance);

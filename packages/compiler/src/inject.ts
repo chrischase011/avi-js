@@ -62,6 +62,19 @@ class InjectGenerator {
 
   run(): GeneratedInjects {
     const devOnly = devOnlyPackages(this.program);
+    const reasons = new Map<string, string | undefined>();
+    // A devDependency, imported directly or through local files. Code that runs in an imported
+    // file is fine: the app loads that file anyway.
+    const needsDev = (source: ts.SourceFile): string | undefined => {
+      const file = path.resolve(source.fileName);
+      if (reasons.has(file)) return reasons.get(file);
+      reasons.set(file, undefined);
+      const reason = importsDevOnly(source, devOnly) ?? this.#viaImport(source, needsDev);
+      reasons.set(file, reason);
+      return reason;
+    };
+    const unsafe = (source: ts.SourceFile): string | undefined =>
+      runsCode(source) ? 'runs code when imported (an entry point or a script)' : needsDev(source);
     for (const source of this.program.getSourceFiles()) {
       if (!this.#inProject(source) || path.resolve(source.fileName) === this.out) continue;
       // Test files are not loaded by the app, and the generated file must not import them.
@@ -70,9 +83,7 @@ class InjectGenerator {
       if (classes.length === 0) continue;
       // Importing a file runs its top level. Only import files that just declare things: never an
       // entry point, a worker or a seed script, and nothing a production install may lack.
-      const reason = runsCode(source)
-        ? 'runs code when imported (an entry point or a script)'
-        : importsDevOnly(source, devOnly);
+      const reason = unsafe(source);
       for (const node of classes) this.#class(node, source, reason);
     }
 
@@ -299,6 +310,25 @@ class InjectGenerator {
     return !source.isDeclarationFile && this.roots.has(path.resolve(source.fileName));
   }
 
+  #viaImport(
+    source: ts.SourceFile,
+    unsafe: (source: ts.SourceFile) => string | undefined,
+  ): string | undefined {
+    const options = this.program.getCompilerOptions();
+    for (const specifier of runtimeSpecifiers(source)) {
+      if (!specifier.startsWith('.')) continue;
+      const resolved = ts.resolveModuleName(specifier, source.fileName, options, ts.sys)
+        .resolvedModule?.resolvedFileName;
+      const target = resolved && this.program.getSourceFile(resolved);
+      if (!target || !this.#inProject(target) || path.resolve(target.fileName) === this.out) {
+        continue;
+      }
+      const reason = unsafe(target);
+      if (reason) return `imports ${specifier}, which ${reason}`;
+    }
+    return undefined;
+  }
+
   #report(source: ts.SourceFile, at: ts.Node, message: string, code = 'AVI201'): void {
     const { line, character } = source.getLineAndCharacterOfPosition(at.getStart(source));
     this.#diagnostics.push({
@@ -325,10 +355,34 @@ function isDecorated(node: ts.ClassDeclaration): boolean {
   return (ts.getDecorators(node) ?? []).length > 0;
 }
 
-/** Whether a file does more than declare things when imported: a call, a loop, a top-level await. */
+// Calls that start a server, a worker or a cluster when a file is imported.
+const STARTERS = new Set(['listen', 'runWorker', 'cluster']);
+
+function starts(node: ts.Node): boolean {
+  if (ts.isCallExpression(node)) {
+    const callee = node.expression;
+    const name = ts.isIdentifier(callee)
+      ? callee.text
+      : ts.isPropertyAccessExpression(callee)
+        ? callee.name.text
+        : undefined;
+    if (name !== undefined && STARTERS.has(name)) return true;
+  }
+  return (
+    ts.isNewExpression(node) &&
+    ts.isIdentifier(node.expression) &&
+    node.expression.text === 'Worker'
+  );
+}
+
+/**
+ * Whether a file does more than declare things when imported: a call statement, a loop, a
+ * top-level await, or a value that starts a server or worker.
+ */
 function runsCode(source: ts.SourceFile): boolean {
   const awaits = (node: ts.Node): boolean =>
     ts.isAwaitExpression(node) ||
+    starts(node) ||
     (!ts.isFunctionLike(node) && !ts.isClassLike(node) && ts.forEachChild(node, awaits) === true);
   return source.statements.some((statement) => {
     if (
@@ -387,20 +441,39 @@ function devOnlyPackages(program: ts.Program): Set<string> {
 
 /** Why a file cannot be imported in production: it imports a package from devDependencies. */
 function importsDevOnly(source: ts.SourceFile, devOnly: ReadonlySet<string>): string | undefined {
-  for (const statement of source.statements) {
-    if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier))
-      continue;
-    const clause = statement.importClause;
-    // Type-only imports are erased.
-    if (clause && (clause.getText(source).startsWith('type ') || isTypeOnlyClause(clause)))
-      continue;
-    const specifier = statement.moduleSpecifier.text;
+  for (const specifier of runtimeSpecifiers(source)) {
     const name = specifier.startsWith('@')
       ? specifier.split('/').slice(0, 2).join('/')
       : specifier.split('/')[0];
     if (name && devOnly.has(name)) return `imports ${name}, a devDependency`;
   }
   return undefined;
+}
+
+/** Modules a file loads at runtime: imports and re-exports, without type-only ones. */
+function runtimeSpecifiers(source: ts.SourceFile): string[] {
+  const specifiers: string[] = [];
+  for (const statement of source.statements) {
+    if (ts.isImportDeclaration(statement)) {
+      const clause = statement.importClause;
+      // Type-only imports are erased.
+      if (clause && (clause.getText(source).startsWith('type ') || isTypeOnlyClause(clause))) {
+        continue;
+      }
+    } else if (ts.isExportDeclaration(statement)) {
+      const named = statement.exportClause;
+      if (statement.isTypeOnly) continue;
+      if (named && ts.isNamedExports(named) && named.elements.length > 0) {
+        if (named.elements.every((element) => element.isTypeOnly)) continue;
+      }
+    } else {
+      continue;
+    }
+    if (statement.moduleSpecifier && ts.isStringLiteral(statement.moduleSpecifier)) {
+      specifiers.push(statement.moduleSpecifier.text);
+    }
+  }
+  return specifiers;
 }
 
 function isTypeOnlyClause(clause: ts.ImportClause): boolean {

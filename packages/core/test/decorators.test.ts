@@ -206,6 +206,31 @@ describe('misuse', () => {
     await app.init();
     await app.close();
   });
+
+  it('rejects an inherited list shorter than the constructor', async () => {
+    @Injectable()
+    class Clock {}
+    class Base {
+      static inject = [Clock] as const;
+      constructor(readonly clock: Clock) {}
+    }
+    // @ts-expect-error TypeScript rejects it too; this checks JavaScript users.
+    @Controller()
+    class Child extends Base {
+      constructor(
+        clock: Clock,
+        readonly label: string,
+      ) {
+        super(clock);
+      }
+    }
+    const app = createAvi({ startupSummary: false }).register(
+      defineModule({ controllers: [Child], providers: [Clock] }),
+    );
+    await expect(app.init()).rejects.toThrow(
+      'Child inherits a dependency list for 1 constructor argument from Base, but takes 2',
+    );
+  });
 });
 
 describe('@Injectable', () => {

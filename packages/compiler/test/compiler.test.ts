@@ -452,6 +452,48 @@ describe('buildProject', () => {
     expect(existsSync(path.join(root, 'dist/a.js'))).toBe(true);
   });
 
+  it('keeps what another tsconfig compiled into the same folder', async () => {
+    const config = await project('dist', 'export const a = 1;');
+    const root = path.dirname(config);
+    await mkdir(path.join(root, 'src/worker'));
+    await writeFile(path.join(root, 'src/worker/main.ts'), 'export const w = 1;');
+    await writeFile(path.join(root, 'src/old.ts'), 'export const old = 1;');
+    const worker = path.join(root, 'tsconfig.worker.json');
+    await writeFile(
+      worker,
+      JSON.stringify({
+        compilerOptions: { outDir: 'dist', rootDir: 'src', types: [], skipLibCheck: true },
+        include: ['src/worker'],
+      }),
+    );
+    await writeFile(
+      config,
+      JSON.stringify({ ...JSON.parse(await readFile(config, 'utf8')), exclude: ['src/worker'] }),
+    );
+
+    expect(buildProject({ project: config })).toBe(0);
+    expect(buildProject({ project: worker })).toBe(0);
+    expect(existsSync(path.join(root, 'dist/a.js'))).toBe(true);
+    expect(existsSync(path.join(root, 'dist/worker/main.js'))).toBe(true);
+
+    // Each build removes only its own stale files.
+    await rm(path.join(root, 'src/old.ts'));
+    expect(buildProject({ project: config })).toBe(0);
+    expect(existsSync(path.join(root, 'dist/old.js'))).toBe(false);
+    expect(existsSync(path.join(root, 'dist/worker/main.js'))).toBe(true);
+  });
+
+  it('reads the list an earlier version wrote', async () => {
+    const config = await project('dist', 'export const a = 1;');
+    const root = path.dirname(config);
+    await mkdir(path.join(root, 'dist'));
+    await writeFile(path.join(root, 'dist/gone.js'), '');
+    await writeFile(path.join(root, 'dist/.avi-build'), JSON.stringify({ files: ['gone.js'] }));
+    expect(buildProject({ project: config })).toBe(0);
+    expect(existsSync(path.join(root, 'dist/gone.js'))).toBe(false);
+    expect(existsSync(path.join(root, 'dist/a.js'))).toBe(true);
+  });
+
   it('removes what avi dev compiled from a source deleted while it ran', async () => {
     vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     const config = await project('dist', 'export const a = 1;');
@@ -646,16 +688,31 @@ describe('generateInjects', { timeout: 60_000 }, () => {
           runs +
           ', so inject.gen.ts cannot import it: move the class to its own file, or add static inject',
       ],
+      // An exported value that starts a server.
+      [
+        'AVI203',
+        'Probe is in a file that ' +
+          runs +
+          ', so inject.gen.ts cannot import it: move the class to its own file, or add static inject',
+      ],
       [
         'AVI203',
         'Cache is in a file that ' +
           runs +
           ', so inject.gen.ts cannot import it: move the class to its own file, or add static inject',
       ],
-      // A production install has no devDependencies.
+      // A production install has no devDependencies, imported, re-exported or through a local file.
+      [
+        'AVI203',
+        'TestApp is in a file that imports @avijs/testing, a devDependency, so inject.gen.ts cannot import it: move the class to its own file, or add static inject',
+      ],
       [
         'AVI203',
         'FakeMailer is in a file that imports @avijs/testing, a devDependency, so inject.gen.ts cannot import it: move the class to its own file, or add static inject',
+      ],
+      [
+        'AVI203',
+        'FakeClock is in a file that imports ./fakes.js, which imports @avijs/testing, a devDependency, so inject.gen.ts cannot import it: move the class to its own file, or add static inject',
       ],
       [
         'AVI201',

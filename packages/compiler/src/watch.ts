@@ -33,7 +33,6 @@ export interface ProjectWatcher {
 export function watchProject(options: WatchProjectOptions): ProjectWatcher {
   const emit = options.emit ?? true;
   // What each build emits goes on avi build's list, so it can remove outputs of deleted files.
-  const projectDir = path.dirname(path.resolve(options.project));
   const emitted = new Set<string>();
   const system: ts.System = {
     ...ts.sys,
@@ -78,7 +77,7 @@ export function watchProject(options: WatchProjectOptions): ProjectWatcher {
     if (results.some((result) => result.written && program.getSourceFile(result.out))) return;
     build?.(builder);
     if (emitted.size > 0) {
-      recordOutputs(program.getCompilerOptions().outDir, projectDir, emitted);
+      recordOutputs(program.getCompilerOptions().outDir, options.project, emitted);
       emitted.clear();
     }
   };

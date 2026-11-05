@@ -63,7 +63,7 @@ export function buildProject(options: BuildProjectOptions): number {
     );
   }
   if (config.errors.length === 0 && !emitted.emitSkipped) {
-    removeStale(config.options.outDir, path.dirname(path.resolve(options.project)), written);
+    removeStale(config.options.outDir, options.project, written);
   }
   const errors = diagnostics.filter((d) => d.category === ts.DiagnosticCategory.Error).length;
   return errors + generated.reduce((sum, result) => sum + result.errors, 0);

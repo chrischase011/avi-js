@@ -22,6 +22,8 @@ export type SseSource = (
 
 const encoder = new TextEncoder();
 const HEARTBEAT = encoder.encode(': ping\n\n');
+// Sent first, so headers reach the client before the source has an event.
+const OPEN = encoder.encode(': open\n\n');
 
 /**
  * Streams `source` as server-sent events. Events are produced only as fast as the client reads
@@ -53,6 +55,7 @@ export function sse(
   const stream = new ReadableStream<Uint8Array>(
     {
       start(controller) {
+        controller.enqueue(OPEN);
         const iterable = source(ctx.signal);
         iterator =
           Symbol.asyncIterator in iterable
