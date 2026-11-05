@@ -13,7 +13,7 @@ A lightweight, TypeScript-first backend framework for Node.js, featuring NestJS-
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%E2%89%A522.12-339933.svg)](package.json)
 [![npm](https://img.shields.io/npm/v/@avijs/core.svg)](https://www.npmjs.com/package/@avijs/core)
-[![Status](https://img.shields.io/badge/status-1.0%20release%20candidate-blue.svg)](#try-it-now)
+[![Status](https://img.shields.io/badge/status-stable-brightgreen.svg)](docs/tutorial/17-stability.md)
 
 [Website](https://chrischase011.github.io/avi-js/) · [Tutorial](docs/tutorial/README.md) · [Project structure](#project-structure) · [Why Avi.js](#why-avijs) · [Try it](#try-it-now)
 
@@ -22,10 +22,8 @@ A lightweight, TypeScript-first backend framework for Node.js, featuring NestJS-
 ---
 
 > [!IMPORTANT]
-> Avi.js 1.0 is in its release candidate: `npm install @avijs/core@next`, or
-> `npm create avi@next my-app`. Until 1.0.0 the API only gets fixes; see
-> [Stability and versions](docs/tutorial/17-stability.md) for what 1.x promises. Try it, and
-> report what gets in your way.
+> Avi.js 1.0 is out. [Stability and versions](docs/tutorial/17-stability.md) says what 1.x
+> promises. Try it, and report what gets in your way.
 
 ## Two styles, one engine
 
@@ -175,8 +173,7 @@ npm run dev    # http://localhost:3000
 ```
 
 Run `npm create avi@latest` without a name to be asked for the name and the template, or pass
-`-- --template minimal` for the minimal one. `npx @avijs/cli new my-api` does the same. Until
-1.0.0 is out, `@latest` is 0.x: use `npm create avi@next` for the release candidate.
+`-- --template minimal` for the minimal one. `npx @avijs/cli new my-api` does the same.
 
 Or add it to an existing project:
 

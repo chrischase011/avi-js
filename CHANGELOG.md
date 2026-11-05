@@ -3,6 +3,29 @@
 All notable changes are listed here. Avi.js follows [Semantic Versioning](https://semver.org); all
 packages share one version.
 
+## 1.0.0 - 2026-11-05
+
+The first stable release. The code is 1.0.0-rc.6's;
+[Stability and versions](docs/tutorial/17-stability.md) says what 1.x promises.
+
+### Upgrading from a release candidate
+
+- An `sse()` stream starts with the comment `: open` (from rc.6). Clients skip comments; a test
+  that compares a stream's body text needs the extra line.
+- The first `avi build` with rc.6 or later takes the old `.avi-build` list as its own tsconfig's.
+  With two tsconfigs sharing an `outDir`, that build may remove the other's output once; the
+  other's next build writes it back.
+- A class that inherits `static inject` and takes more constructor arguments fails at startup
+  (from rc.6). `avi dev` and `avi build` give it its own list; without them, add `static inject`.
+
+### Known limitations
+
+- AVI203 recognizes values that start something by the call's name (`listen`, `runWorker`,
+  `cluster`, `new Worker`). Other top-level side effects, such as `setInterval`, are not caught,
+  and a top-level `bus.listen(...)` is flagged although it starts no server.
+- The devDependency check for `inject.gen.ts` follows relative imports only, not `paths` aliases,
+  and can miss a devDependency reached through an import cycle.
+
 ## 1.0.0-rc.6 - 2026-11-05
 
 Fixes from testing 1.0.0-rc.5.
@@ -20,7 +43,8 @@ Fixes from testing 1.0.0-rc.5.
 - `sse()` sent no headers until the source's first event, so `fetch`, `api.events()` and
   `EventSource` connected late on a quiet stream. A stream now starts with the comment `: open`.
 - `avi build` deleted another tsconfig's output when two shared an `outDir`, so
-  `avi build -p tsconfig.server.json && avi build -p tsconfig.worker.json` left only the worker.
+  `avi build --project tsconfig.server.json && avi build --project tsconfig.worker.json` left
+  only the worker.
   `.avi-build` now keeps one list per tsconfig, and reads the list earlier versions wrote.
 - Docs: chapter 10 describes the runtime list check and the AVI203 cases as they are; chapter 16
   shows calling `handle.restart()` only in the primary, and says Windows may not spread

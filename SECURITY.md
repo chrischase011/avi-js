@@ -2,14 +2,14 @@
 
 ## Supported versions
 
-Avi.js is in its 1.0 release-candidate period. Security fixes go into the latest release candidate
-and the latest 0.x release; upgrade to get them. From 1.0.0, the latest 1.x release is supported.
+Security fixes go into the latest 1.x release; upgrade to get them.
 
 | Version    | Supported |
 | ---------- | --------- |
-| 1.0.0-rc.x | Yes       |
-| Latest 0.x | Yes       |
-| Older 0.x  | No        |
+| Latest 1.x | Yes       |
+| Older 1.x  | No        |
+| 1.0.0-rc.x | No        |
+| 0.x        | No        |
 
 ## Reporting a vulnerability
 

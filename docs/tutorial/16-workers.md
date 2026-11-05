@@ -9,8 +9,7 @@ them, and runs background workers that use the same modules and providers withou
 npm install @avijs/workers
 ```
 
-Install the same version as `@avijs/core`: with a release candidate, `npm install @avijs/workers@next`.
-Two copies of `@avijs/core` do not share their metadata (see [Stability](17-stability.md)).
+Install the same version as `@avijs/core`. Two copies of `@avijs/core` do not share their metadata (see [Stability](17-stability.md)).
 
 ## Every core: cluster()
 

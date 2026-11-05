@@ -1,6 +1,6 @@
 {
   "name": "@avijs/cli",
-  "version": "1.0.0-rc.6",
+  "version": "1.0.0",
   "description": "The avi command: project scaffolding, dev mode and build checks.",
   "keywords": [
     "avi",

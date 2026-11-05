@@ -1,6 +1,6 @@
 {
   "name": "@avijs/security",
-  "version": "1.0.0-rc.6",
+  "version": "1.0.0",
   "description": "CORS and security headers for Avi.js.",
   "keywords": [
     "avi",
