@@ -1,10 +1,11 @@
-import { HttpError, defineController, defineModule, reply } from '@avijs/core';
+import { HttpError, defineController, defineModule, reply, sse } from '@avijs/core';
 import { OUTBOX, OutboxModule, type Email } from './outbox.js';
+import { EmailEvents, PubSub } from './pubsub.js';
 
 const emails = defineController({
   prefix: '/emails',
-  inject: [OUTBOX],
-  routes: (outbox) => [
+  inject: [OUTBOX, PubSub],
+  routes: (outbox, pubsub) => [
     {
       method: 'POST',
       path: '/',
@@ -15,6 +16,7 @@ const emails = defineController({
         }
         // Queued for the background worker; the request does not wait for the send.
         const id = await outbox.add({ to: body.to, subject: body.subject });
+        await pubsub.publish(EmailEvents, { id, to: body.to });
         return reply({ id, queued: true }, { status: 202 });
       },
     },
@@ -22,6 +24,12 @@ const emails = defineController({
       method: 'GET',
       path: '/pending',
       handler: async () => ({ count: (await outbox.pending()).length }),
+    },
+    {
+      // Every queued email, whichever worker queued it.
+      method: 'GET',
+      path: '/events',
+      handler: (ctx) => sse(ctx, (signal) => pubsub.events(EmailEvents, signal)),
     },
   ],
 });
@@ -33,6 +41,6 @@ const info = defineController({
 
 export const AppModule = defineModule({
   name: 'AppModule',
-  imports: [OutboxModule],
+  imports: [OutboxModule, PubSub.module],
   controllers: [emails, info],
 });

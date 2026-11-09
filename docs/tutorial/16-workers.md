@@ -81,8 +81,8 @@ worker:
   Keep shared data in a database or cache server.
 - **Live events** (`sse()`) fed by an in-memory `EventEmitter` reach only the clients of the worker
   that emitted them: a change made through worker A never reaches a browser connected to worker
-  B. It is the first thing to break when you add `cluster()`. Publish through Redis pub/sub or
-  Postgres `LISTEN`/`NOTIFY` instead ([chapter 7](07-production.md#server-sent-events)).
+  B. It is the first thing to break when you add `cluster()`. Publish through
+  [`@avijs/pubsub`](18-realtime.md) with `clusterAdapter()` instead.
 - **Request-scoped providers** and `ctx.state` are per request, so they are unaffected.
 
 ### cluster() or containers?

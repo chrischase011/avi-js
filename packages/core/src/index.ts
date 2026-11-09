@@ -91,6 +91,8 @@ export type {
   Constructor,
   FactoryProvider,
   InjectionToken,
+  OnInit,
+  OnShutdown,
   Provider,
   ResolveTokens,
   Scope,

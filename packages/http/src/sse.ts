@@ -43,6 +43,7 @@ export function sse(
   }
 
   let iterator: AsyncIterator<ServerSentEvent | string> | Iterator<ServerSentEvent | string>;
+  let output: ReadableStreamDefaultController<Uint8Array> | undefined;
   let timer: ReturnType<typeof setInterval> | undefined;
   let closed = false;
   const stop = async () => {
@@ -52,10 +53,23 @@ export function sse(
     await iterator.return?.();
   };
 
+  const end = () => {
+    if (closed) return;
+    void stop().catch(() => undefined);
+    try {
+      output?.close();
+    } catch {
+      // Already cancelled by a client disconnect.
+    }
+  };
+
   const stream = new ReadableStream<Uint8Array>(
     {
       start(controller) {
+        output = controller;
         controller.enqueue(OPEN);
+        // Ends the stream cleanly on shutdown, even if the source is still waiting.
+        ctx.signal.addEventListener('abort', end, { once: true });
         const iterable = source(ctx.signal);
         iterator =
           Symbol.asyncIterator in iterable

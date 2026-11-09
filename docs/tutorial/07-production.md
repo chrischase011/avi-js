@@ -7,15 +7,15 @@ errors, client disconnects, graceful shutdown, timeouts and streaming.
 
 These defaults are part of Avi.js from the start, not add-ons:
 
-| Concern            | Default behavior                                                                                                   |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------ |
-| Request bodies     | Limited to 1 MiB (`bodyLimit`). Oversized bodies get `413`, never read past it.                                    |
-| Error responses    | Generic 5xx bodies in every environment. Details go to your logger.                                                |
-| Client disconnects | `ctx.signal` aborts so handlers can stop work early; streams stop being read.                                      |
-| Shutdown           | `app.close()` drains in-flight requests, forces after `shutdownTimeout`, then disposes providers in reverse order. |
-| Slow clients       | `headersTimeout` and `requestTimeout` close connections that send too slowly.                                      |
-| Malformed input    | Bad URL encodings get `400`; Node rejects broken HTTP and oversized headers (`431`).                               |
-| Streaming          | Streamed responses respect backpressure from slow clients.                                                         |
+| Concern            | Default behavior                                                                                                                                                     |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Request bodies     | Limited to 1 MiB (`bodyLimit`). Oversized bodies get `413`, never read past it.                                                                                      |
+| Error responses    | Generic 5xx bodies in every environment. Details go to your logger.                                                                                                  |
+| Client disconnects | `ctx.signal` aborts so handlers can stop work early; streams stop being read.                                                                                        |
+| Shutdown           | `app.close()` refuses new connections, runs `onShutdown` hooks, drains in-flight requests, forces after `shutdownTimeout`, then disposes providers in reverse order. |
+| Slow clients       | `headersTimeout` and `requestTimeout` close connections that send too slowly.                                                                                        |
+| Malformed input    | Bad URL encodings get `400`; Node rejects broken HTTP and oversized headers (`431`).                                                                                 |
+| Streaming          | Streamed responses respect backpressure from slow clients.                                                                                                           |
 
 ## Streaming responses
 
@@ -93,6 +93,8 @@ cannot inject extra fields.
   slow client slows the generator instead of filling memory.
 - **Disconnects.** When the client leaves, `signal` aborts and the generator's `finally` runs. Pass
   `signal` to anything the generator waits on, so it stops at once instead of on the next event.
+- **Shutdown.** `app.close()` aborts `signal` and ends open streams at once, so they don't hold up
+  the shutdown until `shutdownTimeout`. Browsers reconnect, under `cluster()` to another worker.
 - **Heartbeats.** A comment line every 15 seconds keeps proxies from closing a quiet connection.
   Change it with `sse(ctx, source, { heartbeat: 30_000 })`, or turn it off with `false`.
 - The response sets `cache-control: no-cache` and `x-accel-buffering: no`, so proxies such as nginx
@@ -100,8 +102,8 @@ cannot inject extra fields.
 - **More than one process.** Events published in memory (an `EventEmitter`, as below) reach only
   clients connected to the same process. Under [`cluster()`](16-workers.md), or with several
   containers, a change made through one worker never reaches a browser connected to another. It
-  works in development, with one process, and breaks in production. Publish through something
-  every process can hear, such as Redis pub/sub or Postgres `LISTEN`/`NOTIFY`.
+  works in development, with one process, and breaks in production. Publish through
+  [`@avijs/pubsub`](18-realtime.md), which reaches every worker or server.
 
 A live feed per item fits `node:events`: `on()` with the request's `signal` stops listening when
 the client leaves.

@@ -102,7 +102,10 @@ export class Container {
   readonly #overrides = new Map<Token, ProviderSpec>();
   readonly #overridden = new Set<Token>();
   readonly #supplied = new Map<Token, ProviderRecord>();
-  #state: 'new' | 'initializing' | 'ready' | 'disposed' = 'new';
+  #state: 'new' | 'initializing' | 'ready' | 'stopping' | 'disposed' = 'new';
+  // Singletons whose onInit has run, so whose onShutdown must run too.
+  readonly #initialized: ProviderRecord[] = [];
+  #stopping: Promise<void> | undefined;
 
   constructor(roots: readonly ModuleDefinition[], options: ContainerOptions = {}) {
     resolveInjects();
@@ -122,6 +125,8 @@ export class Container {
         deps: [],
         create: () => undefined,
         dispose: undefined,
+        onInit: undefined,
+        onShutdown: undefined,
         module: REQUEST_MODULE,
         links: [],
         requestBound: true,
@@ -140,6 +145,8 @@ export class Container {
         deps: [],
         create: () => value,
         dispose: undefined,
+        onInit: undefined,
+        onShutdown: undefined,
         module: SUPPLIED_MODULE,
         links: [],
         requestBound: false,
@@ -217,6 +224,16 @@ export class Container {
           else await this.#ensureDeps(record);
         }
       }
+      for (const record of this.#created) {
+        try {
+          await callHook(record, 'onInit');
+          this.#initialized.push(record);
+        } catch (error) {
+          throw new Error(`${tokenName(record.token)} in ${record.module.name} failed in onInit`, {
+            cause: error,
+          });
+        }
+      }
       this.#state = 'ready';
     } catch (error) {
       await this.dispose().catch(() => undefined);
@@ -252,9 +269,55 @@ export class Container {
     return this.#instance([...found][0] as ProviderRecord);
   }
 
+  /**
+   * Runs `onShutdown` in reverse creation order for every singleton whose `onInit` ran, continuing
+   * past failures. Runs once; later calls share the first.
+   */
+  shutdown(): Promise<void> {
+    return (this.#stopping ??= this.#shutdown());
+  }
+
+  async #shutdown(): Promise<void> {
+    if (this.#state === 'ready') this.#state = 'stopping';
+    const errors: unknown[] = [];
+    for (const record of this.#initialized.splice(0).reverse()) {
+      try {
+        await callHook(record, 'onShutdown');
+      } catch (error) {
+        errors.push(
+          new Error(`${tokenName(record.token)} in ${record.module.name} failed in onShutdown`, {
+            cause: error,
+          }),
+        );
+      }
+    }
+    if (errors.length > 0) {
+      throw new AggregateError(errors, `${String(errors.length)} provider(s) failed in onShutdown`);
+    }
+  }
+
+  /** Runs the shutdown hooks if `shutdown()` was not called, then disposes. */
   async dispose(): Promise<void> {
+    let hookError: unknown;
+    // A caller of shutdown() got its errors already; just wait for the hooks to finish.
+    if (this.#stopping) await this.#stopping.catch(() => undefined);
+    else
+      hookError = await this.shutdown().then(
+        () => undefined,
+        (error: unknown) => error,
+      );
     this.#state = 'disposed';
-    await disposeAll(this.#created.splice(0).map((record) => ({ record, value: record.instance })));
+    try {
+      await disposeAll(
+        this.#created.splice(0).map((record) => ({ record, value: record.instance })),
+      );
+    } catch (error) {
+      if (hookError === undefined) throw error;
+      throw new AggregateError([hookError, error], 'Shutdown hooks and dispose failed', {
+        cause: error,
+      });
+    }
+    if (hookError !== undefined) throw hookError as Error;
   }
 
   #collect(definition: ModuleDefinition, stack: ModuleDefinition[], where: string): ModuleRecord {
@@ -422,7 +485,8 @@ export class Container {
   }
 
   #assertReady(): void {
-    if (this.#state !== 'ready')
+    // In-flight requests still resolve providers while shutdown hooks run.
+    if (this.#state !== 'ready' && this.#state !== 'stopping')
       throw new Error('The container is not initialized; call init() first');
   }
 }
@@ -479,6 +543,18 @@ async function disposeAll(
   if (errors.length > 0) {
     throw new AggregateError(errors, `Failed to dispose ${String(errors.length)} provider(s)`);
   }
+}
+
+/** Runs a singleton's hook: the provider option if set, else the value's own method. */
+async function callHook(record: ProviderRecord, hook: 'onInit' | 'onShutdown'): Promise<void> {
+  const own = record[hook];
+  if (own) {
+    await own(record.instance);
+    return;
+  }
+  const value = record.instance as Partial<Record<typeof hook, unknown>> | null | undefined;
+  const method = value?.[hook];
+  if (typeof method === 'function') await (method as () => unknown).call(value);
 }
 
 async function disposeValue(record: ProviderRecord, instance: unknown): Promise<void> {

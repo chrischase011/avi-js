@@ -12,6 +12,9 @@
     },
     {
       "path": "../../packages/workers/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/pubsub/tsconfig.build.json"
     }
   ]
 }

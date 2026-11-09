@@ -301,6 +301,9 @@ importers:
       '@avijs/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@avijs/pubsub':
+        specifier: workspace:*
+        version: link:../../packages/pubsub
       '@avijs/workers':
         specifier: workspace:*
         version: link:../../packages/workers
@@ -399,6 +402,16 @@ importers:
       zod:
         specifier: 4.6.7
         version: 4.6.7
+
+  packages/pubsub:
+    dependencies:
+      '@avijs/core':
+        specifier: workspace:^
+        version: link:../core
+    devDependencies:
+      '@avijs/workers':
+        specifier: workspace:^
+        version: link:../workers
 
   packages/security:
     dependencies:

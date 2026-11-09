@@ -91,7 +91,10 @@ export interface AviApp {
   get<K extends Token>(token: K): TokenType<K>;
   /** Every registered route, including runtime-created ones. Available after `init()`. */
   routes(): readonly RouteInfo[];
-  /** Stops accepting connections, waits for in-flight requests, then disposes providers. */
+  /**
+   * Runs `onShutdown` hooks, stops accepting connections, ends open streams, waits for in-flight
+   * requests, then disposes providers.
+   */
   close(): Promise<void>;
 }
 
@@ -128,6 +131,7 @@ type Resolve = (token: Token) => unknown;
 
 class Application implements AviApp {
   readonly #router = new Router();
+  #closing: Promise<void> | undefined;
   readonly #server: HttpServer;
   readonly #roots: AviModule[] = [];
   readonly #middleware: readonly MiddlewareRef[];
@@ -253,9 +257,21 @@ class Application implements AviApp {
     return this.#routes;
   }
 
-  async close(): Promise<void> {
-    await this.#server.close();
-    await this.#container?.dispose();
+  close(): Promise<void> {
+    // A second call (two signals, a test teardown) waits for the first instead of racing it.
+    return (this.#closing ??= this.#close());
+  }
+
+  async #close(): Promise<void> {
+    const errors: unknown[] = [];
+    // New connections are refused at once (another worker takes them under cluster()); the hooks
+    // run while requests in flight finish. A failing hook must not skip the rest.
+    const draining = this.#server.close();
+    await this.#container?.shutdown().catch((error: unknown) => errors.push(error));
+    await draining;
+    await this.#container?.dispose().catch((error: unknown) => errors.push(error));
+    if (errors.length === 1) throw errors[0];
+    if (errors.length > 1) throw new AggregateError(errors, 'The app did not close cleanly');
   }
 
   async #start(): Promise<void> {

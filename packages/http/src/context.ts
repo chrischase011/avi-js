@@ -143,6 +143,11 @@ export class RequestContext implements Context {
     (this.#headers ??= {})[name.toLowerCase()] = stored;
   }
 
+  /** Aborts `signal` so a long response, such as `sse()`, ends before the server closes. */
+  endForShutdown(): void {
+    (this.#abort ??= new AbortController()).abort(new Error('The server is shutting down'));
+  }
+
   get signal(): AbortSignal {
     if (!this.#abort) {
       const controller = new AbortController();

@@ -168,6 +168,38 @@ describe('sse', () => {
     }
   });
 
+  it('ends open streams when the server closes, even if the source ignores the signal', async () => {
+    const never = deferred();
+    let finished = false;
+    const server = await serve(async function* () {
+      try {
+        yield 'first';
+        await never.promise;
+      } finally {
+        finished = true;
+      }
+    });
+    const res = await fetch(`${server.url}/events`);
+    const reader = (res.body as ReadableStream<Uint8Array>).getReader();
+    const decoder = new TextDecoder();
+    let text = '';
+    while (!text.includes('data: first')) {
+      text += decoder.decode((await reader.read()).value);
+    }
+
+    const started = performance.now();
+    await server.server.close();
+    expect(performance.now() - started).toBeLessThan(2000);
+    for (let chunk = await reader.read(); !chunk.done; chunk = await reader.read()) {
+      text += decoder.decode(chunk.value);
+    }
+    expect(text).toBe(': open\n\ndata: first\n\n');
+    never.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(finished).toBe(true);
+    current = undefined;
+  });
+
   it('validates the heartbeat option', () => {
     const ctx = {} as Parameters<typeof sse>[0];
     expect(() => sse(ctx, () => [], { heartbeat: 0 })).toThrow(RangeError);

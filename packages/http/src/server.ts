@@ -168,6 +168,8 @@ export class HttpServer {
   readonly #upgraded = new Map<Duplex, AbortController>();
   #server: Server | undefined;
   #closing: Promise<void> | undefined;
+  // Responses still streaming after the handler returned; their signals abort on close().
+  readonly #streaming = new Map<RequestContext, ServerResponse>();
   // Connections whose first request has not arrived yet.
   readonly #fresh = new Set<Socket>();
   #onFreshServed: (() => void) | undefined;
@@ -261,6 +263,7 @@ export class HttpServer {
       force.unref();
       // Upgraded connections are the handler's to close; tell it to.
       for (const controller of this.#upgraded.values()) controller.abort();
+      for (const [ctx, res] of this.#streaming) endStream(ctx, res);
 
       // Refuse new connections at once. In a cluster, Node hands them to another worker.
       server.maxConnections = 0;
@@ -439,6 +442,15 @@ export class HttpServer {
     } catch (error) {
       clearHeaders(res);
       this.#fail(ctx, res, error);
+      return;
+    }
+    if (!res.writableEnded) {
+      if (this.#closing) {
+        endStream(ctx, res);
+        return;
+      }
+      this.#streaming.set(ctx, res);
+      res.once('close', () => this.#streaming.delete(ctx));
     }
   }
 
@@ -523,6 +535,14 @@ export class HttpServer {
         });
     });
   }
+}
+
+/** Asks a streaming response to end, and closes its connection once it has. */
+function endStream(ctx: RequestContext, res: ServerResponse): void {
+  // Its headers promised keep-alive; an idle socket would hold up server.close().
+  const socket = res.socket;
+  res.once('finish', () => socket?.end());
+  ctx.endForShutdown();
 }
 
 function nonNegative(name: string, value: number): number {

@@ -505,6 +505,234 @@ describe('dispose', () => {
   });
 });
 
+describe('lifecycle hooks', () => {
+  it('runs onInit after every singleton exists, dependencies first', async () => {
+    const log: string[] = [];
+    class First {
+      onInit() {
+        log.push(`First (Second created: ${String(created)})`);
+      }
+    }
+    let created = false;
+    class Second {
+      static inject = [First] as const;
+      constructor(readonly first: First) {
+        created = true;
+      }
+      async onInit() {
+        await Promise.resolve();
+        log.push('Second');
+      }
+    }
+    const Value = createToken<{ onInit(): void }>('Value');
+    await start(
+      mod('App', {
+        providers: [
+          Second,
+          First,
+          { provide: Value, useValue: { onInit: () => log.push('Value') } },
+        ],
+      }),
+    );
+    expect(log).toEqual(['First (Second created: true)', 'Second']);
+  });
+
+  it('runs onShutdown in reverse order, past failures, and resolves while stopping', async () => {
+    const log: string[] = [];
+    class First {
+      onShutdown() {
+        log.push('First');
+      }
+    }
+    class Second {
+      static inject = [First] as const;
+      constructor(readonly first: First) {}
+      onShutdown() {
+        throw new Error('boom');
+      }
+    }
+    class Third {
+      static inject = [Second] as const;
+      constructor(readonly second: Second) {}
+      onShutdown() {
+        log.push('Third');
+      }
+    }
+    const c = await start(mod('App', { providers: [First, Second, Third] }));
+    const shutdown = c.shutdown();
+    expect(c.get(First)).toBeInstanceOf(First);
+    const error = await shutdown.then(
+      () => undefined,
+      (e: unknown) => e,
+    );
+    expect(error).toBeInstanceOf(AggregateError);
+    expect((error as AggregateError).errors[0]).toMatchObject({
+      message: 'Second in App failed in onShutdown',
+      cause: { message: 'boom' },
+    });
+    expect(log).toEqual(['Third', 'First']);
+    // Later calls share the first run and its result.
+    await expect(c.shutdown()).rejects.toBeInstanceOf(AggregateError);
+    expect(log).toHaveLength(2);
+  });
+
+  it('prefers factory options over the value methods', async () => {
+    const log: string[] = [];
+    const Client = createToken<{ onInit(): void; onShutdown(): void }>('Client');
+    const value = {
+      onInit: () => log.push('method init'),
+      onShutdown: () => log.push('method shutdown'),
+    };
+    const c = await start(
+      mod('App', {
+        providers: [
+          defineFactory({
+            provide: Client,
+            useFactory: () => value,
+            onInit: (v) => log.push(`option init ${String(v === value)}`),
+            onShutdown: () => log.push('option shutdown'),
+          }),
+        ],
+      }),
+    );
+    await c.shutdown();
+    expect(log).toEqual(['option init true', 'option shutdown']);
+  });
+
+  it('calls the methods of a factory value without options', async () => {
+    const log: string[] = [];
+    const Client = createToken('Client');
+    const c = await start(
+      mod('App', {
+        providers: [
+          {
+            provide: Client,
+            useFactory: () => ({
+              onInit: () => log.push('init'),
+              onShutdown: () => log.push('down'),
+            }),
+          },
+        ],
+      }),
+    );
+    await c.shutdown();
+    expect(log).toEqual(['init', 'down']);
+  });
+
+  it('skips transient and request-scoped instances', async () => {
+    const log: string[] = [];
+    class Temp {
+      onInit() {
+        log.push('Temp');
+      }
+    }
+    class User {
+      static inject = [Temp] as const;
+      constructor(readonly temp: Temp) {}
+    }
+    const c = await start(
+      mod('App', { providers: [{ provide: Temp, useClass: Temp, scope: 'transient' }, User] }),
+    );
+    await c.shutdown();
+    expect(log).toEqual([]);
+  });
+
+  it('rejects hook options on non-singleton factories', () => {
+    const Thing = createToken('Thing');
+    expect(
+      () =>
+        new Container([
+          mod('App', {
+            providers: [
+              { provide: Thing, useFactory: () => ({}), scope: 'transient', onInit: () => 1 },
+            ],
+          }),
+        ]),
+    ).toThrow(
+      'onInit and onShutdown at App.providers[0] (Thing) need a singleton, not transient scope',
+    );
+    expect(
+      () =>
+        new Container([
+          mod('App', {
+            providers: [{ provide: Thing, useFactory: () => ({}), onShutdown: 1 as never }],
+          }),
+        ]),
+    ).toThrow('onShutdown at App.providers[0] (Thing) must be a function');
+  });
+
+  it('runs onShutdown for started providers when a later onInit fails', async () => {
+    const log: string[] = [];
+    class Poller {
+      onInit() {
+        log.push('Poller started');
+      }
+      onShutdown() {
+        log.push('Poller stopped');
+      }
+    }
+    class NeverStarted {
+      onShutdown() {
+        log.push('NeverStarted stopped');
+      }
+    }
+    class Broken {
+      onInit() {
+        throw new Error('no connection');
+      }
+    }
+    const c = new Container([mod('App', { providers: [Poller, Broken, NeverStarted] })]);
+    await expect(c.init()).rejects.toThrow('Broken in App failed in onInit');
+    expect(log).toEqual(['Poller started', 'Poller stopped']);
+  });
+
+  it('runs the hooks once when dispose is called without shutdown, or both at once', async () => {
+    const log: string[] = [];
+    const tick = () => new Promise((resolve) => setTimeout(resolve, 5));
+    class Svc {
+      async onShutdown() {
+        await tick();
+        log.push('shutdown');
+      }
+      [Symbol.dispose]() {
+        log.push('dispose');
+      }
+    }
+    const one = await start(mod('App', { providers: [Svc] }));
+    await one.dispose();
+    expect(log).toEqual(['shutdown', 'dispose']);
+
+    log.length = 0;
+    const two = await start(mod('App', { providers: [Svc] }));
+    await Promise.all([two.shutdown(), two.shutdown(), two.dispose()]);
+    expect(log).toEqual(['shutdown', 'dispose']);
+  });
+
+  it('fails init with the provider name and disposes when onInit throws', async () => {
+    const log: string[] = [];
+    class Opened {
+      [Symbol.dispose]() {
+        log.push('disposed');
+      }
+    }
+    class Broken {
+      onInit() {
+        throw new Error('no connection');
+      }
+    }
+    const c = new Container([mod('App', { providers: [Opened, Broken] })]);
+    const error = await c.init().then(
+      () => undefined,
+      (e: unknown) => e,
+    );
+    expect(error).toMatchObject({
+      message: 'Broken in App failed in onInit',
+      cause: { message: 'no connection' },
+    });
+    expect(log).toEqual(['disposed']);
+  });
+});
+
 describe('createToken', () => {
   it('creates distinct, frozen tokens', () => {
     const a = createToken('Same');

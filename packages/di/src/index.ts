@@ -11,6 +11,8 @@ export { checkInjectList, injectListError, registerInjects, resolveInjects } fro
 export type {
   ClassProvider,
   FactoryProvider,
+  OnInit,
+  OnShutdown,
   Provider,
   Scope,
   TypedFactoryProvider,

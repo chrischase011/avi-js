@@ -38,6 +38,7 @@ export default defineConfig({
       '@avijs/http': src('http'),
       '@avijs/multipart': src('multipart'),
       '@avijs/openapi': src('openapi'),
+      '@avijs/pubsub': src('pubsub'),
       '@avijs/security': src('security'),
       '@avijs/testing': src('testing'),
       '@avijs/validation': src('validation'),

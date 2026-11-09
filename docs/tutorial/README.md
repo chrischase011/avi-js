@@ -26,6 +26,7 @@ create a project, then follow the chapters in order or jump to what you need.
 | [15](15-typed-client.md)      | Typed client                               | Runnable  |
 | [16](16-workers.md)           | Workers and multiple cores                 | Runnable  |
 | [17](17-stability.md)         | Stability and versions                     | Reference |
+| [18](18-realtime.md)          | Real-time updates with pub/sub             | Runnable  |
 | [Appendix](99-from-nestjs.md) | Avi.js for NestJS developers               | Runnable  |
 
 Throughout the tutorial you build **Greeter**, a small API with a users resource and a greeting

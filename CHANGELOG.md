@@ -3,6 +3,31 @@
 All notable changes are listed here. Avi.js follows [Semantic Versioning](https://semver.org); all
 packages share one version.
 
+## 1.1.0 - 2026-11-09
+
+### Added
+
+- Lifecycle hooks for singletons: an `onInit()` method runs once every singleton exists, before
+  routes are built; `onShutdown()` runs when `app.close()` starts, once new connections are refused and while
+  requests in flight finish.
+  Factory providers take them as `onInit` and `onShutdown` options. `OnInit` and `OnShutdown`
+  types for `implements`. `runWorker()` runs them too.
+- `@avijs/pubsub`: typed channels (`defineChannel`), `publish`, `subscribe`, `on`, and `events()`
+  for `sse()`. Adapters for one process (`memoryAdapter`), every `cluster()` worker
+  (`clusterAdapter`, through the primary) and Redis (`redisAdapter` for `redis`, `ioredisAdapter`
+  for `ioredis`). Slow subscribers are dropped after a buffer (1 000 messages by default).
+- Tutorial chapter 18: real-time updates with pub/sub.
+
+### Changed
+
+- `app.close()` ends open streaming responses, such as `sse()`, as soon as shutdown starts: their
+  `signal` aborts and `sse()` streams finish. Before, they held the shutdown until
+  `shutdownTimeout`. A stream that ignores its signal still gets the full timeout.
+- When an `onShutdown` hook or a provider's dispose fails, `app.close()` still closes the server
+  and disposes the other providers, then rejects with the errors.
+- Calling `app.close()` again while it runs waits for the first call instead of starting a second
+  shutdown.
+
 ## 1.0.2 - 2026-11-05
 
 ### Fixed

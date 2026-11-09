@@ -38,7 +38,9 @@ type Message =
   | { readonly avi: 'ready' }
   | { readonly avi: 'failed'; readonly error: string }
   | { readonly avi: 'shutdown' }
-  | { readonly avi: 'closed' };
+  | { readonly avi: 'closed' }
+  // From @avijs/pubsub's clusterAdapter: sent on to every worker, the sender included.
+  | { readonly avi: 'pubsub'; readonly channel: string; readonly message: string };
 
 const MARK = 'AVI_CLUSTER_WORKER';
 
@@ -199,6 +201,10 @@ async function runPrimary(
         } else if (message.avi === 'closed') {
           // Node stops routing to the worker, then lets it hand back connections in flight.
           worker.disconnect();
+        } else if (message.avi === 'pubsub') {
+          for (const target of running) {
+            if (target.isConnected()) target.send(message, () => undefined);
+          }
         }
       });
       worker.once('exit', (code, signal) => {

@@ -1,6 +1,6 @@
 {
   "name": "@avijs/http",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "Router, request pipeline and Node.js HTTP adapter for Avi.js.",
   "keywords": [
     "avi",

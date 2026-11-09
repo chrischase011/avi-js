@@ -5,6 +5,7 @@ An email API that runs on every CPU core, plus a background worker that sends th
 | Process         | File            | Does                                                          |
 | --------------- | --------------- | ------------------------------------------------------------- |
 | API (`cluster`) | `src/main.ts`   | `POST /emails` queues an email and answers `202` at once      |
+|                 |                 | `GET /emails/events` streams every queued email (SSE)         |
 | Worker          | `src/worker.ts` | Sends queued emails until stopped; `ONCE=1` empties and exits |
 
 What it shows:
@@ -13,6 +14,8 @@ What it shows:
   replaced, graceful shutdown on `SIGINT`/`SIGTERM`. `GET /pid` shows which worker answered.
 - **`runWorker()`**: the worker uses the app's providers (`OutboxModule`) without an HTTP server,
   stops on a signal and closes its providers.
+- **Live events across workers.** `GET /emails/events` hears emails queued by any worker:
+  `@avijs/pubsub` with `clusterAdapter()` passes each event through the cluster primary.
 - **Shared work lives outside the processes.** Each process has its own memory, so the queue is a
   folder (`data/outbox/`). A real app would use a database table or a queue such as Redis.
 
@@ -22,6 +25,7 @@ src/
 ├── worker.ts    the background worker
 ├── app.ts       routes
 ├── outbox.ts    the file-based queue, as a module both processes import
+├── pubsub.ts    live events across workers
 └── smoke.ts     starts both and checks the queue empties
 ```
 

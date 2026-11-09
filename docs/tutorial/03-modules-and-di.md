@@ -224,10 +224,56 @@ defineFactory({
 Transient and request-scoped factories must stay synchronous; an async one fails when it is first
 used.
 
+## Lifecycle hooks
+
+A singleton can run code once the app is assembled, and again when it starts to shut down. Add an
+`onInit()` or `onShutdown()` method; both may be `async`:
+
+```ts
+import { Injectable, type OnInit, type OnShutdown } from '@avijs/core';
+
+@Injectable()
+export class Mailer implements OnInit, OnShutdown {
+  constructor(private readonly queue: Queue) {}
+
+  async onInit() {
+    await this.queue.verify(); // a failure stops startup with a clear error
+  }
+
+  async onShutdown() {
+    await this.queue.pause(); // stop taking new jobs while requests drain
+  }
+}
+```
+
+A factory provider takes the same hooks as options, called with the created value:
+
+```ts
+defineFactory({
+  provide: Poller,
+  useFactory: () => new Poller(),
+  onInit: (poller) => poller.start(),
+  onShutdown: (poller) => poller.stop(),
+});
+```
+
+| Hook         | Runs                                                                                                            |
+| ------------ | --------------------------------------------------------------------------------------------------------------- |
+| `onInit`     | Once every singleton exists, in creation order (dependencies first), before routes are built.                   |
+| `onShutdown` | When `app.close()` starts, in reverse order. New connections are refused; requests in flight are still running. |
+
+- `onInit` runs one provider at a time. If one throws, or startup fails later, the app does not
+  start: providers whose `onInit` ran get their `onShutdown`, then everything created is disposed.
+- `onShutdown` errors don't stop the shutdown: the server still closes and providers are still
+  disposed, then `app.close()` rejects with the errors.
+- Only singletons get hooks. `useValue` values, transients and request-scoped providers don't.
+- [`runWorker()`](16-workers.md#background-workers-runworker) runs them too.
+
 ## Cleanup on shutdown
 
-`app.close()` stops the server, waits for in-flight requests, then disposes providers in reverse
-creation order, so a repository closes before the database it uses:
+`app.close()` refuses new connections, runs the `onShutdown` hooks while in-flight requests finish,
+then disposes providers in reverse creation order, so a repository closes before the database it
+uses:
 
 ```ts
 class Db {

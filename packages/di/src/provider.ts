@@ -29,6 +29,10 @@ export interface FactoryProvider<T = unknown> {
    * so typed callbacks fit `Provider[]`.
    */
   dispose?(value: T): unknown;
+  /** Singletons only: runs once every singleton exists. Replaces the value's own `onInit()`. */
+  onInit?(value: T): unknown;
+  /** Singletons only: runs when `close()` starts. Replaces the value's own `onShutdown()`. */
+  onShutdown?(value: T): unknown;
 }
 
 /** A factory provider whose parameters are typed from `inject`. */
@@ -38,6 +42,18 @@ export interface TypedFactoryProvider<T, K extends readonly Token[]> {
   useFactory: (...deps: ResolveTokens<K>) => T | Promise<T>;
   scope?: Scope;
   dispose?(value: T): unknown;
+  onInit?(value: T): unknown;
+  onShutdown?(value: T): unknown;
+}
+
+/** A singleton with this method has it called once every singleton exists, before routes. */
+export interface OnInit {
+  onInit(): unknown;
+}
+
+/** A singleton with this method has it called when `close()` starts, while requests in flight finish. */
+export interface OnShutdown {
+  onShutdown(): unknown;
 }
 
 /**
@@ -60,6 +76,8 @@ export interface ProviderSpec {
   readonly deps: readonly Token[];
   readonly create: (deps: unknown[]) => unknown;
   readonly dispose: ((value: unknown) => unknown) | undefined;
+  readonly onInit: ((value: unknown) => unknown) | undefined;
+  readonly onShutdown: ((value: unknown) => unknown) | undefined;
 }
 
 /** Validates a provider and converts it to one internal shape. `where` labels errors. */
@@ -95,6 +113,8 @@ export function normalizeProvider(provider: unknown, where: string): ProviderSpe
       deps: [],
       create: () => value,
       dispose: undefined,
+      onInit: undefined,
+      onShutdown: undefined,
     };
   }
 
@@ -121,9 +141,17 @@ export function normalizeProvider(provider: unknown, where: string): ProviderSpe
       `Factory at ${label} takes ${String(factory.length)} arguments but inject lists ${String(deps.length)}`,
     );
   }
-  const dispose = p['dispose'];
-  if (dispose !== undefined && typeof dispose !== 'function') {
-    throw new TypeError(`dispose at ${label} must be a function`);
+  const [dispose, onInit, onShutdown] = (['dispose', 'onInit', 'onShutdown'] as const).map(
+    (key) => {
+      const fn = p[key];
+      if (fn !== undefined && typeof fn !== 'function') {
+        throw new TypeError(`${key} at ${label} must be a function`);
+      }
+      return fn as ((value: unknown) => unknown) | undefined;
+    },
+  );
+  if ((onInit ?? onShutdown) && scope !== 'singleton') {
+    throw new TypeError(`onInit and onShutdown at ${label} need a singleton, not ${scope} scope`);
   }
   return {
     token,
@@ -131,7 +159,9 @@ export function normalizeProvider(provider: unknown, where: string): ProviderSpe
     scope,
     deps,
     create: (values) => (factory as (...args: unknown[]) => unknown)(...values),
-    dispose: dispose as ((value: unknown) => unknown) | undefined,
+    dispose,
+    onInit,
+    onShutdown,
   };
 }
 
@@ -146,6 +176,8 @@ function classSpec(token: Token, cls: Constructor, scope: Scope, where: string):
     deps,
     create: (values) => new Ctor(...values),
     dispose: undefined,
+    onInit: undefined,
+    onShutdown: undefined,
   };
 }
 

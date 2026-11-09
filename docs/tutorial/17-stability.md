@@ -10,7 +10,8 @@ Avi.js follows [Semantic Versioning](https://semver.org). All packages share one
 Within 1.x, a minor or patch release does not break code that uses only the stable API:
 
 - **The documented exports** of `@avijs/core`, `@avijs/client`, `@avijs/testing`,
-  `@avijs/security`, `@avijs/multipart`, `@avijs/openapi` and `@avijs/workers`: names, parameters
+  `@avijs/security`, `@avijs/multipart`, `@avijs/openapi`, `@avijs/workers` and `@avijs/pubsub`
+  (from 1.1): names, parameters
   and the types you write against them.
 - **Documented behavior**: route precedence, the order of hooks, middleware, guards and
   validation, the status codes this tutorial lists, default limits, and the JSON shape of error
@@ -67,5 +68,4 @@ modules to the other.
 
 ## Next
 
-Coming from NestJS? See [Avi.js for NestJS developers](99-from-nestjs.md), or go back to the
-[tutorial index](README.md).
+[Chapter 18: Real-time updates with pub/sub](18-realtime.md).

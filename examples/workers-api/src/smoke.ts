@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
-import { request } from 'node:http';
+import { get, request } from 'node:http';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -57,11 +57,27 @@ try {
   }
   assert.equal(pids.size, 2, 'both workers answer');
 
+  // One worker streams. Round-robin (set above) hands the fresh connections that queue the
+  // emails to both workers in turn, so some events must cross to the streaming one.
+  let events = '';
+  const stream = get(`${base}/emails/events`, { agent: false }, (res) => {
+    res.on('data', (chunk: Buffer) => (events += chunk.toString('utf8')));
+  });
+  stream.on('error', () => undefined);
+  for (let i = 0; i < 100 && !events.includes(': open'); i++) {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+
   for (const to of ['shiela@example.com', 'ada@example.com', 'joy@example.com']) {
     const res = await call('POST', `${base}/emails`, JSON.stringify({ to, subject: 'Welcome' }));
     assert.equal(res.status, 202);
   }
   assert.deepEqual((await call('GET', `${base}/emails/pending`)).json, { count: 3 });
+  for (let i = 0; i < 100 && (events.match(/^data: /gm) ?? []).length < 3; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  assert.equal((events.match(/^data: /gm) ?? []).length, 3, 'the stream hears every worker');
+  stream.destroy();
 
   const worker = spawn(process.execPath, [path.join(here, 'worker.js')], {
     env: { ...env, ONCE: '1' },
