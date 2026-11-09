@@ -151,6 +151,39 @@ describe('cli', () => {
     expect(error).toHaveBeenCalledWith(expect.stringContaining('Usage:'));
     error.mockRestore();
   });
+
+  it('reports a tsconfig it cannot parse in one line and exits 1', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const dir = await mkdtemp(path.join(tmpdir(), 'avi-tsconfig-'));
+    try {
+      await mkdir(path.join(dir, 'src'));
+      await writeFile(path.join(dir, 'src/a.ts'), 'export const a = 1;');
+      const cases: [string, RegExp][] = [
+        ['{ "include": ["src"] } x', /tsconfig\.json\(1,24\): error TS1012: Unexpected token\.$/],
+        ['{ "include": ["src"]', /tsconfig\.json\(1,21\): error TS1005: '}' expected\.$/],
+        [
+          '{ "extends": "./missing.json", "include": ["src"] }',
+          /^error TS5083: Cannot read file '.*missing\.json'\.$/,
+        ],
+      ];
+      for (const [text, message] of cases) {
+        await writeFile(path.join(dir, 'tsconfig.json'), text);
+        for (const command of ['check', 'client', 'inject']) {
+          expect(await main([command, '-p', path.join(dir, 'tsconfig.json')])).toBe(1);
+          const printed = String(error.mock.lastCall?.[0]);
+          expect(printed).toMatch(message);
+          expect(printed).not.toContain('\n');
+        }
+        const watch = () => watchProject({ project: path.join(dir, 'tsconfig.json'), emit: false });
+        expect(watch).toThrow(message);
+      }
+    } finally {
+      error.mockRestore();
+      log.mockRestore();
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('generateClient', { timeout: 60_000 }, () => {
@@ -705,6 +738,19 @@ describe('generateInjects', { timeout: 60_000 }, () => {
       ],
       // An `imports` entry that only an ES module can resolve.
       ['AVI203', `Hashed ${dev('imports #lib/dev.js, which imports ')}`],
+      // A cluster through `export *` barrels: namespace imported, and `export * as`.
+      [
+        'AVI203',
+        'Hive is in a file that ' +
+          runs +
+          ', so inject.gen.ts cannot import it: move the class to its own file, or add static inject',
+      ],
+      [
+        'AVI203',
+        'Nest is in a file that ' +
+          runs +
+          ', so inject.gen.ts cannot import it: move the class to its own file, or add static inject',
+      ],
       // A seed script, a service worker and a worker entry run code when imported.
       [
         'AVI203',
@@ -729,6 +775,13 @@ describe('generateInjects', { timeout: 60_000 }, () => {
       [
         'AVI203',
         'Cache is in a file that ' +
+          runs +
+          ', so inject.gen.ts cannot import it: move the class to its own file, or add static inject',
+      ],
+      // A cluster imported by name through two `export *` barrels.
+      [
+        'AVI203',
+        'Swarm is in a file that ' +
           runs +
           ', so inject.gen.ts cannot import it: move the class to its own file, or add static inject',
       ],

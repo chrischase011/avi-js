@@ -121,3 +121,40 @@ describe.each([
     expect(server.subscribers.size).toBe(0);
   });
 });
+
+describe.each([
+  ['redisAdapter', redisAdapter, nodeRedisSubscriber],
+  ['ioredisAdapter', ioredisAdapter, ioredisSubscriber],
+] as const)('%s with one subscriber client for two apps', (_name, adapter, subscriber) => {
+  it('keeps delivering to one app after the other leaves the channel', async () => {
+    const server = fakeServer();
+    const shared = subscriber(server);
+    const make = () =>
+      connected({ adapter: adapter({ publisher: server.publisher, subscriber: shared as never }) });
+    const [one, two] = await Promise.all([make(), make()]);
+    const received: unknown[] = [];
+    one.on(Tasks, (task) => received.push(task));
+    const stop = two.on(Tasks, () => undefined);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    stop();
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    await two.publish(Tasks, { id: 1 });
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(received).toEqual([{ id: 1 }]);
+  });
+});
+
+it('does not hold up app.close() while Redis is down', async () => {
+  const server = fakeServer();
+  const stuck: IoRedisSubscriber = {
+    ...ioredisSubscriber(server),
+    subscribe: () => new Promise(() => undefined),
+    unsubscribe: () => new Promise(() => undefined),
+  };
+  const pubsub = await connected({
+    adapter: ioredisAdapter({ publisher: server.publisher, subscriber: stuck }),
+  });
+  pubsub.on(Tasks, () => undefined);
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  await apps.pop()?.close();
+});

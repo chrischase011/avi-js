@@ -83,6 +83,14 @@ export function sendValue(res: ServerResponse, value: unknown, options: SendOpti
   finish(res, status, payload, type, options.close || status === 413);
 }
 
+/** Releases a streamed body that will never be sent, such as one returned after the client left. */
+export function discardValue(value: unknown): void {
+  const body = value instanceof Reply ? (value as Reply).body : value;
+  const stream = body instanceof Response ? body.body : body;
+  if (stream instanceof Readable) stream.destroy();
+  else if (stream instanceof ReadableStream) stream.cancel().catch(() => undefined);
+}
+
 /** Writes a safe error response. Only 4xx `HttpError` messages reach the client. */
 export function sendError(
   res: ServerResponse,

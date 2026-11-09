@@ -16,6 +16,7 @@ import { HttpError, RequestAbortedError } from './errors.js';
 import type { HttpMethod } from './methods.js';
 import {
   clearHeaders,
+  discardValue,
   errorHeaders,
   sendError,
   sendOptions,
@@ -167,6 +168,7 @@ export class HttpServer {
   // controller of the signal its handler got. Dropped on close, so nothing piles up.
   readonly #upgraded = new Map<Duplex, AbortController>();
   #server: Server | undefined;
+  #binding: Promise<AddressInfo> | undefined;
   #closing: Promise<void> | undefined;
   // Responses still streaming after the handler returned; their signals abort on close().
   readonly #streaming = new Map<RequestContext, ServerResponse>();
@@ -234,7 +236,7 @@ export class HttpServer {
     }
     this.#server = server;
 
-    return new Promise((resolve, reject) => {
+    return (this.#binding = new Promise((resolve, reject) => {
       const onError = (error: Error) => {
         this.#server = undefined;
         reject(error);
@@ -247,15 +249,25 @@ export class HttpServer {
         });
         resolve(server.address() as AddressInfo);
       });
-    });
+    }));
   }
 
   /** Stops accepting connections and waits for in-flight requests, up to `shutdownTimeout`. */
   close(): Promise<void> {
     const server = this.#server;
     if (!server) return Promise.resolve();
+    this.#closing ??= this.#close(server);
+    return this.#closing;
+  }
 
-    this.#closing ??= new Promise<void>((resolve, reject) => {
+  async #close(server: Server): Promise<void> {
+    // Node cannot close a server whose bind (a DNS lookup, a cluster primary) is still pending.
+    if (!server.listening) await this.#binding?.catch(() => undefined);
+    if (!server.listening) {
+      this.#closing = undefined;
+      return;
+    }
+    return new Promise<void>((resolve, reject) => {
       const force = setTimeout(() => {
         server.closeAllConnections();
         for (const socket of this.#upgraded.keys()) socket.destroy();
@@ -280,7 +292,6 @@ export class HttpServer {
         server.closeIdleConnections();
       });
     });
-    return this.#closing;
   }
 
   #upgradeRequest(
@@ -426,7 +437,10 @@ export class HttpServer {
   }
 
   #respond(ctx: RequestContext, res: ServerResponse, value: unknown): void {
-    if (res.destroyed) return;
+    if (res.destroyed) {
+      discardValue(value);
+      return;
+    }
     try {
       sendValue(res, value, {
         headers: ctx.responseHeaders,
@@ -444,14 +458,18 @@ export class HttpServer {
       this.#fail(ctx, res, error);
       return;
     }
-    if (!res.writableEnded) {
-      if (this.#closing) {
-        endStream(ctx, res);
-        return;
-      }
-      this.#streaming.set(ctx, res);
-      res.once('close', () => this.#streaming.delete(ctx));
+    this.#track(ctx, res);
+  }
+
+  // A response still streaming is ended when shutdown starts.
+  #track(ctx: RequestContext, res: ServerResponse): void {
+    if (res.writableEnded) return;
+    if (this.#closing) {
+      endStream(ctx, res);
+      return;
     }
+    this.#streaming.set(ctx, res);
+    res.once('close', () => this.#streaming.delete(ctx));
   }
 
   #fail(ctx: RequestContext, res: ServerResponse, error: unknown): void {
@@ -490,7 +508,10 @@ export class HttpServer {
   }
 
   #sendHandled(ctx: RequestContext, res: ServerResponse, error: unknown, value: unknown): void {
-    if (res.destroyed) return;
+    if (res.destroyed) {
+      discardValue(value);
+      return;
+    }
     const headers: OutgoingHttpHeaders = errorHeaders(ctx.responseHeaders ?? {});
     if (error instanceof HttpError) Object.assign(headers, error.headers);
     try {
@@ -502,7 +523,9 @@ export class HttpServer {
       });
     } catch (handlerError) {
       this.#fallback(ctx, res, error, handlerError);
+      return;
     }
+    this.#track(ctx, res);
   }
 
   #fallback(ctx: RequestContext, res: ServerResponse, error: unknown, handlerError: unknown): void {

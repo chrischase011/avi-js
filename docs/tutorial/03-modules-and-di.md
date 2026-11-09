@@ -262,8 +262,14 @@ defineFactory({
 | `onInit`     | Once every singleton exists, in creation order (dependencies first), before routes are built.                   |
 | `onShutdown` | When `app.close()` starts, in reverse order. New connections are refused; requests in flight are still running. |
 
-- `onInit` runs one provider at a time. If one throws, or startup fails later, the app does not
-  start: providers whose `onInit` ran get their `onShutdown`, then everything created is disposed.
+- `onInit` runs one provider at a time. If one throws, or building the routes fails after it, the
+  app does not start: providers whose `onInit` ran get their `onShutdown`, then everything created
+  is disposed. If `listen()` itself fails, such as on a port in use, the providers stay up until
+  you call `app.close()`.
+- A factory that returns another provider's instance does not run its hooks or dispose a second
+  time.
+- `app.close()` during startup waits for it to finish, then shuts down. A closed app cannot start
+  again.
 - `onShutdown` errors don't stop the shutdown: the server still closes and providers are still
   disposed, then `app.close()` rejects with the errors.
 - Only singletons get hooks. `useValue` values, transients and request-scoped providers don't.

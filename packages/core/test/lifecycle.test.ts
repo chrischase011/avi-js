@@ -203,4 +203,105 @@ describe('lifecycle hooks', () => {
     app = undefined;
     expect(performance.now() - started).toBeLessThan(2000);
   });
+  it('waits for a startup in progress, then shuts it down', async () => {
+    const log: string[] = [];
+    class Database {
+      async onInit() {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        log.push('init');
+      }
+      onShutdown() {
+        log.push('shutdown');
+      }
+      [Symbol.dispose]() {
+        log.push('dispose');
+      }
+    }
+    const instance = createAvi(silent).register({ providers: [Database] });
+    const listening = instance.listen(0, '127.0.0.1');
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    await instance.close();
+    await expect(listening).rejects.toThrow('The app was closed while starting');
+    expect(log).toEqual(['init', 'shutdown', 'dispose']);
+    expect(instance.routes()).toEqual([]);
+  });
+
+  it('cannot start again once closed', async () => {
+    const instance = createAvi(silent).register({ providers: [] });
+    await instance.listen(0, '127.0.0.1');
+    await instance.close();
+    await expect(instance.listen(0, '127.0.0.1')).rejects.toThrow('The app is closed');
+    const unused = createAvi(silent).register({ providers: [] });
+    await unused.close();
+    await expect(unused.init()).rejects.toThrow('The app is closed');
+  });
+
+  it('closes cleanly while the server is still binding', async () => {
+    const instance = createAvi(silent).register({ providers: [] });
+    // localhost needs a lookup, so the bind is still pending when close() starts.
+    const listening = instance.listen(0, 'localhost');
+    await Promise.resolve();
+    await instance.close();
+    await listening.then(
+      () => undefined,
+      () => undefined,
+    );
+  });
+
+  it("runs a shared instance's hooks and dispose once", async () => {
+    const log: string[] = [];
+    class Database {
+      onInit() {
+        log.push('init');
+      }
+      onShutdown() {
+        log.push('shutdown');
+      }
+      [Symbol.dispose]() {
+        log.push('dispose');
+      }
+    }
+    const Alias = createToken<Database>('Alias');
+    const instance = createAvi().register(
+      defineModule({
+        providers: [
+          Database,
+          defineFactory({ provide: Alias, inject: [Database], useFactory: (db) => db }),
+        ],
+      }),
+    );
+    await instance.init();
+    await instance.close();
+    expect(log).toEqual(['init', 'shutdown', 'dispose']);
+  });
+
+  it('ends a stream sent by the errorHandler on close', async () => {
+    const broken = defineController({
+      routes: [
+        {
+          method: 'GET',
+          path: '/broken',
+          handler: () => {
+            throw new Error('no');
+          },
+        },
+      ],
+    });
+    app = createAvi({
+      shutdownTimeout: 10_000,
+      logger: { error: () => undefined },
+      errorHandler: (_error, ctx) =>
+        sse(ctx, async function* () {
+          yield 'sorry';
+          await new Promise(() => undefined);
+        }),
+    }).register({ controllers: [broken] });
+    const { port } = await app.listen(0, '127.0.0.1');
+    const res = await fetch(`http://127.0.0.1:${String(port)}/broken`);
+    await (res.body as ReadableStream<Uint8Array>).getReader().read();
+    const started = performance.now();
+    await app.close();
+    app = undefined;
+    expect(performance.now() - started).toBeLessThan(2000);
+  });
 });

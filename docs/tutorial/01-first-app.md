@@ -172,7 +172,13 @@ createAvi({
 
 ```ts
 const shutdown = () => {
-  void app.close().then(() => process.exit(0));
+  app.close().then(
+    () => process.exit(0),
+    (error: unknown) => {
+      console.error(error);
+      process.exit(1);
+    },
+  );
 };
 process.once('SIGINT', shutdown);
 process.once('SIGTERM', shutdown);

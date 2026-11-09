@@ -205,4 +205,48 @@ describe('sse', () => {
     expect(() => sse(ctx, () => [], { heartbeat: 0 })).toThrow(RangeError);
     expect(() => sse(ctx, () => [], { heartbeat: 1.5 })).toThrow(RangeError);
   });
+  it('stops the source when the client left before sse() was called', async () => {
+    const left = deferred();
+    const stopped = deferred();
+    let heartbeats = 0;
+    current = await startServer([
+      {
+        method: 'GET',
+        path: '/events',
+        handler: async (ctx) => {
+          await left.promise;
+          const source: AsyncIterableIterator<string> = {
+            next: () => new Promise(() => undefined),
+            return: () => {
+              stopped.resolve();
+              return Promise.resolve({ value: undefined, done: true });
+            },
+            [Symbol.asyncIterator]: () => source,
+          };
+          return sse(ctx, () => source, { heartbeat: 5 });
+        },
+      },
+    ]);
+    const client = new AbortController();
+    const res = fetch(`${current.url}/events`, { signal: client.signal }).catch(() => undefined);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    client.abort();
+    await res;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- called with its own this
+    const enqueue = ReadableStreamDefaultController.prototype.enqueue;
+    ReadableStreamDefaultController.prototype.enqueue = function (this: never, chunk: never) {
+      heartbeats++;
+      enqueue.call(this, chunk);
+    };
+    try {
+      left.resolve();
+      await stopped.promise;
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      // The opening comment only; no heartbeats.
+      expect(heartbeats).toBeLessThanOrEqual(1);
+    } finally {
+      ReadableStreamDefaultController.prototype.enqueue = enqueue;
+    }
+  });
 });

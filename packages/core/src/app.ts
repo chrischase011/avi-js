@@ -92,8 +92,9 @@ export interface AviApp {
   /** Every registered route, including runtime-created ones. Available after `init()`. */
   routes(): readonly RouteInfo[];
   /**
-   * Runs `onShutdown` hooks, stops accepting connections, ends open streams, waits for in-flight
-   * requests, then disposes providers.
+   * Stops accepting connections, ends open streams, runs `onShutdown` hooks while in-flight
+   * requests finish, then disposes providers. Waits for a startup in progress first. The app
+   * cannot start again.
    */
   close(): Promise<void>;
 }
@@ -187,6 +188,7 @@ class Application implements AviApp {
   }
 
   init(): Promise<void> {
+    if (this.#closing && !this.#init) return Promise.reject(new Error('The app is closed'));
     // AviFactory.create calls this directly, so a failure is reported here, not only by listen().
     this.#init ??= this.#start().catch((error: unknown) => {
       this.#fail(error);
@@ -206,7 +208,9 @@ class Application implements AviApp {
   async listen(port: number, host?: string): Promise<AddressInfo> {
     let address: AddressInfo;
     try {
+      if (this.#isClosed()) throw new Error('The app is closed');
       await this.init();
+      if (this.#isClosed()) throw new Error('The app was closed while starting');
       this.#step = 'HTTP server';
       address = await this.#server.listen(port, host);
     } catch (error) {
@@ -257,6 +261,10 @@ class Application implements AviApp {
     return this.#routes;
   }
 
+  #isClosed(): boolean {
+    return this.#closing !== undefined;
+  }
+
   close(): Promise<void> {
     // A second call (two signals, a test teardown) waits for the first instead of racing it.
     return (this.#closing ??= this.#close());
@@ -264,9 +272,13 @@ class Application implements AviApp {
 
   async #close(): Promise<void> {
     const errors: unknown[] = [];
+    // Let a startup in progress finish, so what it creates is shut down too.
+    await this.#init?.catch(() => undefined);
     // New connections are refused at once (another worker takes them under cluster()); the hooks
     // run while requests in flight finish. A failing hook must not skip the rest.
-    const draining = this.#server.close();
+    const draining = this.#server.close().catch((error: unknown) => {
+      errors.push(error);
+    });
     await this.#container?.shutdown().catch((error: unknown) => errors.push(error));
     await draining;
     await this.#container?.dispose().catch((error: unknown) => errors.push(error));
@@ -361,7 +373,10 @@ class Application implements AviApp {
       }
       this.#container = container;
     } catch (error) {
-      await container.dispose().catch(() => undefined);
+      // The startup error is the one thrown; a failing hook or dispose is logged.
+      await container.dispose().catch((cleanupError: unknown) => {
+        this.#logger.error('Cleanup after the failed startup also failed', cleanupError);
+      });
       throw error;
     }
   }

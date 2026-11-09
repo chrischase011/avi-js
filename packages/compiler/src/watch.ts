@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
-import { formatDiagnostic, type Diagnostic } from './check.js';
+import { configPath, formatDiagnostic, readConfig, type Diagnostic } from './check.js';
 import { generateFrom, sameContent } from './client.js';
 import { INJECT_HEADER, generateInjectsFrom, plural } from './inject.js';
 import { recordOutputs } from './outputs.js';
@@ -32,6 +32,8 @@ export interface ProjectWatcher {
  */
 export function watchProject(options: WatchProjectOptions): ProjectWatcher {
   const emit = options.emit ?? true;
+  // A tsconfig that cannot be read fails here, with one line, instead of being watched.
+  readConfig(options.project);
   // What each build emits goes on avi build's list, so it can remove outputs of deleted files.
   const emitted = new Set<string>();
   const system: ts.System = {
@@ -42,7 +44,7 @@ export function watchProject(options: WatchProjectOptions): ProjectWatcher {
     },
   };
   const host = ts.createWatchCompilerHost(
-    path.resolve(options.project),
+    configPath(options.project),
     emit ? { preserveWatchOutput: true } : { noEmit: true },
     system,
     ts.createEmitAndSemanticDiagnosticsBuilderProgram,

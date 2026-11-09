@@ -83,8 +83,8 @@ to name the events, for `addEventListener('user', ...)` in the browser.
 | `subscribe(channel, signal, options?)` | The messages themselves, for `for await`.                       |
 | `on(channel, listener)`                | Calls `listener` per message; returns a function that stops it. |
 
-A subscription starts when `subscribe()` or `events()` is called and ends when `signal` aborts.
-Inside `sse()`, that is when the client leaves. With Redis, messages arrive once Redis has
+A subscription starts when `subscribe()` or `events()` is called and ends when `signal` aborts;
+messages not read by then are dropped. Inside `sse()`, that is when the client leaves. With Redis, messages arrive once Redis has
 confirmed the subscription, a moment later: a message published in between is not received.
 
 ## Listening without a request
@@ -128,7 +128,9 @@ one Redis server.
 
 `clusterAdapter()` sends each message to the `cluster()` primary, which passes it to every worker.
 Outside a cluster, such as under `avi dev` or with one worker, it works in memory, so the same code
-runs everywhere. In a worker forked by something other than `cluster()` it refuses to start.
+runs everywhere. It reaches `cluster()` workers only: a [`runWorker()`](16-workers.md#background-workers-runworker) process or
+a worker thread works in memory too, so use Redis to reach those. In a worker forked by something
+other than `cluster()` it refuses to start.
 
 For Redis, create and connect the clients yourself. A subscribing connection can only subscribe,
 so it needs its own client:
@@ -155,14 +157,17 @@ export const PubSub = definePubSub({ adapter: ioredisAdapter({ publisher, subscr
 ```
 
 Closing the app unsubscribes but leaves the clients open: they are yours to `quit()` after
-`app.close()`. Give each app its own subscriber client: Redis counts subscriptions per connection,
-so another user of the same client could be unsubscribed. To share one Redis server between apps,
-set `prefix: 'myapp:'`; it is added to every channel name.
+`app.close()`. Apps may share the clients, as apps made from one module do in tests: each app's
+channels are counted, and one app leaving a channel does not unsubscribe another. Don't subscribe
+on the subscriber client outside Avi: Redis counts subscriptions per connection, so Avi could
+unsubscribe a channel you also use. To share one Redis server between apps, set
+`prefix: 'myapp:'`; it is added to every channel name.
 
 ## What a message is
 
 - **JSON.** `publish` sends `JSON.stringify(data)`, so a `Date` arrives as a string. The types
-  follow: a subscriber of `defineChannel<{ at: Date }>` receives `{ at: string }`.
+  follow: a subscriber of `defineChannel<{ at: Date }>` receives `{ at: string }`. A `BigInt` or a
+  cycle makes `publish` reject; `NaN` and `Infinity` arrive as `null`.
 - **Shared and frozen.** Every listener in a process gets the same object, frozen so one cannot
   change it for the others. Its type is `Received<T>`: the JSON form, read-only.
 - **Everyone hears it**, the publishing process included.
@@ -194,7 +199,8 @@ definePubSub({ adapter, onError: (error) => logger.error('pubsub', error) });
 ```
 
 When the adapter cannot subscribe to a channel, its subscribers end with that error instead of
-waiting for messages that will never come.
+waiting for messages that will never come. `on()` listeners are removed; the error reaches
+`onError`, so call `on()` again to retry.
 
 ## Testing
 

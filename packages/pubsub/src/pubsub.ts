@@ -111,7 +111,9 @@ export function definePubSub(options: PubSubOptions = {}): PubSubToken {
     // Without an adapter, each app gets its own broker, so apps never hear each other.
     useFactory: () => Broker.connect(adapter ?? memoryAdapter(), buffer, onError),
     // Ends subscriptions so streams finish; publishing works until dispose.
-    onShutdown: (pubsub) => (pubsub as Broker).stop(),
+    onShutdown: (pubsub) => {
+      (pubsub as Broker).stop();
+    },
     dispose: (pubsub) => (pubsub as Broker).close(),
   };
   token.module = defineModule({
@@ -141,8 +143,10 @@ interface Waiter {
 
 class Broker implements PubSub {
   readonly #channels = new Map<string, Set<Listener>>();
-  // Subscribe and unsubscribe calls per channel, in order.
+  // The adapter's subscribe and unsubscribe calls, one at a time per channel.
   readonly #pending = new Map<string, Promise<void>>();
+  // Channels the adapter is subscribed to.
+  readonly #subscribed = new Set<string>();
   readonly #buffer: number;
   readonly #onError: (error: unknown) => void;
   #connection!: PubSubConnection;
@@ -168,8 +172,17 @@ class Broker implements PubSub {
   async publish<T>(channel: Channel<T>, data: NoInfer<T>): Promise<void> {
     const name = channelName(channel, 'publish');
     if (this.#state === 'closed') throw new Error('Cannot publish: the app has closed');
-    const text = JSON.stringify(data) as string | undefined;
-    if (text === undefined) throw new TypeError(`Cannot publish to "${name}": data is not JSON`);
+    let text: unknown;
+    try {
+      text = JSON.stringify(data);
+    } catch (error) {
+      // A BigInt or a cycle.
+      throw new TypeError(`Cannot publish to "${name}": data is not JSON`, { cause: error });
+    }
+    // undefined for a function or undefined itself.
+    if (typeof text !== 'string') {
+      throw new TypeError(`Cannot publish to "${name}": data is not JSON`);
+    }
     await this.#connection.publish(name, text);
   }
 
@@ -185,7 +198,7 @@ class Broker implements PubSub {
     // Several next() calls may wait at once; they are answered in order.
     const waiting: Waiter[] = [];
     let done = false;
-    let failure: { error: unknown } | undefined;
+    let failure: { error: Error } | undefined;
 
     const listener: Listener = {
       receive: (data) => {
@@ -200,10 +213,9 @@ class Broker implements PubSub {
         done = true;
         signal?.removeEventListener('abort', onAbort);
         this.#remove(name, listener);
-        if (error !== undefined) {
-          queue.length = 0;
-          failure = { error };
-        }
+        // Like return(): an ended subscription yields nothing more.
+        queue.length = 0;
+        if (error !== undefined) failure = { error: asError(error) };
         for (const waiter of waiting.splice(0)) {
           if (failure) {
             waiter.reject(failure.error);
@@ -232,7 +244,7 @@ class Broker implements PubSub {
         if (failure) {
           const { error } = failure;
           failure = undefined;
-          return Promise.reject(error instanceof Error ? error : new Error(String(error)));
+          return Promise.reject(error);
         }
         if (done) return Promise.resolve({ value: undefined, done: true });
         return new Promise<IteratorResult<Received<T>>>((resolve, reject) => {
@@ -285,8 +297,10 @@ class Broker implements PubSub {
     const name = channelName(channel, 'on');
     if (typeof listener !== 'function') throw new TypeError('on() needs a listener function');
     if (this.#state !== 'open') return () => undefined;
+    let done = false;
     const entry: Listener = {
       receive: (data) => {
+        if (done) return;
         try {
           const result = listener(data as Received<T>);
           if (result instanceof Promise) {
@@ -299,6 +313,7 @@ class Broker implements PubSub {
         }
       },
       end: () => {
+        done = true;
         this.#remove(name, entry);
       },
     };
@@ -308,18 +323,20 @@ class Broker implements PubSub {
     };
   }
 
-  /** Ends every subscription; new ones end at once. Publishing still works. */
-  async stop(): Promise<void> {
+  /**
+   * Ends every subscription; new ones end at once. Publishing still works. Does not wait for the
+   * adapter: a broker that is down must not hold up app.close().
+   */
+  stop(): void {
     if (this.#state !== 'open') return;
     this.#state = 'stopped';
     for (const listeners of [...this.#channels.values()]) {
       for (const listener of [...listeners]) listener.end();
     }
-    await Promise.all(this.#pending.values());
   }
 
   async close(): Promise<void> {
-    await this.stop();
+    this.stop();
     if (this.#state === 'closed') return;
     this.#state = 'closed';
     await this.#connection.close();
@@ -343,18 +360,8 @@ class Broker implements PubSub {
   #add(channel: string, listener: Listener): void {
     let listeners = this.#channels.get(channel);
     if (!listeners) {
-      const joined = new Set<Listener>();
-      this.#channels.set(channel, (listeners = joined));
-      this.#queue(
-        channel,
-        () => this.#connection.subscribe(channel),
-        (error) => {
-          // Nothing would arrive; end the subscribers rather than leave them waiting. Only
-          // those this subscribe was for: a later one may have succeeded.
-          if (this.#channels.get(channel) !== joined) return;
-          for (const each of [...joined]) each.end(error);
-        },
-      );
+      this.#channels.set(channel, (listeners = new Set()));
+      this.#sync(channel, listeners);
     }
     listeners.add(listener);
   }
@@ -363,25 +370,42 @@ class Broker implements PubSub {
     const listeners = this.#channels.get(channel);
     if (!listeners?.delete(listener) || listeners.size > 0) return;
     this.#channels.delete(channel);
-    this.#queue(channel, () => this.#connection.unsubscribe(channel));
+    this.#sync(channel);
   }
 
-  #queue(
-    channel: string,
-    step: () => Promise<void> | void,
-    failed?: (error: unknown) => void,
-  ): void {
+  // Steps run one at a time per channel. Each brings the adapter in line with the listeners at
+  // that moment, so a quick leave and rejoin sends nothing and misses nothing.
+  #sync(channel: string, joined?: Set<Listener>): void {
     const previous = this.#pending.get(channel) ?? Promise.resolve();
     const next = previous
-      .then(step)
-      .catch((error: unknown) => {
-        this.#report(error);
-        failed?.(error);
-      })
+      .then(() => this.#syncNow(channel, joined))
       .finally(() => {
         if (this.#pending.get(channel) === next) this.#pending.delete(channel);
       });
     this.#pending.set(channel, next);
+  }
+
+  async #syncNow(channel: string, joined: Set<Listener> | undefined): Promise<void> {
+    if (this.#state === 'closed') return;
+    const listeners = this.#channels.get(channel);
+    const wanted = listeners !== undefined;
+    if (wanted === this.#subscribed.has(channel)) return;
+    try {
+      if (wanted) {
+        await this.#connection.subscribe(channel);
+        this.#subscribed.add(channel);
+      } else {
+        this.#subscribed.delete(channel);
+        await this.#connection.unsubscribe(channel);
+      }
+    } catch (error) {
+      this.#report(error);
+      // Nothing would arrive; end the subscribers this step was for rather than leave them
+      // waiting. Others that joined since have a step of their own, which tries again.
+      if (wanted && listeners === joined) {
+        for (const each of [...listeners]) each.end(error);
+      }
+    }
   }
 
   // A throwing onError must not break delivery or shutdown.
@@ -395,10 +419,19 @@ class Broker implements PubSub {
 }
 
 // Every listener gets the same parsed value; freezing keeps one from changing it for the others.
+// A loop, not recursion: JSON.parse accepts nesting deeper than the call stack.
 function deepFreeze(value: unknown): unknown {
-  if (typeof value === 'object' && value !== null && !Object.isFrozen(value)) {
-    Object.freeze(value);
-    for (const item of Object.values(value)) deepFreeze(item);
+  const stack: unknown[] = [value];
+  while (stack.length > 0) {
+    const item = stack.pop();
+    if (typeof item === 'object' && item !== null && !Object.isFrozen(item)) {
+      Object.freeze(item);
+      for (const child of Object.values(item)) stack.push(child);
+    }
   }
   return value;
+}
+
+function asError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
 }

@@ -7,15 +7,15 @@ errors, client disconnects, graceful shutdown, timeouts and streaming.
 
 These defaults are part of Avi.js from the start, not add-ons:
 
-| Concern            | Default behavior                                                                                                                                                     |
-| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Request bodies     | Limited to 1 MiB (`bodyLimit`). Oversized bodies get `413`, never read past it.                                                                                      |
-| Error responses    | Generic 5xx bodies in every environment. Details go to your logger.                                                                                                  |
-| Client disconnects | `ctx.signal` aborts so handlers can stop work early; streams stop being read.                                                                                        |
-| Shutdown           | `app.close()` refuses new connections, runs `onShutdown` hooks, drains in-flight requests, forces after `shutdownTimeout`, then disposes providers in reverse order. |
-| Slow clients       | `headersTimeout` and `requestTimeout` close connections that send too slowly.                                                                                        |
-| Malformed input    | Bad URL encodings get `400`; Node rejects broken HTTP and oversized headers (`431`).                                                                                 |
-| Streaming          | Streamed responses respect backpressure from slow clients.                                                                                                           |
+| Concern            | Default behavior                                                                                                                                                                        |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Request bodies     | Limited to 1 MiB (`bodyLimit`). Oversized bodies get `413`, never read past it.                                                                                                         |
+| Error responses    | Generic 5xx bodies in every environment. Details go to your logger.                                                                                                                     |
+| Client disconnects | `ctx.signal` aborts so handlers can stop work early; streams stop being read.                                                                                                           |
+| Shutdown           | `app.close()` refuses new connections, ends open streams, runs `onShutdown` hooks, drains in-flight requests, forces after `shutdownTimeout`, then disposes providers in reverse order. |
+| Slow clients       | `headersTimeout` and `requestTimeout` close connections that send too slowly.                                                                                                           |
+| Malformed input    | Bad URL encodings get `400`; Node rejects broken HTTP and oversized headers (`431`).                                                                                                    |
+| Streaming          | Streamed responses respect backpressure from slow clients.                                                                                                                              |
 
 ## Streaming responses
 
@@ -304,7 +304,13 @@ const app = createAvi({
 await app.listen(Number(process.env['PORT'] ?? 3000), '0.0.0.0');
 
 const shutdown = () => {
-  void app.close().then(() => process.exit(0));
+  app.close().then(
+    () => process.exit(0),
+    (error: unknown) => {
+      console.error(error);
+      process.exit(1);
+    },
+  );
 };
 process.once('SIGINT', shutdown);
 process.once('SIGTERM', shutdown);

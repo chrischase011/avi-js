@@ -222,11 +222,14 @@ export class Container {
         for (const record of module.own.values()) {
           if (record.scope === 'singleton') await this.#ensure(record);
           else await this.#ensureDeps(record);
+          this.#assertInitializing();
         }
       }
+      const seen = new Set<unknown>();
       for (const record of this.#created) {
+        this.#assertInitializing();
         try {
-          await callHook(record, 'onInit');
+          await callHook(record, 'onInit', seen);
           this.#initialized.push(record);
         } catch (error) {
           throw new Error(`${tokenName(record.token)} in ${record.module.name} failed in onInit`, {
@@ -239,6 +242,11 @@ export class Container {
       await this.dispose().catch(() => undefined);
       throw error;
     }
+  }
+
+  // dispose() during init() must not let init carry on creating providers.
+  #assertInitializing(): void {
+    if (this.#state !== 'initializing') throw new Error(`Container was ${this.#state} during init`);
   }
 
   /** Resolves `token` as seen from `module`. Transients are created on every call. */
@@ -280,9 +288,10 @@ export class Container {
   async #shutdown(): Promise<void> {
     if (this.#state === 'ready') this.#state = 'stopping';
     const errors: unknown[] = [];
+    const seen = new Set<unknown>();
     for (const record of this.#initialized.splice(0).reverse()) {
       try {
-        await callHook(record, 'onShutdown');
+        await callHook(record, 'onShutdown', seen);
       } catch (error) {
         errors.push(
           new Error(`${tokenName(record.token)} in ${record.module.name} failed in onShutdown`, {
@@ -533,9 +542,10 @@ async function disposeAll(
   created: readonly { record: ProviderRecord; value: unknown }[],
 ): Promise<void> {
   const errors: unknown[] = [];
+  const seen = new Set<unknown>();
   for (const { record, value } of [...created].reverse()) {
     try {
-      await disposeValue(record, value);
+      await disposeValue(record, value, seen);
     } catch (error) {
       errors.push(error);
     }
@@ -545,23 +555,43 @@ async function disposeAll(
   }
 }
 
-/** Runs a singleton's hook: the provider option if set, else the value's own method. */
-async function callHook(record: ProviderRecord, hook: 'onInit' | 'onShutdown'): Promise<void> {
+/**
+ * Runs a singleton's hook: the provider option if set, else the value's own method, once per
+ * value (a factory may return another provider's instance).
+ */
+async function callHook(
+  record: ProviderRecord,
+  hook: 'onInit' | 'onShutdown',
+  seen: Set<unknown>,
+): Promise<void> {
   const own = record[hook];
   if (own) {
     await own(record.instance);
     return;
   }
+  if (!firstTime(record.instance, seen)) return;
   const value = record.instance as Partial<Record<typeof hook, unknown>> | null | undefined;
   const method = value?.[hook];
   if (typeof method === 'function') await (method as () => unknown).call(value);
 }
 
-async function disposeValue(record: ProviderRecord, instance: unknown): Promise<void> {
+function firstTime(value: unknown, seen: Set<unknown>): boolean {
+  if ((typeof value !== 'object' && typeof value !== 'function') || value === null) return true;
+  if (seen.has(value)) return false;
+  seen.add(value);
+  return true;
+}
+
+async function disposeValue(
+  record: ProviderRecord,
+  instance: unknown,
+  seen: Set<unknown>,
+): Promise<void> {
   if (record.dispose) {
     await record.dispose(instance);
     return;
   }
+  if (!firstTime(instance, seen)) return;
   const value = instance as Partial<AsyncDisposable & Disposable> | null | undefined;
   const asyncDispose = value?.[Symbol.asyncDispose];
   const syncDispose = value?.[Symbol.dispose];

@@ -662,6 +662,30 @@ describe('avi usage mistakes', () => {
     error.mockRestore();
   });
 
+  it('reports a malformed tsconfig, or a missing extends, in one line', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const dir = await mkdtemp(path.join(workdir, 'tsconfig-'));
+    await mkdir(path.join(dir, 'src'));
+    await writeFile(path.join(dir, 'src/main.ts'), 'export const a = 1;');
+    const config = path.join(dir, 'tsconfig.json');
+    const cases: [string, RegExp][] = [
+      ['{ "include": ["src"] } }', /tsconfig\.json\(1,24\): error TS1012: Unexpected token\.$/],
+      ['{ "include": ["src"', /tsconfig\.json\(1,\d+\): error TS1005: /],
+      ['{ "extends": "./base.json" }', /^error TS5083: Cannot read file '.*base\.json'\.$/],
+    ];
+    for (const [text, message] of cases) {
+      await writeFile(config, text);
+      for (const command of ['build', 'check', 'client', 'inject', 'dev']) {
+        expect(await main([command, '-p', config])).toBe(1);
+        expect(String(error.mock.lastCall?.[0])).toMatch(message);
+        expect(String(error.mock.lastCall?.[0])).not.toContain('\n');
+      }
+    }
+    log.mockRestore();
+    error.mockRestore();
+  });
+
   it('explains a stray argument from npm create without --', async () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     expect(await main(['new', 'shop', 'minimal', '--dir', workdir])).toBe(2);

@@ -39,14 +39,32 @@ export function checkInjectLists(project: string): Diagnostic[] {
 }
 
 export function readConfig(project: string): ts.ParsedCommandLine {
-  const config = ts.getParsedCommandLineOfConfigFile(path.resolve(project), undefined, {
+  const config = ts.getParsedCommandLineOfConfigFile(configPath(project), undefined, {
     ...ts.sys,
     onUnRecoverableConfigFileDiagnostic: (diagnostic) => {
       throw projectError(ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'));
     },
   });
   if (!config) throw projectError(`Cannot read ${project}`);
+  // JSON syntax errors are not in config.errors. TS18003, no inputs, is left to avi build.
+  const error = ts
+    .getConfigFileParsingDiagnostics(config)
+    .find((d) => d.category === ts.DiagnosticCategory.Error && d.code !== 18003);
+  if (error) {
+    const host: ts.FormatDiagnosticsHost = {
+      getCanonicalFileName: (file) => file,
+      getCurrentDirectory: () => process.cwd(),
+      getNewLine: () => '\n',
+    };
+    // The first error only: a syntax error's later ones are mostly its echoes.
+    throw projectError(ts.formatDiagnostic(error, host).trimEnd());
+  }
   return config;
+}
+
+/** The absolute tsconfig path with forward slashes: TypeScript asserts on a Windows one. */
+export function configPath(project: string): string {
+  return path.resolve(project).replaceAll('\\', '/');
 }
 
 /** A tsconfig that cannot be read: the CLIs print the message, without a stack trace. */

@@ -81,6 +81,8 @@ export function sse(
           }, heartbeat);
           timer.unref();
         }
+        // The client may have left before the handler returned; abort listeners never fire then.
+        if (ctx.signal.aborted) end();
       },
       async pull(controller) {
         try {

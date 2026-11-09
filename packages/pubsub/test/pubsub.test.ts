@@ -5,6 +5,7 @@ import {
   definePubSub,
   memoryAdapter,
   SubscriptionOverflowError,
+  type Deliver,
   type PubSub,
   type PubSubAdapter,
   type PubSubToken,
@@ -144,7 +145,7 @@ describe('definePubSub', () => {
     ]);
   });
 
-  it('subscribes to the adapter once per channel and in order', async () => {
+  it('subscribes to the adapter once per channel, skipping a leave and quick rejoin', async () => {
     const calls: string[] = [];
     const adapter: PubSubAdapter = {
       connect: () => ({
@@ -166,6 +167,12 @@ describe('definePubSub', () => {
     const off2 = pubsub.on(Tasks, () => undefined);
     off1();
     off2();
+    // Rejoined before the adapter heard of the leave: nothing to send, nothing missed.
+    const off3 = pubsub.on(Tasks, () => undefined);
+    for (let i = 0; i < 5; i++) await tick();
+    expect(calls).toEqual(['+tasks']);
+    off3();
+    for (let i = 0; i < 5; i++) await tick();
     pubsub.on(Tasks, () => undefined);
     for (let i = 0; i < 20 && calls.length < 3; i++) await tick();
     expect(calls).toEqual(['+tasks', '-tasks', '+tasks']);
@@ -354,5 +361,76 @@ describe('definePubSub', () => {
       'subscribe needs a channel from defineChannel()',
     );
     expect(() => pubsub.subscribe(Tasks, undefined, { buffer: -1 })).toThrow(RangeError);
+  });
+});
+
+describe('definePubSub edge cases', () => {
+  it('does not call an on() listener removed during the same delivery', async () => {
+    const pubsub = await start();
+    const calls: string[] = [];
+    let offB = () => undefined as unknown;
+    pubsub.on(Tasks, () => {
+      calls.push('A');
+      offB();
+    });
+    offB = pubsub.on(Tasks, () => calls.push('B'));
+    await pubsub.publish(Tasks, { id: 1 });
+    await tick();
+    expect(calls).toEqual(['A']);
+  });
+
+  it('delivers JSON nested deeper than the call stack, as another publisher may send', async () => {
+    let deliver: Deliver = () => undefined;
+    const adapter: PubSubAdapter = {
+      connect: (d) => {
+        deliver = d;
+        return {
+          publish: () => undefined,
+          subscribe: () => undefined,
+          unsubscribe: () => undefined,
+          close: () => undefined,
+        };
+      },
+    };
+    const pubsub = await start(definePubSub({ adapter }));
+    const events = pubsub.subscribe(Other);
+    await tick();
+    deliver('other', '['.repeat(20_000) + ']'.repeat(20_000));
+    const value: unknown = (await events.next()).value;
+    expect(Array.isArray(value)).toBe(true);
+    expect(Object.isFrozen(value)).toBe(true);
+  });
+
+  it('yields nothing more once the signal aborts, buffered messages included', async () => {
+    const pubsub = await start();
+    const controller = new AbortController();
+    const events = pubsub.subscribe(Tasks, controller.signal);
+    await pubsub.publish(Tasks, { id: 1 });
+    await tick();
+    controller.abort();
+    expect(await events.next()).toEqual({ value: undefined, done: true });
+  });
+
+  it('rejects data JSON cannot hold with the channel name', async () => {
+    const pubsub = await start();
+    await expect(pubsub.publish(Tasks, { id: 1n } as never)).rejects.toThrow(
+      'Cannot publish to "tasks": data is not JSON',
+    );
+  });
+
+  it('does not hold up app.close() on an adapter that never answers', async () => {
+    const adapter: PubSubAdapter = {
+      connect: () => ({
+        publish: () => undefined,
+        subscribe: () => new Promise(() => undefined),
+        unsubscribe: () => new Promise(() => undefined),
+        close: () => undefined,
+      }),
+    };
+    const pubsub = await start(definePubSub({ adapter }));
+    pubsub.on(Tasks, () => undefined);
+    await tick();
+    await app?.close();
+    app = undefined;
   });
 });

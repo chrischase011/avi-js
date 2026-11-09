@@ -411,7 +411,7 @@ function starts(node: ts.Node, checker: ts.TypeChecker, own: Own): boolean {
   if (ts.isPropertyAccessExpression(callee)) {
     // `workers.cluster(...)` through `import * as workers`.
     const namespace = ts.isIdentifier(callee.expression)
-      ? origin(callee.expression, checker)
+      ? origin(callee.expression, checker, callee.name.text)
       : undefined;
     const from = STARTERS[callee.name.text];
     if (namespace?.name === '*' && from && namespace.modules.some((m) => from.test(m))) {
@@ -431,11 +431,13 @@ function starts(node: ts.Node, checker: ts.TypeChecker, own: Own): boolean {
 
 /**
  * Where an imported name comes from: its name there (`*` for a namespace) and every module on the
- * way, following re-exports through the project's own files.
+ * way, following re-exports through the project's own files. `member` is the name used on a
+ * namespace, to follow `export *` from its module.
  */
 function origin(
   id: ts.Identifier,
   checker: ts.TypeChecker,
+  member?: string,
 ): { name: string; modules: string[] } | undefined {
   let symbol = checker.getSymbolAtLocation(id);
   let name = id.text;
@@ -452,14 +454,47 @@ function origin(
     } else if (d && ts.isNamespaceImport(d)) {
       name = '*';
       specifier = d.parent.parent.moduleSpecifier;
+    } else if (d && ts.isNamespaceExport(d)) {
+      name = '*';
+      specifier = d.parent.moduleSpecifier;
     } else {
       break;
     }
-    if (specifier && ts.isStringLiteral(specifier)) modules.push(specifier.text);
+    if (specifier && ts.isStringLiteral(specifier)) {
+      modules.push(specifier.text);
+      const exported = name === '*' ? member : name;
+      if (exported) modules.push(...throughStars(specifier, exported, checker, new Set()));
+    }
     if ((symbol.flags & ts.SymbolFlags.Alias) === 0) break;
     symbol = checker.getImmediateAliasedSymbol(symbol);
   }
   return modules.length > 0 ? { name, modules } : undefined;
+}
+
+/** The modules a name comes through when a module re-exports it with `export * from`. */
+function throughStars(
+  specifier: ts.StringLiteral,
+  name: string,
+  checker: ts.TypeChecker,
+  seen: Set<ts.Symbol>,
+): string[] {
+  const module = checker.getSymbolAtLocation(specifier);
+  if (!module || seen.has(module)) return [];
+  seen.add(module);
+  // Declared or re-exported by name: the alias chain continues from there.
+  if (module.exports?.has(ts.escapeLeadingUnderscores(name))) return [];
+  for (const declaration of module.declarations ?? []) {
+    if (!ts.isSourceFile(declaration)) continue;
+    for (const statement of declaration.statements) {
+      if (!ts.isExportDeclaration(statement) || statement.exportClause) continue;
+      const from = statement.moduleSpecifier;
+      if (!from || !ts.isStringLiteral(from)) continue;
+      const target = checker.getSymbolAtLocation(from);
+      if (!target || !checker.tryGetMemberInModuleExports(name, target)) continue;
+      return [from.text, ...throughStars(from, name, checker, seen)];
+    }
+  }
+  return [];
 }
 
 type Own = (source: ts.SourceFile) => boolean;

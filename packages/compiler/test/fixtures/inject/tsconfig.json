@@ -10,7 +10,8 @@
     "skipLibCheck": true,
     "types": ["node"],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@avijs/workers": ["../../../../workers/src/index.ts"]
     }
   },
   "include": ["src"]

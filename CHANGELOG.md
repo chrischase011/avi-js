@@ -3,6 +3,48 @@
 All notable changes are listed here. Avi.js follows [Semantic Versioning](https://semver.org); all
 packages share one version.
 
+## Unreleased
+
+### Fixed
+
+- `app.close()` called while the app was still starting, such as on a signal during a slow
+  `onInit`, did nothing: the server then started and never closed. It now waits for startup to
+  finish and shuts it down; `listen()` rejects with "The app was closed while starting".
+- `listen()` or `init()` after `app.close()` started the app again on disposed providers, and a
+  second `close()` did nothing. Both now reject: a closed app cannot start again.
+- `app.close()` while the server was still binding (a host name lookup, a `cluster()` worker)
+  crashed the process with an unhandled rejection and skipped dispose.
+- An `sse()` stream returned after the client had left kept its heartbeat timer and source
+  running forever. Any streamed body returned for a request that is gone is now released.
+- A stream sent by an `errorHandler` was not ended on shutdown and held `app.close()` until
+  `shutdownTimeout`.
+- A factory provider that returns another provider's instance ran that instance's `onInit`,
+  `onShutdown` and dispose twice.
+- When startup failed and an `onShutdown` hook or dispose also failed, that second error was lost.
+  It is now logged.
+- The shutdown snippets in the templates, examples and tutorial crashed with an unhandled
+  rejection when `app.close()` rejected. They now log the error and exit with code 1.
+- `@avijs/pubsub`: `app.close()` could hang forever when Redis was down, waiting on a queued
+  subscribe or unsubscribe. Shutdown no longer waits on the adapter.
+- `@avijs/pubsub`: with `ioredisAdapter`, two apps sharing one subscriber client (such as parallel
+  tests using one module) unsubscribed each other: one app leaving a channel stopped it for both.
+  Channels are now counted per client.
+- `@avijs/pubsub`: a subscriber leaving a channel just as another joined could miss messages for a
+  round trip to Redis. The adapter is now told only what changed.
+- `@avijs/pubsub`: an `on()` listener removed during a delivery still received that message.
+- `@avijs/pubsub`: a subscription ended by its `signal` still yielded the messages it had buffered.
+- `@avijs/pubsub`: valid JSON nested deeper than the call stack was dropped as "not JSON".
+- `@avijs/pubsub`: publishing a `BigInt` or a cycle rejected with JSON's own error; it now names
+  the channel, like other data JSON cannot hold.
+- AVI203 did not follow `export * from` re-exports, so a file starting a cluster, a worker or a
+  timer through a barrel file was put in `inject.gen.ts`. Named and namespace imports through
+  `export *`, and `export * as name from`, are now followed.
+- A malformed `tsconfig.json`, such as a stray token or a missing brace, crashed `avi dev`,
+  `avi build`, `avi check`, `avi client` and `avi inject` with a TypeScript "Debug Failure" on
+  Windows. It now fails with a one-line error and exit code 1.
+- A `tsconfig.json` whose `extends` points to a missing file, or with another config error, was
+  ignored and the command exited 0. It now fails with a one-line error and exit code 1.
+
 ## 1.1.0 - 2026-11-09
 
 ### Added
