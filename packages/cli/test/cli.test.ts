@@ -619,6 +619,32 @@ export class PostsModule {}
     }, 120_000);
   });
 
+  it.each(['modular', 'minimal'] as const)(
+    'names a reserved word safely in a %s project',
+    async (template) => {
+      const dir = await project(template, `reserved-${template}`);
+      const runs = [
+        ...(template === 'modular' ? [await generate(dir, 'module', 'public')] : []),
+        await generate(dir, 'service', 'public'),
+        await generate(dir, 'controller', 'public'),
+        await generate(dir, 'resource', 'delete'),
+        await generate(dir, 'resource', 'class', '--validator', 'none'),
+      ];
+      for (const { code, out, err } of runs) {
+        expect(code).toBe(0);
+        expect([...out, ...err].join('\n')).not.toContain('AVI201');
+      }
+      const controller =
+        template === 'modular' ? 'src/modules/public/public.controller.ts' : 'src/routes/public.ts';
+      expect(await read(dir, controller)).toContain('publicService');
+
+      const result = run([tsc, '-p', 'tsconfig.json'], dir);
+      expect(result.stdout + result.stderr).toBe('');
+      expect(await startAndGet(dir, '/delete')).toEqual({ status: 200, body: '[]' });
+    },
+    120_000,
+  );
+
   it('detects the validator from package.json, or takes --validator', async () => {
     const dir = await project('modular', 'res-detect', 'zod');
     const files = async (...extra: string[]) =>

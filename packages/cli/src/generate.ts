@@ -41,7 +41,17 @@ interface Names {
   readonly pascal: string;
   /** camelCase, e.g. `userProfile`. */
   readonly camel: string;
+  /** The service's parameter name: `camel`, or `publicService` when `camel` is a reserved word. */
+  readonly variable: string;
 }
+
+// Words that cannot name a parameter in strict-mode code, such as a class or an ES module.
+const RESERVED = new Set(
+  `arguments await break case catch class const continue debugger default delete do else enum
+  eval export extends false finally for function if implements import in instanceof interface let
+  new null package private protected public return static super switch this throw true try typeof
+  var void while with yield`.split(/\s+/),
+);
 
 /** Files to write, keyed by absolute path. Reads fall back to disk. */
 class Plan {
@@ -257,11 +267,11 @@ import { ${serviceClass} } from './${names.file}.service.js';
 export class ${className} {
   static inject = [${serviceClass}] as const;
 
-  constructor(private readonly ${names.camel}: ${serviceClass}) {}
+  constructor(private readonly ${names.variable}: ${serviceClass}) {}
 
   @Get()
   findAll() {
-    return this.${names.camel}.findAll();
+    return this.${names.variable}.findAll();
   }
 }
 `
@@ -342,8 +352,8 @@ import { ${serviceClass} } from '${serviceImport}';
 export const ${exportName} = defineController({
   prefix: '/${names.file}',
   inject: [${serviceClass}],
-  routes: (${names.camel}) => [
-    route({ method: 'GET', path: '/', handler: () => ${names.camel}.findAll() }),
+  routes: (${names.variable}) => [
+    route({ method: 'GET', path: '/', handler: () => ${names.variable}.findAll() }),
   ],
 });
 `
@@ -486,7 +496,8 @@ function importPath(from: string, to: string): string {
 
 function toNames(file: string): Names {
   const camel = file.replace(/-([a-z0-9])/g, (_, char: string) => char.toUpperCase());
-  return { file, camel, pascal: capitalize(camel) };
+  const variable = RESERVED.has(camel) ? `${camel}Service` : camel;
+  return { file, camel, pascal: capitalize(camel), variable };
 }
 
 function capitalize(value: string): string {
@@ -572,7 +583,7 @@ function bodyOf(value: unknown): Record<string, unknown> {
 
 function crudController(names: Names): string {
   const service = `${names.pascal}Service`;
-  const field = names.camel;
+  const field = names.variable;
   return `import { Controller, Delete, Get, HttpError, Patch, Post, reply, type Context } from '@avijs/core';
 import { ${service} } from './${names.file}.service.js';
 
@@ -614,13 +625,13 @@ export class ${names.pascal}Controller {
 
 function crudRoutes(names: Names, serviceImport: string): string {
   const service = `${names.pascal}Service`;
-  const field = names.camel;
+  const field = names.variable;
   return `import { HttpError, defineController, reply, route } from '@avijs/core';
 import { ${service} } from '${serviceImport}';
 
 ${INPUT_HELPERS}
 
-export const ${field}Routes = defineController({
+export const ${names.camel}Routes = defineController({
   prefix: '/${names.file}',
   inject: [${service}],
   routes: (${field}) => [
@@ -726,7 +737,7 @@ ${decorated ? '@Injectable()\n' : ''}export class ${names.pascal}Service {
 function typedController(names: Names, schemas: string): string {
   const { id, create, update } = schemaNames(names);
   const service = `${names.pascal}Service`;
-  const field = names.camel;
+  const field = names.variable;
   return `import {
   Controller,
   Delete,
@@ -781,12 +792,12 @@ export class ${names.pascal}Controller {
 function typedRoutes(names: Names, serviceImport: string, schemas: string): string {
   const { id, create, update } = schemaNames(names);
   const service = `${names.pascal}Service`;
-  const field = names.camel;
+  const field = names.variable;
   return `import { defineController, reply, route } from '@avijs/core';
 import { ${create}, ${id}, ${update} } from '${schemas}';
 import { ${service} } from '${serviceImport}';
 
-export const ${field}Routes = defineController({
+export const ${names.camel}Routes = defineController({
   prefix: '/${names.file}',
   inject: [${service}],
   routes: (${field}) => [

@@ -3,6 +3,14 @@
 All notable changes are listed here. Avi.js follows [Semantic Versioning](https://semver.org); all
 packages share one version.
 
+## Unreleased
+
+### Fixed
+
+- `avi generate` with a reserved word as the name, such as `avi g controller public` or
+  `avi g resource delete`, wrote code that did not compile (`private readonly public`). The
+  service parameter is now named `publicService`.
+
 ## 1.1.1 - 2026-11-11
 
 The code is 1.1.1-rc.0's. Its changes since 1.1.0 are listed below.
