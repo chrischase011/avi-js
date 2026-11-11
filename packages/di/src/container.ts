@@ -237,6 +237,8 @@ export class Container {
           });
         }
       }
+      // dispose() empties #created, which ends the loop above early.
+      this.#assertInitializing();
       this.#state = 'ready';
     } catch (error) {
       await this.dispose().catch(() => undefined);

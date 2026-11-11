@@ -1040,3 +1040,30 @@ describe('registerInjects', () => {
     }).toThrow('dependency 0 of Service is not a token (is there a circular import?)');
   });
 });
+
+describe('dispose during init', () => {
+  it('stops init from creating or starting more providers', async () => {
+    const log: string[] = [];
+    let release: () => void = () => undefined;
+    class First {
+      onInit() {
+        log.push('First');
+        return new Promise<void>((resolve) => {
+          release = resolve;
+        });
+      }
+    }
+    class Second {
+      onInit() {
+        log.push('Second');
+      }
+    }
+    const container = new Container([mod('App', { providers: [First, Second] })]);
+    const init = container.init();
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    await container.dispose();
+    release();
+    await expect(init).rejects.toThrow('Container was disposed during init');
+    expect(log).toEqual(['First']);
+  });
+});
