@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { HttpServer } from '@avijs/http';
 import {
   Controller,
   Get,
@@ -257,6 +258,46 @@ describe('lifecycle hooks', () => {
     const unused = createAvi(silent).register({ providers: [] });
     await unused.close();
     await expect(unused.init()).rejects.toThrow('The app is closed');
+  });
+
+  it('logs a dispose failure after a failed startup and throws the startup error', async () => {
+    const errors: string[] = [];
+    class Leaky {
+      [Symbol.dispose]() {
+        throw new Error('dispose failed');
+      }
+    }
+    const duplicate = defineController({
+      routes: [
+        { method: 'GET', path: '/', handler: () => 'a' },
+        { method: 'GET', path: '/', handler: () => 'b' },
+      ],
+    });
+    const instance = createAvi({
+      logger: { error: (message: string) => errors.push(message) },
+    }).register({ providers: [Leaky], controllers: [duplicate] });
+    await expect(instance.init()).rejects.not.toThrow('dispose failed');
+    expect(errors).toContain('Cleanup after the failed startup also failed');
+  });
+
+  it('reports a server close failure after disposing providers', async () => {
+    const log: string[] = [];
+    class Db {
+      [Symbol.dispose]() {
+        log.push('disposed');
+      }
+    }
+    const instance = createAvi(silent).register({ providers: [Db] });
+    await instance.listen(0, '127.0.0.1');
+    const close = vi
+      .spyOn(HttpServer.prototype, 'close')
+      .mockRejectedValueOnce(new Error('close failed'));
+    try {
+      await expect(instance.close()).rejects.toThrow('close failed');
+    } finally {
+      close.mockRestore();
+    }
+    expect(log).toEqual(['disposed']);
   });
 
   it('prints no startup failure for listen() on a closed app', async () => {
