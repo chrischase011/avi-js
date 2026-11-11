@@ -449,6 +449,17 @@ describe('lifecycle', () => {
     await expect(new HttpServer(new Router()).close()).resolves.toBeUndefined();
   });
 
+  it('closes a server whose bind was still pending', async () => {
+    const other = new HttpServer(new Router());
+    // localhost needs a lookup, so close() starts before the bind finishes.
+    const listening = other.listen(0, 'localhost');
+    expect(other.listening).toBe(false);
+    await other.close();
+    const { port } = await listening;
+    expect(other.listening).toBe(false);
+    await expect(fetch(`http://localhost:${String(port)}/`)).rejects.toThrow();
+  });
+
   it('lets in-flight requests finish before closing', async () => {
     const started = deferred();
     const release = deferred();
