@@ -1,5 +1,5 @@
 import { Controller, Get, HttpError, Post, reply, type Context } from '@avijs/core';
-import { parseCreateUser } from './dto/create-user.dto.js';
+import { parseCreateUser } from './users.schemas.js';
 import { UsersService } from './users.service.js';
 
 @Controller('/users')
@@ -22,9 +22,9 @@ export class UsersController {
 
   @Post()
   async create(ctx: Context) {
-    const dto = parseCreateUser(await ctx.json());
-    if (!dto) throw new HttpError(400, 'Body must be an object with a name');
-    const user = this.users.create(dto);
+    const input = parseCreateUser(await ctx.json());
+    if (!input) throw new HttpError(400, 'Body must be an object with a name');
+    const user = this.users.create(input);
     return reply(user, { status: 201, headers: { location: `/users/${String(user.id)}` } });
   }
 }

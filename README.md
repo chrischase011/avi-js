@@ -102,7 +102,7 @@ src/
 │       ├── users.module.ts
 │       ├── users.controller.ts
 │       ├── users.service.ts
-│       └── dto/
+│       └── users.schemas.ts
 └── common/
 ```
 

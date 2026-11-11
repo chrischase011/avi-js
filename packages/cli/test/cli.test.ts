@@ -117,9 +117,7 @@ describe.each(TEMPLATES.flatMap((t) => VALIDATORS.map((v) => [t, v] as const)))(
                 'src/app.module.ts',
                 'src/modules/users/users.module.ts',
                 'src/common/health.controller.ts',
-                validator === 'none'
-                  ? 'src/modules/users/dto/create-user.dto.ts'
-                  : 'src/modules/users/dto/user.dto.ts',
+                'src/modules/users/users.schemas.ts',
               ]
             : ['src/main.ts', 'src/routes/users.ts', 'src/services/users.ts'],
         ),

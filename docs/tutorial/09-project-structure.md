@@ -35,7 +35,8 @@ Invalid input gets the standard `400` with every issue listed ([chapter 6](06-va
 Response schemas drop fields they don't list, so internal data cannot leak by accident.
 
 The layouts are conventions. Avi.js never scans folders or depends on file names. You register
-what you use, wherever it lives.
+what you use, wherever it lives. Prefer a `dto/` folder over `users.schemas.ts`? Move the file and
+fix the imports.
 
 ## Minimal template
 
@@ -104,7 +105,7 @@ closes the app on `SIGINT` and `SIGTERM`.
 
 ## Modular template
 
-Feature-first. Each feature folder owns its module, controller, service and DTOs. Good for larger
+Feature-first. Each feature folder owns its module, controller, service and schemas. Good for larger
 APIs and teams.
 
 ```text
@@ -118,7 +119,7 @@ src/
 │       ├── users.module.ts
 │       ├── users.controller.ts
 │       ├── users.service.ts
-│       └── dto/
+│       └── users.schemas.ts
 └── common/
 ```
 

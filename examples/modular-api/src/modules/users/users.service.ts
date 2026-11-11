@@ -1,5 +1,5 @@
 import { Injectable } from '@avijs/core';
-import type { CreateUserDto } from './dto/create-user.dto.js';
+import type { CreateUser } from './users.schemas.js';
 
 export interface User {
   id: number;
@@ -18,8 +18,8 @@ export class UsersService {
     return this.#users.find((user) => user.id === id);
   }
 
-  create(dto: CreateUserDto): User {
-    const user = { id: this.#users.length + 1, name: dto.name };
+  create(input: CreateUser): User {
+    const user = { id: this.#users.length + 1, name: input.name };
     this.#users.push(user);
     return user;
   }

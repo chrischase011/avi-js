@@ -69,7 +69,7 @@ my-api/
 │       ├── users.controller.ts    GET /users, GET /users/:id, POST /users
 │       ├── users.service.ts
 │       ├── users.test.ts
-│       └── dto/user.dto.ts        Valibot schemas for input and responses
+│       └── users.schemas.ts       Valibot schemas for input and responses
 ├── package.json
 └── tsconfig.json
 ```

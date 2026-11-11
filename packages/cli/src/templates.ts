@@ -27,7 +27,6 @@ export function templateFiles(options: TemplateOptions): Record<string, string> 
       files,
       options.template === 'modular' ? modularSchemas(syntax) : minimalSchemas(syntax),
     );
-    if (options.template === 'modular') delete files['src/modules/users/dto/create-user.dto.ts'];
   }
   return { ...shared(options, validator), ...files };
 }
@@ -215,7 +214,7 @@ import { UsersService } from './users.service.js';
 export class UsersModule {}
 `,
     'src/modules/users/users.service.ts': `import { Injectable } from '@avijs/core';
-import type { CreateUserDto } from './dto/create-user.dto.js';
+import type { CreateUser } from './users.schemas.js';
 
 export interface User {
   id: number;
@@ -234,15 +233,15 @@ export class UsersService {
     return this.#users.find((user) => user.id === id);
   }
 
-  create(dto: CreateUserDto): User {
-    const user = { id: this.#users.length + 1, name: dto.name };
+  create(input: CreateUser): User {
+    const user = { id: this.#users.length + 1, name: input.name };
     this.#users.push(user);
     return user;
   }
 }
 `,
     'src/modules/users/users.controller.ts': `import { Controller, Get, HttpError, Post, reply, type Context } from '@avijs/core';
-import { parseCreateUser } from './dto/create-user.dto.js';
+import { parseCreateUser } from './users.schemas.js';
 import { UsersService } from './users.service.js';
 
 @Controller('/users')
@@ -263,18 +262,18 @@ export class UsersController {
 
   @Post()
   async create(ctx: Context) {
-    const dto = parseCreateUser(await ctx.json());
-    if (!dto) throw new HttpError(400, 'Body must be an object with a name');
-    return reply(this.users.create(dto), { status: 201 });
+    const input = parseCreateUser(await ctx.json());
+    if (!input) throw new HttpError(400, 'Body must be an object with a name');
+    return reply(this.users.create(input), { status: 201 });
   }
 }
 `,
-    'src/modules/users/dto/create-user.dto.ts': `export interface CreateUserDto {
+    'src/modules/users/users.schemas.ts': `export interface CreateUser {
   name: string;
 }
 
 // Swap this for a schema library (Zod, Valibot, ...) and route schemas when the API grows.
-export function parseCreateUser(input: unknown): CreateUserDto | undefined {
+export function parseCreateUser(input: unknown): CreateUser | undefined {
   if (typeof input !== 'object' || input === null) return undefined;
   const { name } = input as { name?: unknown };
   return typeof name === 'string' && name.trim() !== '' ? { name: name.trim() } : undefined;
@@ -468,12 +467,12 @@ import { UsersModule } from './modules/users/users.module.js';
 @Module({ imports: [Config.module, UsersModule], controllers: [HealthController] })
 export class AppModule {}
 `,
-    'src/modules/users/dto/user.dto.ts': `${syntax.import}
+    'src/modules/users/users.schemas.ts': `${syntax.import}
 
 export const UserId = ${syntax.id};
 
-export const CreateUserDto = ${syntax.object([['name', syntax.text(100, 'name is required')]])};
-export type CreateUserDto = ${syntax.infer('CreateUserDto')};
+export const CreateUser = ${syntax.object([['name', syntax.text(100, 'name is required')]])};
+export type CreateUser = ${syntax.infer('CreateUser')};
 
 // Responses are checked against these and lose any field not listed, so internals cannot leak.
 export const User = ${syntax.object([
@@ -485,7 +484,7 @@ export type User = ${syntax.infer('User')};
 export const UserList = ${syntax.array('User')};
 `,
     'src/modules/users/users.service.ts': `import { Injectable } from '@avijs/core';
-import type { CreateUserDto, User } from './dto/user.dto.js';
+import type { CreateUser, User } from './users.schemas.js';
 
 @Injectable()
 export class UsersService {
@@ -499,8 +498,8 @@ export class UsersService {
     return this.#users.find((user) => user.id === id);
   }
 
-  create(dto: CreateUserDto): User {
-    const user = { id: this.#users.length + 1, name: dto.name };
+  create(input: CreateUser): User {
+    const user = { id: this.#users.length + 1, name: input.name };
     this.#users.push(user);
     return user;
   }
@@ -515,11 +514,11 @@ export class UsersService {
   type RouteContext,
   type RouteSchema,
 } from '@avijs/core';
-import { CreateUserDto, User, UserId, UserList } from './dto/user.dto.js';
+import { CreateUser, User, UserId, UserList } from './users.schemas.js';
 import { UsersService } from './users.service.js';
 
 const findOne = { params: UserId, response: User } satisfies RouteSchema;
-const create = { body: CreateUserDto, response: User } satisfies RouteSchema;
+const create = { body: CreateUser, response: User } satisfies RouteSchema;
 
 @Controller('/users')
 export class UsersController {

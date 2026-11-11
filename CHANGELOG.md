@@ -5,6 +5,12 @@ packages share one version.
 
 ## Unreleased
 
+### Changed
+
+- The modular template keeps the users schemas in `users.schemas.ts`, the name
+  `avi generate resource` uses, instead of a `dto/` folder. `CreateUserDto` is now `CreateUser`.
+  A `dto/` folder still works: the layout is a convention.
+
 ### Fixed
 
 - `app.close()` called while the app was still starting, such as on a signal during a slow
