@@ -261,7 +261,7 @@ describe('lifecycle hooks', () => {
   });
 
   it('logs a dispose failure after a failed startup and throws the startup error', async () => {
-    const errors: string[] = [];
+    const errors: [string, unknown][] = [];
     class Leaky {
       [Symbol.dispose]() {
         throw new Error('dispose failed');
@@ -274,10 +274,12 @@ describe('lifecycle hooks', () => {
       ],
     });
     const instance = createAvi({
-      logger: { error: (message: string) => errors.push(message) },
+      logger: { error: (message: string, error: unknown) => errors.push([message, error]) },
     }).register({ providers: [Leaky], controllers: [duplicate] });
-    await expect(instance.init()).rejects.not.toThrow('dispose failed');
-    expect(errors).toContain('Cleanup after the failed startup also failed');
+    await expect(instance.init()).rejects.toThrow('Duplicate route: GET /');
+    const [, cleanup] = errors.find(([message]) => message.startsWith('Cleanup')) ?? [];
+    expect(cleanup).toBeInstanceOf(AggregateError);
+    expect((cleanup as AggregateError).errors).toEqual([new Error('dispose failed')]);
   });
 
   it('reports a server close failure after disposing providers', async () => {
