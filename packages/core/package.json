@@ -1,6 +1,6 @@
 {
   "name": "@avijs/core",
-  "version": "1.1.0",
+  "version": "1.1.1-rc.0",
   "description": "Avi.js public API: application factory, modules and controllers.",
   "keywords": [
     "avi",
