@@ -186,7 +186,8 @@ process.once('SIGTERM', shutdown);
 
 `close()` stops accepting connections, closes idle keep-alive connections, lets in-flight
 requests finish, and resolves. Requests still running after `shutdownTimeout` are cut off.
-Avi.js does not install signal handlers for you.
+Avi.js does not install signal handlers for you. Registered before `listen()`, a signal during
+startup still shuts down cleanly: `close()` waits for startup, and `listen()` rejects only after it.
 
 ## Next
 

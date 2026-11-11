@@ -15,9 +15,11 @@ packages share one version.
 
 - `app.close()` called while the app was still starting, such as on a signal during a slow
   `onInit`, did nothing: the server then started and never closed. It now waits for startup to
-  finish and shuts it down; `listen()` rejects with "The app was closed while starting".
+  finish and shuts it down; once that is done, `listen()` rejects with "The app was closed while
+  starting". An `onInit` that never settles, or that awaits `app.close()`, keeps `close()` waiting.
 - `listen()` or `init()` after `app.close()` started the app again on disposed providers, and a
-  second `close()` did nothing. Both now reject: a closed app cannot start again.
+  second `close()` did nothing. A closed app cannot start again: `listen()` rejects, and `init()`
+  rejects unless the app had already started.
 - `app.close()` while the server was still binding (a host name lookup, a `cluster()` worker)
   crashed the process with an unhandled rejection and skipped dispose.
 - An `sse()` stream returned after the client had left kept its heartbeat timer and source

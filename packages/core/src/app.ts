@@ -93,8 +93,8 @@ export interface AviApp {
   routes(): readonly RouteInfo[];
   /**
    * Stops accepting connections, ends open streams, runs `onShutdown` hooks while in-flight
-   * requests finish, then disposes providers. Waits for a startup in progress first. The app
-   * cannot start again.
+   * requests finish, then disposes providers. Waits for a startup in progress first, so an
+   * `onInit` that awaits `close()` never finishes. The app cannot start again.
    */
   close(): Promise<void>;
 }
@@ -210,7 +210,11 @@ class Application implements AviApp {
     try {
       if (this.#isClosed()) throw new Error('The app is closed');
       await this.init();
-      if (this.#isClosed()) throw new Error('The app was closed while starting');
+      if (this.#isClosed()) {
+        // After the shutdown, so a main that exits on this rejection does not cut it short.
+        await this.#closing?.catch(() => undefined);
+        throw new Error('The app was closed while starting');
+      }
       this.#step = 'HTTP server';
       address = await this.#server.listen(port, host);
     } catch (error) {

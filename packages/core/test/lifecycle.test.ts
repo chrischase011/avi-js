@@ -226,6 +226,28 @@ describe('lifecycle hooks', () => {
     expect(instance.routes()).toEqual([]);
   });
 
+  it('rejects listen() only after a close during startup has shut down', async () => {
+    const log: string[] = [];
+    class Database {
+      async onInit() {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      onShutdown() {
+        log.push('shutdown');
+      }
+      [Symbol.dispose]() {
+        log.push('dispose');
+      }
+    }
+    const instance = createAvi(silent).register({ providers: [Database] });
+    const listening = instance.listen(0, '127.0.0.1').catch(() => log.push('listen rejected'));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    // Like a signal handler registered before listen(): nobody awaits this close().
+    void instance.close();
+    await listening;
+    expect(log).toEqual(['shutdown', 'dispose', 'listen rejected']);
+  });
+
   it('cannot start again once closed', async () => {
     const instance = createAvi(silent).register({ providers: [] });
     await instance.listen(0, '127.0.0.1');
