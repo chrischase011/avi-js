@@ -205,6 +205,35 @@ describe('sse', () => {
     expect(() => sse(ctx, () => [], { heartbeat: 0 })).toThrow(RangeError);
     expect(() => sse(ctx, () => [], { heartbeat: 1.5 })).toThrow(RangeError);
   });
+  it('ends at once when the request was aborted before sse() ran', async () => {
+    const stopped = deferred();
+    const source: AsyncIterableIterator<string> = {
+      next: () => new Promise(() => undefined),
+      return: () => {
+        stopped.resolve();
+        return Promise.resolve({ value: undefined, done: true });
+      },
+      [Symbol.asyncIterator]: () => source,
+    };
+    const ctx = { signal: AbortSignal.abort() } as Parameters<typeof sse>[0];
+    const reader = sse(ctx, () => source, { heartbeat: false }).body.getReader();
+    const read = async () => {
+      let text = '';
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) return text;
+        text += new TextDecoder().decode(value);
+      }
+    };
+    const timeout = new Promise((resolve) =>
+      setTimeout(() => {
+        resolve('still open');
+      }, 500),
+    );
+    expect(await Promise.race([read(), timeout])).toBe(': open\n\n');
+    await stopped.promise;
+  });
+
   it('stops the source when the client left before sse() was called', async () => {
     const left = deferred();
     const stopped = deferred();
