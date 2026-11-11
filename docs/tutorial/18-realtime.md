@@ -84,8 +84,9 @@ to name the events, for `addEventListener('user', ...)` in the browser.
 | `on(channel, listener)`                | Calls `listener` per message; returns a function that stops it. |
 
 A subscription starts when `subscribe()` or `events()` is called and ends when `signal` aborts;
-messages not read by then are dropped. Inside `sse()`, that is when the client leaves. With Redis, messages arrive once Redis has
-confirmed the subscription, a moment later: a message published in between is not received.
+messages not read by then are dropped. Inside `sse()`, that is when the client leaves. With Redis,
+messages arrive once Redis has confirmed the subscription, a moment later: a message published in
+between is not received.
 
 ## Listening without a request
 
@@ -128,9 +129,10 @@ one Redis server.
 
 `clusterAdapter()` sends each message to the `cluster()` primary, which passes it to every worker.
 Outside a cluster, such as under `avi dev` or with one worker, it works in memory, so the same code
-runs everywhere. It reaches `cluster()` workers only: a [`runWorker()`](16-workers.md#background-workers-runworker) process or
-a worker thread works in memory too, so use Redis to reach those. In a worker forked by something
-other than `cluster()` it refuses to start.
+runs everywhere. It reaches `cluster()` workers only: a
+[`runWorker()`](16-workers.md#background-workers-runworker) process or a worker thread works in
+memory too, so use Redis to reach those. In a worker forked by something other than `cluster()` it
+refuses to start.
 
 For Redis, create and connect the clients yourself. A subscribing connection can only subscribe,
 so it needs its own client:
@@ -180,14 +182,16 @@ unsubscribe a channel you also use. To share one Redis server between apps, set
 Each subscription keeps up to 1 000 messages for a reader that falls behind, such as a browser on
 a slow network. One that falls further behind is dropped with a `SubscriptionOverflowError`, and
 `sse()` closes its connection; `EventSource` reconnects by itself. Change the limit for all
-subscriptions with `definePubSub({ buffer })`, or for one with `subscribe(channel, signal, { buffer })`.
+subscriptions with `definePubSub({ buffer })`, or for one with
+`subscribe(channel, signal, { buffer })`.
 
 ## Shutdown
 
 `app.close()` refuses new connections, then ends every subscription, so open `sse()` streams
-finish and browsers reconnect. During a rolling `restart()` of `cluster()`, they reconnect to a
-worker that stays up; when the whole app stops, they retry until it is back. Requests still in
-flight can publish until the app has closed; after that, `publish` rejects.
+finish and browsers reconnect. Messages a subscription had buffered but not yet read are dropped.
+During a rolling `restart()` of `cluster()`, browsers reconnect to a worker that stays up; when the
+whole app stops, they retry until it is back. Requests still in flight can publish until the app
+has closed; after that, `publish` rejects.
 
 ## Errors
 

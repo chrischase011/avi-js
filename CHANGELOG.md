@@ -41,6 +41,7 @@ packages share one version.
   round trip to Redis. The adapter is now told only what changed.
 - `@avijs/pubsub`: an `on()` listener removed during a delivery still received that message.
 - `@avijs/pubsub`: a subscription ended by its `signal` still yielded the messages it had buffered.
+  Any ended subscription, including one ended by shutdown, now drops its unread messages.
 - `@avijs/pubsub`: valid JSON nested deeper than the call stack was dropped as "not JSON".
 - `@avijs/pubsub`: publishing a `BigInt` or a cycle rejected with JSON's own error; it now names
   the channel, like other data JSON cannot hold.
