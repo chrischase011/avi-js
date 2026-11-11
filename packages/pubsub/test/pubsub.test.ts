@@ -196,6 +196,32 @@ describe('definePubSub', () => {
     expect(onError).toHaveBeenCalledWith(expect.objectContaining({ message: 'NOPERM' }));
   });
 
+  it('reports no adapter failure that settles after the app has closed', async () => {
+    const onError = vi.fn();
+    let fail: (error: Error) => void = () => undefined;
+    const adapter: PubSubAdapter = {
+      connect: () => ({
+        publish: () => undefined,
+        subscribe: () => undefined,
+        unsubscribe: () =>
+          new Promise((_resolve, reject) => {
+            fail = reject;
+          }),
+        close: () => undefined,
+      }),
+    };
+    const pubsub = await start(definePubSub({ adapter, onError }));
+    const stop = pubsub.on(Tasks, () => undefined);
+    await tick();
+    stop();
+    await tick();
+    await app?.close();
+    app = undefined;
+    fail(new Error('connection lost'));
+    await tick();
+    expect(onError).not.toHaveBeenCalled();
+  });
+
   it('ends subscriptions on shutdown but publishes until the app has closed', async () => {
     const token = definePubSub();
     app = createAvi().register({ imports: [token.module] });

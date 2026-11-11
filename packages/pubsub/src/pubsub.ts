@@ -399,7 +399,9 @@ class Broker implements PubSub {
         await this.#connection.unsubscribe(channel);
       }
     } catch (error) {
-      this.#report(error);
+      // close() may have run during the await (the cast undoes TypeScript's narrowing). Its
+      // onError may be torn down by now, so a late failure is not reported.
+      if ((this.#state as string) !== 'closed') this.#report(error);
       // Nothing would arrive; end the subscribers this step was for rather than leave them
       // waiting. Others that joined since have a step of their own, which tries again.
       if (wanted && listeners === joined) {
