@@ -258,6 +258,15 @@ describe('lifecycle hooks', () => {
     await expect(unused.init()).rejects.toThrow('The app is closed');
   });
 
+  it('prints no startup failure for listen() on a closed app', async () => {
+    const errors: string[] = [];
+    const logger = { error: (message: string) => errors.push(message), info: () => undefined };
+    const instance = createAvi({ logger, startupSummary: true }).register({ providers: [] });
+    await instance.close();
+    await expect(instance.listen(0, '127.0.0.1')).rejects.toThrow('The app is closed');
+    expect(errors).toEqual([]);
+  });
+
   it('closes cleanly while the server is still binding', async () => {
     const instance = createAvi(silent).register({ providers: [] });
     // localhost needs a lookup, so the bind is still pending when close() starts.

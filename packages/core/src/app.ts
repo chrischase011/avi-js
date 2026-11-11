@@ -206,19 +206,20 @@ class Application implements AviApp {
   }
 
   async listen(port: number, host?: string): Promise<AddressInfo> {
+    if (this.#isClosed()) throw new Error('The app is closed');
+    // init() reports its own failure.
+    await this.init();
+    if (this.#isClosed()) {
+      // After the shutdown, so a main that exits on this rejection does not cut it short.
+      await this.#closing?.catch(() => undefined);
+      throw new Error('The app was closed while starting');
+    }
+    this.#step = 'HTTP server';
     let address: AddressInfo;
     try {
-      if (this.#isClosed()) throw new Error('The app is closed');
-      await this.init();
-      if (this.#isClosed()) {
-        // After the shutdown, so a main that exits on this rejection does not cut it short.
-        await this.#closing?.catch(() => undefined);
-        throw new Error('The app was closed while starting');
-      }
-      this.#step = 'HTTP server';
       address = await this.#server.listen(port, host);
     } catch (error) {
-      this.#fail(error);
+      if (!this.#isClosed()) this.#fail(error);
       throw error;
     }
     this.#report.url = addressUrl(address);
