@@ -78,8 +78,13 @@ export function redisAdapter(
 }
 
 // ioredis has no listener per channel, so apps sharing a subscriber client count their channels
-// here: one app leaving a channel must not unsubscribe the others.
-const shared = new WeakMap<IoRedisSubscriber, Map<string, number>>();
+// here: one app leaving a channel must not unsubscribe the others. Later joiners wait on the
+// first one's SUBSCRIBE.
+interface Shared {
+  count: number;
+  ready: Promise<unknown>;
+}
+const shared = new WeakMap<IoRedisSubscriber, Map<string, Shared>>();
 
 /** Like `redisAdapter`, for `ioredis` clients. */
 export function ioredisAdapter(
@@ -87,25 +92,26 @@ export function ioredisAdapter(
 ): PubSubAdapter {
   const { publisher, subscriber, prefix = '' } = options;
   let counts = shared.get(subscriber);
-  if (!counts) shared.set(subscriber, (counts = new Map<string, number>()));
+  if (!counts) shared.set(subscriber, (counts = new Map<string, Shared>()));
   const users = counts;
   const join = async (channel: string) => {
-    const count = users.get(channel) ?? 0;
-    users.set(channel, count + 1);
-    if (count > 0) return;
+    let entry = users.get(channel);
+    if (entry) entry.count++;
+    else {
+      const ready = (async () => subscriber.subscribe(channel))();
+      users.set(channel, (entry = { count: 1, ready }));
+    }
     try {
-      await subscriber.subscribe(channel);
+      await entry.ready;
     } catch (error) {
-      leave(channel)?.catch(() => undefined);
+      // Every app waiting on it fails; the next join sends a new SUBSCRIBE.
+      if (users.get(channel) === entry) users.delete(channel);
       throw error;
     }
   };
   const leave = (channel: string) => {
-    const count = (users.get(channel) ?? 1) - 1;
-    if (count > 0) {
-      users.set(channel, count);
-      return undefined;
-    }
+    const entry = users.get(channel);
+    if (!entry || --entry.count > 0) return undefined;
     users.delete(channel);
     return subscriber.unsubscribe(channel);
   };

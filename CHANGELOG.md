@@ -34,7 +34,7 @@ packages share one version.
   subscribe or unsubscribe. Shutdown no longer waits on the adapter.
 - `@avijs/pubsub`: with `ioredisAdapter`, two apps sharing one subscriber client (such as parallel
   tests using one module) unsubscribed each other: one app leaving a channel stopped it for both.
-  Channels are now counted per client.
+  Channels are now counted per client, and a failed subscribe fails every app waiting on it.
 - `@avijs/pubsub`: a subscriber leaving a channel just as another joined could miss messages for a
   round trip to Redis. The adapter is now told only what changed.
 - `@avijs/pubsub`: an `on()` listener removed during a delivery still received that message.

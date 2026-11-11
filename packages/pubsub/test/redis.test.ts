@@ -158,3 +158,62 @@ it('does not hold up app.close() while Redis is down', async () => {
   await new Promise((resolve) => setTimeout(resolve, 5));
   await apps.pop()?.close();
 });
+
+describe('ioredisAdapter with one subscriber client for two apps', () => {
+  // A subscriber whose SUBSCRIBE calls stay pending until the test settles them.
+  function pending() {
+    const calls: { command: string; channel: string; fail: (error: Error) => void }[] = [];
+    const client: IoRedisSubscriber = {
+      subscribe: (channel) =>
+        new Promise((_resolve, reject) =>
+          calls.push({ command: 'subscribe', channel, fail: reject }),
+        ),
+      unsubscribe: (channel) => {
+        calls.push({ command: 'unsubscribe', channel, fail: () => undefined });
+        return Promise.resolve(1);
+      },
+      on: () => undefined,
+      off: () => undefined,
+    };
+    return { calls, client };
+  }
+
+  it('fails every app waiting on a SUBSCRIBE that fails', async () => {
+    const server = fakeServer();
+    const { calls, client } = pending();
+    const adapter = ioredisAdapter({ publisher: server.publisher, subscriber: client });
+    const one = await adapter.connect(() => undefined);
+    const two = await adapter.connect(() => undefined);
+    const first = one.subscribe('tasks');
+    const second = two.subscribe('tasks');
+    calls[0]?.fail(new Error('down'));
+    await expect(first).rejects.toThrow('down');
+    await expect(second).rejects.toThrow('down');
+
+    // Nobody is subscribed now, so the next app sends its own SUBSCRIBE.
+    void Promise.resolve(one.subscribe('tasks')).catch(() => undefined);
+    expect(calls.filter((call) => call.command === 'subscribe')).toHaveLength(2);
+  });
+
+  it('keeps a later app subscribed when an earlier pending SUBSCRIBE fails', async () => {
+    const server = fakeServer();
+    const { calls, client } = pending();
+    const adapter = ioredisAdapter({ publisher: server.publisher, subscriber: client });
+    const one = await adapter.connect(() => undefined);
+    const two = await adapter.connect(() => undefined);
+    const first = Promise.resolve(one.subscribe('tasks')).catch(() => undefined);
+    await one.close();
+    void Promise.resolve(two.subscribe('tasks')).catch(() => undefined);
+    calls[0]?.fail(new Error('down'));
+    await first;
+    await two.unsubscribe('tasks');
+
+    // two's own SUBSCRIBE is still in place until two leaves: one UNSUBSCRIBE per join.
+    expect(calls.map((call) => call.command)).toEqual([
+      'subscribe',
+      'unsubscribe',
+      'subscribe',
+      'unsubscribe',
+    ]);
+  });
+});
