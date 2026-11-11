@@ -10,6 +10,11 @@ packages share one version.
 - `avi generate` with a reserved word as the name, such as `avi g controller public` or
   `avi g resource delete`, wrote code that did not compile (`private readonly public`). The
   service parameter is now named `publicService`.
+- `npx @avijs/cli generate` in a project without its own TypeScript crashed with
+  "Cannot read properties of undefined (reading 'Latest')": npx installed TypeScript 7, which has
+  no compiler API. The packages now ask for TypeScript `>=5.8 <7`, and `avi` and `avi-compile`
+  commands on TypeScript 7 fail with a one-line error that names the version.
+- The README said CI checks types against TypeScript 7.0; it does not.
 
 ## 1.1.1 - 2026-11-11
 

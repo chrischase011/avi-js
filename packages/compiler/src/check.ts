@@ -68,6 +68,19 @@ export function configPath(project: string): string {
   return process.platform === 'win32' ? absolute.replaceAll('\\', '/') : absolute;
 }
 
+/**
+ * Throws a one-line error when `typescript` has no compiler API, as in TypeScript 7 (the native
+ * port), which npx installs when the project has no TypeScript of its own.
+ */
+export function assertTypeScript(
+  api: { version?: unknown; createSourceFile?: unknown } = ts,
+): void {
+  if (typeof api.createSourceFile === 'function') return;
+  throw projectError(
+    `Avi.js needs TypeScript 5.8 to 6.x, found ${String(api.version)}, which has no compiler API. Run npm install in the project, or install typescript@~6.0.`,
+  );
+}
+
 /** A tsconfig that cannot be read: the CLIs print the message, without a stack trace. */
 function projectError(message: string): Error {
   return Object.assign(new Error(message), { code: 'ERR_AVI_PROJECT' });

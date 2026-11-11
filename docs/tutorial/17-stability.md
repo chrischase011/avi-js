@@ -51,7 +51,7 @@ in a major release.
 | What       | Supported                                                                |
 | ---------- | ------------------------------------------------------------------------ |
 | Node.js    | 22.12 or newer; CI tests 22, 24 and 26 on Linux, 24 on Windows and macOS |
-| TypeScript | 5.8 or newer; CI tests 6.0                                               |
+| TypeScript | 5.8 to 6.x; CI tests 6.0. The `avi` CLI does not run on TypeScript 7     |
 | Avi.js 1.x | The latest 1.x release gets fixes, security fixes included               |
 
 Dropping a Node.js version happens only in a major release, after that version has reached its end

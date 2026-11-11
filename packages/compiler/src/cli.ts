@@ -1,7 +1,12 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
-import { checkInjectLists, formatDiagnostic as format, type Diagnostic } from './check.js';
+import {
+  assertTypeScript,
+  checkInjectLists,
+  formatDiagnostic as format,
+  type Diagnostic,
+} from './check.js';
 import { generateClient, sameContent } from './client.js';
 import { writeManifest } from './manifest.js';
 import { INJECT_HEADER, generateInjects, plural } from './inject.js';
@@ -18,6 +23,8 @@ const USAGE = `Usage:
   avi-compile inject [-p|--project tsconfig.json] [--out src/inject.gen.ts] [--check | --watch]
       Infer dependency lists from constructor types, for classes without static inject.`;
 
+const COMMANDS = new Set(['check', 'client', 'inject', 'manifest']);
+
 export async function main(argv: readonly string[]): Promise<number> {
   try {
     return await run(argv);
@@ -31,6 +38,8 @@ export async function main(argv: readonly string[]): Promise<number> {
 
 async function run(argv: readonly string[]): Promise<number> {
   const [command, ...rest] = argv;
+  // Printing the usage needs no TypeScript.
+  if (command && COMMANDS.has(command)) assertTypeScript();
   const { values, positionals } = parseArgs({
     args: [...rest],
     allowPositionals: true,

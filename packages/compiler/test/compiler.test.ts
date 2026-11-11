@@ -5,7 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import ts from 'typescript';
-import { configPath, readProgram } from '../src/check.js';
+import { assertTypeScript, configPath, readProgram } from '../src/check.js';
 import { sameContent } from '../src/client.js';
 import {
   buildProject,
@@ -869,6 +869,23 @@ describe('buildProject write errors', () => {
     await chmod(path.join(dir, 'dist/a.js'), 0o444);
     expect(buildProject({ project })).toBeGreaterThan(0);
     expect(write.mock.calls.map((call) => String(call[0])).join('')).toContain('TS5033');
+  });
+});
+
+describe('assertTypeScript', () => {
+  it('passes with the compiler API and names the version without it', () => {
+    expect(() => {
+      assertTypeScript();
+    }).not.toThrow();
+    // What TypeScript 7 (the native port) exports.
+    expect(() => {
+      assertTypeScript({ version: '7.0.2' });
+    }).toThrow(
+      expect.objectContaining({
+        code: 'ERR_AVI_PROJECT',
+        message: expect.stringContaining('found 7.0.2') as unknown,
+      }),
+    );
   });
 });
 

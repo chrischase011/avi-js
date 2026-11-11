@@ -4,6 +4,7 @@ import * as api from '../src/index.js';
 
 it('exposes only the reviewed runtime exports', () => {
   expect(Object.keys(api).sort()).toEqual([
+    'assertTypeScript',
     'buildProject',
     'checkInjectLists',
     'generateClient',

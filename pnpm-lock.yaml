@@ -314,7 +314,7 @@ importers:
         specifier: workspace:^
         version: link:../compiler
       typescript:
-        specifier: '>=5.8'
+        specifier: '>=5.8 <7'
         version: 6.0.3
     devDependencies:
       valibot:
@@ -339,7 +339,7 @@ importers:
         specifier: workspace:^
         version: link:../core
       typescript:
-        specifier: '>=5.8'
+        specifier: '>=5.8 <7'
         version: 6.0.3
     devDependencies:
       '@avijs/client':
@@ -371,7 +371,7 @@ importers:
         specifier: workspace:^
         version: link:../cli
       typescript:
-        specifier: '>=5.8'
+        specifier: '>=5.8 <7'
         version: 6.0.3
 
   packages/di: {}

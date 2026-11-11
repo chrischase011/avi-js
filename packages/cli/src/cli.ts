@@ -1,4 +1,4 @@
-import { buildProject, main as compile, watchProject } from '@avijs/compiler';
+import { assertTypeScript, buildProject, main as compile, watchProject } from '@avijs/compiler';
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdir, readdir, writeFile } from 'node:fs/promises';
@@ -75,7 +75,7 @@ export async function main(argv: readonly string[]): Promise<number> {
       console.error(`${(error as Error).message}\n\n${USAGE}`);
       return 2;
     }
-    // A tsconfig that cannot be read.
+    // A tsconfig that cannot be read, or a TypeScript without the compiler API.
     if (code === 'ERR_AVI_PROJECT') {
       console.error((error as Error).message);
       return 1;
@@ -99,10 +99,13 @@ async function run(argv: readonly string[]): Promise<number> {
       return create(rest);
     case 'generate':
     case 'g':
+      assertTypeScript();
       return generate(rest);
     case 'dev':
+      assertTypeScript();
       return dev(rest);
     case 'build':
+      assertTypeScript();
       return build(rest);
     case 'check':
     case 'manifest':

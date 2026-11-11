@@ -51,7 +51,7 @@
     "@avijs/core": "workspace:^"
   },
   "peerDependencies": {
-    "typescript": ">=5.8"
+    "typescript": ">=5.8 <7"
   },
   "devDependencies": {
     "@avijs/client": "workspace:^",

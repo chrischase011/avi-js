@@ -50,7 +50,7 @@
     "@avijs/compiler": "workspace:^"
   },
   "peerDependencies": {
-    "typescript": ">=5.8"
+    "typescript": ">=5.8 <7"
   },
   "devDependencies": {
     "valibot": "1.5.0",
