@@ -203,6 +203,7 @@ describe('lifecycle hooks', () => {
     app = undefined;
     expect(performance.now() - started).toBeLessThan(2000);
   });
+
   it('waits for a startup in progress, then shuts it down', async () => {
     const log: string[] = [];
     class Database {
