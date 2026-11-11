@@ -5,7 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import ts from 'typescript';
-import { readProgram } from '../src/check.js';
+import { configPath, readProgram } from '../src/check.js';
 import { sameContent } from '../src/client.js';
 import {
   buildProject,
@@ -869,5 +869,16 @@ describe('buildProject write errors', () => {
     await chmod(path.join(dir, 'dist/a.js'), 0o444);
     expect(buildProject({ project })).toBeGreaterThan(0);
     expect(write.mock.calls.map((call) => String(call[0])).join('')).toContain('TS5033');
+  });
+});
+
+describe('configPath', () => {
+  it.runIf(process.platform === 'win32')('uses forward slashes on Windows', () => {
+    expect(configPath('C:\\app\\tsconfig.json')).toBe('C:/app/tsconfig.json');
+  });
+
+  // A backslash is a legal character in a POSIX file name.
+  it.runIf(process.platform !== 'win32')('keeps backslashes elsewhere', () => {
+    expect(configPath('/app/my\\dir/tsconfig.json')).toBe('/app/my\\dir/tsconfig.json');
   });
 });

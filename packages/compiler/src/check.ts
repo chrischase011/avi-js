@@ -62,9 +62,10 @@ export function readConfig(project: string): ts.ParsedCommandLine {
   return config;
 }
 
-/** The absolute tsconfig path with forward slashes: TypeScript asserts on a Windows one. */
+/** The absolute tsconfig path, with forward slashes on Windows: TypeScript asserts on backslashes. */
 export function configPath(project: string): string {
-  return path.resolve(project).replaceAll('\\', '/');
+  const absolute = path.resolve(project);
+  return process.platform === 'win32' ? absolute.replaceAll('\\', '/') : absolute;
 }
 
 /** A tsconfig that cannot be read: the CLIs print the message, without a stack trace. */
