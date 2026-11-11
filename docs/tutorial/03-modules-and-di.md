@@ -269,8 +269,9 @@ defineFactory({
 - A factory that returns another provider's instance does not run its hooks or dispose a second
   time.
 - `app.close()` during startup waits for it to finish, then shuts down, and `listen()` rejects with
-  "The app was closed while starting". A closed app cannot start again. An `onInit` that never
-  settles, or that awaits `app.close()`, keeps `close()` waiting.
+  "The app was closed while starting", or with the startup error if startup failed. A closed app
+  cannot start again. An `onInit` that never settles, or that awaits `app.close()`, keeps `close()`
+  waiting.
 - `onShutdown` errors don't stop the shutdown: the server still closes and providers are still
   disposed, then `app.close()` rejects with the errors.
 - Only singletons get hooks. `useValue` values, transients and request-scoped providers don't.
