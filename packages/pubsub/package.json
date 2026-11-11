@@ -1,6 +1,6 @@
 {
   "name": "@avijs/pubsub",
-  "version": "1.1.2-rc.0",
+  "version": "1.1.2",
   "description": "Typed pub/sub for Avi.js: in memory, across cluster() workers, or through Redis.",
   "keywords": [
     "avi",
