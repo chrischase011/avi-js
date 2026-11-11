@@ -60,7 +60,11 @@ packages/
   openapi/      @avijs/openapi: OpenAPI documents
   security/     @avijs/security: CORS, security headers and rate limits
   multipart/    @avijs/multipart: file uploads
+  pubsub/       @avijs/pubsub: typed pub/sub in memory, across workers or through Redis
+  workers/      @avijs/workers: cluster() and background workers
+  client/       @avijs/client: typed fetch client, no dependencies
   cli/          @avijs/cli: the avi command and project templates
+  create-avi/   create-avi: npm create avi@latest
 examples/       apps built from the published entry points
 benchmarks/     router, HTTP and startup benchmarks
 docs/tutorial/  the tutorial, also published as the website
