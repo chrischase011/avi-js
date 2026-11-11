@@ -98,16 +98,15 @@ export function ioredisAdapter(
     let entry = users.get(channel);
     if (entry) entry.count++;
     else {
-      const ready = (async () => subscriber.subscribe(channel))();
-      users.set(channel, (entry = { count: 1, ready }));
+      const created: Shared = { count: 1, ready: Promise.resolve() };
+      // Every app waiting on it fails; removed at once so the next join sends a new SUBSCRIBE.
+      created.ready = (async () => subscriber.subscribe(channel))().catch((error: unknown) => {
+        if (users.get(channel) === created) users.delete(channel);
+        throw error;
+      });
+      users.set(channel, (entry = created));
     }
-    try {
-      await entry.ready;
-    } catch (error) {
-      // Every app waiting on it fails; the next join sends a new SUBSCRIBE.
-      if (users.get(channel) === entry) users.delete(channel);
-      throw error;
-    }
+    await entry.ready;
   };
   const leave = (channel: string) => {
     const entry = users.get(channel);
