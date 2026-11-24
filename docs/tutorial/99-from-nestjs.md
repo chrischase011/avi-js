@@ -101,6 +101,7 @@ request.
 | Request-scoped providers                        | `scope: 'request'` and the `REQUEST` token                                       |
 | `Test.createTestingModule().overrideProvider()` | `createTestClient(AppModule, { overrides })`                                     |
 | `@nestjs/swagger`                               | `@avijs/openapi`                                                                 |
+| `@WebSocketGateway()`, `@SubscribeMessage()`    | A route returning `websocket(ctx, handler)` from `@avijs/websocket`              |
 | Express or Fastify adapter                      | Native `node:http`                                                               |
 
 ## Trying Avi.js with NestJS experience

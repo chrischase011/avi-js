@@ -27,7 +27,8 @@ advisory and a note in the [changelog](https://github.com/chrischase011/avi-js/b
 
 - **Experimental APIs**, marked _experimental_ in this tutorial, may change in a minor release.
   Today that is manifests: `describeApp`, the `manifest` option and `avi manifest`
-  ([chapter 10](10-build-checks.md)).
+  ([chapter 10](10-build-checks.md)), and WebSockets: the `@avijs/websocket` package and
+  `upgrade()` in `@avijs/core` (from 1.2, [chapter 19](19-websockets.md)).
 - **The building-block packages** `@avijs/di`, `@avijs/http`, `@avijs/validation` and
   `@avijs/compiler`. Core and the CLI are built on them and re-export what apps need; import from
   `@avijs/core` instead. Their own exports, such as `Container` or `generateClient`, may change in a

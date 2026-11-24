@@ -61,6 +61,7 @@ packages/
   security/     @avijs/security: CORS, security headers and rate limits
   multipart/    @avijs/multipart: file uploads
   pubsub/       @avijs/pubsub: typed pub/sub in memory, across workers or through Redis
+  websocket/    @avijs/websocket: WebSocket routes on ws
   workers/      @avijs/workers: cluster() and background workers
   client/       @avijs/client: typed fetch client, no dependencies
   cli/          @avijs/cli: the avi command and project templates

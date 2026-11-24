@@ -199,6 +199,7 @@ authentication with guards and roles, and Prisma with SQLite.
 | `@avijs/client`     | A typed `fetch` client from your routes, for any frontend          |
 | `@avijs/workers`    | `cluster()` on every core, and `runWorker()` for jobs              |
 | `@avijs/pubsub`     | Typed pub/sub for live updates across workers and servers          |
+| `@avijs/websocket`  | WebSocket routes with guards, DI and typed messages (experimental) |
 | `@avijs/openapi`    | OpenAPI 3.1 documents from routes and schemas                      |
 | `@avijs/security`   | CORS, security headers and rate limits                             |
 | `@avijs/multipart`  | Streaming file uploads with limits                                 |

@@ -3,6 +3,39 @@
 All notable changes are listed here. Avi.js follows [Semantic Versioning](https://semver.org); all
 packages share one version.
 
+## Unreleased
+
+### Added
+
+- New package `@avijs/websocket` (experimental): `websocket(ctx, handler, options)` accepts a
+  WebSocket connection on an ordinary `GET` route, so request hooks, middleware, guards,
+  validation and dependency injection apply. The connection is async-iterable for the client's
+  messages, has `send()` (text, bytes or JSON, resolving once written), `close()`, a `signal`
+  that aborts when it closes, and `raw` for the `ws` socket underneath. Options: a `message`
+  schema (invalid messages close with 1007), `maxPayload` (default 1 MiB), `heartbeat` (default
+  30 s), `origins` (default: browser pages from the same host only) and `protocols`. On
+  shutdown, connections close with 1001. Tutorial chapter 19.
+- `upgrade(ctx, accept, { protocol })` in `@avijs/core` (experimental, low level): accepts an
+  upgrade request on a route. `websocket()` is built on it.
+- The typed client gives routes that return an upgrade the response type `never`.
+
+### Changed
+
+- Without `onUpgrade`, upgrade requests without a body are now routed like other requests. A
+  route that does not accept the upgrade answers as usual, then the connection closes. Before,
+  Node.js answered them on a kept-alive connection or dropped them, depending on its version.
+  Upgrade requests with a body, such as `curl --http2` against `http://` sends, stay plain
+  requests on Node.js 22.21+ and 24.9+; older versions answer them `400`. With `onUpgrade`,
+  nothing changes.
+
+### Fixed
+
+- A client that reset its connection while an async `onUpgrade` handler was still deciding
+  crashed the process with `ECONNRESET`: Node.js removes its error listener from upgrade
+  sockets.
+- A failing `onUpgrade` handler was logged with the full URL, query string included, which can
+  hold a token. Only the path is logged now, as for other requests.
+
 ## 1.1.2 - 2026-11-11
 
 The code is 1.1.2-rc.0's. Its changes since 1.1.1 are listed below.

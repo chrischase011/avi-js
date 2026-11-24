@@ -130,8 +130,11 @@ route({
 
 ## WebSockets
 
-For two-way messages, hand upgrade requests to a WebSocket library with `onUpgrade` (from
-1.0.0-rc.1). With [`ws`](https://github.com/websockets/ws):
+For two-way messages, use [`@avijs/websocket`](19-websockets.md) (from 1.2.0): a WebSocket
+endpoint is a route, so guards, middleware and dependency injection apply.
+
+To handle upgrades yourself instead, hand them to a WebSocket library with `onUpgrade` (from
+1.0.0-rc.1). It takes every upgrade request before routing. With [`ws`](https://github.com/websockets/ws):
 
 ```ts
 import { createAvi } from '@avijs/core';
@@ -156,8 +159,7 @@ const app = createAvi({
 Check `req.url` and authenticate in `onUpgrade`, before `handleUpgrade`: `onRequest` hooks, guards
 and middleware do not run for upgrades. Connections still open after `shutdownTimeout` are
 destroyed, and requests to upgrade during shutdown get `503`. Under `cluster()`, each connection
-lives on one worker, like [server-sent events](#server-sent-events). A built-in, dependency-injected
-WebSocket package is planned for 1.x.
+lives on one worker, like [server-sent events](#server-sent-events).
 
 ## Request ids and logging
 
