@@ -42,6 +42,7 @@ export default defineConfig({
       '@avijs/security': src('security'),
       '@avijs/testing': src('testing'),
       '@avijs/validation': src('validation'),
+      '@avijs/websocket': src('websocket'),
       '@avijs/workers': src('workers'),
     },
   },

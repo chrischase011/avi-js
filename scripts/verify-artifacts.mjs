@@ -78,7 +78,11 @@ for (const tarball of tarballs) {
       throw new Error('package.json still has workspace: ranges');
     // Third-party runtime dependencies are part of the security review; adding one means
     // reviewing it and listing it here.
-    const reviewed = { '@avijs/multipart': ['@fastify/busboy'] };
+    const reviewed = {
+      '@avijs/multipart': ['@fastify/busboy'],
+      // @types/ws: socket.raw is a ws socket in the published types.
+      '@avijs/websocket': ['@types/ws', 'ws'],
+    };
     const pkg = JSON.parse(manifest);
     const external = Object.keys(pkg.dependencies ?? {}).filter(
       (name) => !name.startsWith('@avijs/'),
@@ -191,6 +195,7 @@ assert.equal(typeof require('@avijs/multipart').readForm, 'function');
 assert.equal(typeof require('@avijs/client').createClient, 'function');
 assert.equal(typeof require('@avijs/workers').cluster, 'function');
 assert.equal(typeof require('@avijs/pubsub').definePubSub, 'function');
+assert.equal(typeof require('@avijs/websocket').websocket, 'function');
 console.log('require(esm) ok');
 `,
 );

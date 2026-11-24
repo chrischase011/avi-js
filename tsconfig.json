@@ -13,6 +13,7 @@
     { "path": "./packages/client/tsconfig.build.json" },
     { "path": "./packages/workers/tsconfig.build.json" },
     { "path": "./packages/pubsub/tsconfig.build.json" },
+    { "path": "./packages/websocket/tsconfig.build.json" },
     { "path": "./packages/cli/tsconfig.build.json" },
     { "path": "./packages/create-avi/tsconfig.build.json" },
     { "path": "./examples/basic-api/tsconfig.build.json" },
