@@ -3,6 +3,10 @@
 All notable changes are listed here. Avi.js follows [Semantic Versioning](https://semver.org); all
 packages share one version.
 
+## 1.2.0 - 2026-11-24
+
+The code is 1.2.0-rc.0's. Its changes since 1.1.2 are listed below.
+
 ## 1.2.0-rc.0 - 2026-11-24
 
 ### Added

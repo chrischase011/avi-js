@@ -1,6 +1,6 @@
 {
   "name": "@avijs/testing",
-  "version": "1.2.0-rc.0",
+  "version": "1.2.0",
   "description": "Testing helpers for Avi.js apps.",
   "keywords": [
     "avi",
