@@ -1,6 +1,7 @@
 import { request } from 'node:http';
 import type { Duplex } from 'node:stream';
-import { afterEach, describe, expect, it } from 'vitest';
+import { connect } from 'node:net';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { UpgradeHandler } from '../src/index.js';
 import { startServer, type TestServer } from './helpers.js';
 
@@ -134,6 +135,27 @@ describe('onUpgrade', () => {
     const [message, error] = (running.logger.error.mock.calls[0] ?? []) as [string?, Error?];
     expect(message).toBe('Upgrade handler failed: GET /');
     expect(error?.message).toBe('boom');
+  });
+
+  it('survives a client that resets while the handler is still deciding', async () => {
+    let decide: (() => void) | undefined;
+    running = await startServer(ok, {
+      onUpgrade: async (req, socket, head, signal) => {
+        await new Promise<void>((resolve) => (decide = resolve));
+        echo(req, socket, head, signal);
+      },
+    });
+    const client = connect(running.port, '127.0.0.1');
+    client.on('error', () => undefined);
+    client.write('GET / HTTP/1.1\r\nHost: x\r\nConnection: Upgrade\r\nUpgrade: echo\r\n\r\n');
+    await vi.waitFor(() => {
+      expect(decide).toBeDefined();
+    });
+    client.resetAndDestroy();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    decide?.();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(running.logger.error).not.toHaveBeenCalled();
   });
 
   it('leaves upgrade requests to Node when there is no handler', async () => {

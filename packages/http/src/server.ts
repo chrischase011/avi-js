@@ -311,6 +311,8 @@ export class HttpServer {
     const controller = new AbortController();
     this.#upgraded.set(socket, controller);
     socket.once('close', () => this.#upgraded.delete(socket));
+    // Node removed its error listener; without one, a reset connection crashes the process.
+    socket.on('error', () => socket.destroy());
     const failed = (error: unknown) => {
       this.#logger.error(`Upgrade handler failed: ${req.method ?? ''} ${req.url ?? ''}`, error);
       socket.destroy();
