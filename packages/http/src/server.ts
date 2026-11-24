@@ -6,9 +6,9 @@ import {
   type OutgoingHttpHeaders,
   type Server,
   type ServerOptions as NodeServerOptions,
-  type ServerResponse,
+  ServerResponse,
 } from 'node:http';
-import type { AddressInfo, Socket } from 'node:net';
+import { Socket, type AddressInfo } from 'node:net';
 import { performance } from 'node:perf_hooks';
 import type { Duplex } from 'node:stream';
 import { RequestContext, type Context } from './context.js';
@@ -24,6 +24,7 @@ import {
   statusOf,
 } from './respond.js';
 import type { Handler, RouteMatch, Router } from './router.js';
+import { Upgrade, upgradeRequests } from './upgrade.js';
 
 /** Context added to log entries, such as the request id. */
 export interface LogFields {
@@ -105,7 +106,8 @@ export interface ServerOptions {
   onResponse?: (info: ResponseInfo) => unknown;
   /**
    * Takes over requests that ask to upgrade the connection, such as WebSockets; `ws`'s
-   * `handleUpgrade` fits. The socket is the handler's from then on, and HTTP timeouts no longer
+   * `handleUpgrade` fits. Without it, upgrade requests are routed like other requests, and a
+   * route accepts one by returning `upgrade()`, as `websocket()` from `@avijs/websocket` does. The socket is the handler's from then on, and HTTP timeouts no longer
    * apply to it. Each connection gets its own `signal`, which aborts when shutdown starts, so it
    * can be closed politely; any still open after `shutdownTimeout` are destroyed.
    */
@@ -152,6 +154,13 @@ const INCOMING_ID = /^[\x21-\x7e]{1,128}$/;
 
 const NO_PARAMS = Object.freeze(Object.create(null) as Record<string, string>);
 
+// An upgrade request on its way through the pipeline.
+interface PendingUpgrade {
+  readonly socket: Duplex;
+  readonly head: Buffer;
+  readonly controller: AbortController;
+}
+
 export class HttpServer {
   readonly #router: Router;
   readonly #bodyLimit: number;
@@ -167,6 +176,7 @@ export class HttpServer {
   // Upgraded connections, which server.close() waits for but no longer manages, each with the
   // controller of the signal its handler got. Dropped on close, so nothing piles up.
   readonly #upgraded = new Map<Duplex, AbortController>();
+  readonly #pending = new WeakMap<RequestContext, PendingUpgrade>();
   #server: Server | undefined;
   #binding: Promise<AddressInfo> | undefined;
   #closing: Promise<void> | undefined;
@@ -216,7 +226,13 @@ export class HttpServer {
   listen(port: number, host?: string): Promise<AddressInfo> {
     if (this.#server) return Promise.reject(new Error('Server is already listening'));
 
-    const server = createServer(this.#nodeOptions, (req, res) => {
+    const onUpgrade = this.#onUpgrade;
+    // Node 22.21+ and 24.9+ read this: an upgrade request with a body (curl --http2 sends
+    // `Upgrade: h2c`) stays a plain request, body and keep-alive included.
+    const options = onUpgrade
+      ? this.#nodeOptions
+      : { ...this.#nodeOptions, shouldUpgradeCallback: (req: IncomingMessage) => !hasBody(req) };
+    const server = createServer(options, (req, res) => {
       this.#fresh.delete(req.socket);
       if (this.#fresh.size === 0) this.#onFreshServed?.();
       this.#handle(req, res);
@@ -228,12 +244,10 @@ export class HttpServer {
         if (this.#fresh.size === 0) this.#onFreshServed?.();
       });
     });
-    const onUpgrade = this.#onUpgrade;
-    if (onUpgrade) {
-      server.on('upgrade', (req: IncomingMessage, socket: Duplex, head: Buffer) => {
-        this.#upgradeRequest(onUpgrade, req, socket, head);
-      });
-    }
+    server.on('upgrade', (req: IncomingMessage, socket: Duplex, head: Buffer) => {
+      if (onUpgrade) this.#upgradeRequest(onUpgrade, req, socket, head);
+      else this.#routeUpgrade(req, socket, head);
+    });
     this.#server = server;
 
     return (this.#binding = new Promise((resolve, reject) => {
@@ -300,19 +314,8 @@ export class HttpServer {
     socket: Duplex,
     head: Buffer,
   ): void {
-    this.#fresh.delete(req.socket);
-    if (this.#fresh.size === 0) this.#onFreshServed?.();
-    if (this.#closing) {
-      socket.end(
-        'HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\nContent-Length: 0\r\n\r\n',
-      );
-      return;
-    }
-    const controller = new AbortController();
-    this.#upgraded.set(socket, controller);
-    socket.once('close', () => this.#upgraded.delete(socket));
-    // Node removed its error listener; without one, a reset connection crashes the process.
-    socket.on('error', () => socket.destroy());
+    const controller = this.#adopt(req, socket);
+    if (!controller) return;
     const failed = (error: unknown) => {
       // The path only: a query string can hold a token.
       const path = (req.url ?? '').split('?')[0] ?? '';
@@ -327,7 +330,76 @@ export class HttpServer {
     }
   }
 
-  #handle(req: IncomingMessage, res: ServerResponse): void {
+  /** Tracks an upgrade request's socket for shutdown; during shutdown, refuses it instead. */
+  #adopt(req: IncomingMessage, socket: Duplex): AbortController | undefined {
+    this.#fresh.delete(req.socket);
+    if (this.#fresh.size === 0) this.#onFreshServed?.();
+    if (this.#closing) {
+      socket.end(
+        'HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\nContent-Length: 0\r\n\r\n',
+      );
+      return undefined;
+    }
+    const controller = new AbortController();
+    this.#upgraded.set(socket, controller);
+    socket.once('close', () => this.#upgraded.delete(socket));
+    // Node removed its error listener; without one, a reset connection crashes the process.
+    socket.on('error', () => socket.destroy());
+    return controller;
+  }
+
+  /** Sends an upgrade request through routing, hooks, middleware and guards like any other. */
+  #routeUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer): void {
+    const controller = this.#adopt(req, socket);
+    if (!controller) return;
+    // Older Node versions upgrade these anyway; the body is then out of reach.
+    if (hasBody(req)) {
+      socket.end('HTTP/1.1 400 Bad Request\r\nConnection: close\r\nContent-Length: 0\r\n\r\n');
+      return;
+    }
+    // Node hands over a bare socket; a response object lets a refusal (401, 404) be sent as usual.
+    const res = new ServerResponse(req);
+    res.shouldKeepAlive = false;
+    res.assignSocket(socket as Socket);
+    res.once('finish', () => {
+      endSoon(socket);
+    });
+    this.#handle(req, res, { socket, head, controller });
+  }
+
+  /** Hands the connection to the route that returned `upgrade()`. */
+  #takeOver(ctx: RequestContext, res: ServerResponse, value: Upgrade): void {
+    const pending = this.#pending.get(ctx);
+    if (!pending) {
+      this.#fail(ctx, res, new HttpError(426));
+      return;
+    }
+    if (this.#closing) {
+      this.#fail(ctx, res, new HttpError(503));
+      return;
+    }
+    // Nothing is written through res from here; the status is for onResponse.
+    res.statusCode = 101;
+    const { socket, head, controller } = pending;
+    const failed = (error: unknown) => {
+      this.#logger.error(`Upgrade handler failed: ${ctx.method} ${ctx.path}`, error, fieldsOf(ctx));
+      endSoon(socket);
+    };
+    try {
+      const result = value.accept({
+        req: ctx.req,
+        socket,
+        head,
+        signal: controller.signal,
+        headers: { ...ctx.responseHeaders },
+      });
+      if (result instanceof Promise) result.catch(failed);
+    } catch (error) {
+      failed(error);
+    }
+  }
+
+  #handle(req: IncomingMessage, res: ServerResponse, upgrade?: PendingUpgrade): void {
     const url = req.url ?? '/';
     const queryStart = url.indexOf('?');
     const path = queryStart === -1 ? url : url.slice(0, queryStart);
@@ -353,6 +425,10 @@ export class HttpServer {
       this.#trustProxy,
     );
     if (ids && id) ctx.presetHeader(ids.header, id);
+    if (upgrade) {
+      upgradeRequests.add(ctx);
+      this.#pending.set(ctx, upgrade);
+    }
 
     if (this.#onResponse) {
       this.#observe(res, ctx, match.kind === 'found' ? match.route : undefined);
@@ -443,6 +519,10 @@ export class HttpServer {
   #respond(ctx: RequestContext, res: ServerResponse, value: unknown): void {
     if (res.destroyed) {
       discardValue(value);
+      return;
+    }
+    if (value instanceof Upgrade) {
+      this.#takeOver(ctx, res, value);
       return;
     }
     try {
@@ -553,7 +633,8 @@ export class HttpServer {
         route,
         status: res.statusCode,
         duration: performance.now() - start,
-        aborted: !res.writableFinished,
+        // An accepted upgrade ends when its connection does.
+        aborted: res.statusCode !== 101 && !res.writableFinished,
       };
       Promise.resolve()
         .then(() => onResponse(info))
@@ -570,6 +651,17 @@ function endStream(ctx: RequestContext, res: ServerResponse): void {
   const socket = res.socket;
   res.once('finish', () => socket?.end());
   ctx.endForShutdown();
+}
+
+function hasBody(req: IncomingMessage): boolean {
+  const length = req.headers['content-length'];
+  return (length !== undefined && length !== '0') || req.headers['transfer-encoding'] !== undefined;
+}
+
+/** Ends the socket once pending writes are out. */
+function endSoon(socket: Duplex): void {
+  if (socket instanceof Socket) socket.destroySoon();
+  else socket.destroy();
 }
 
 function nonNegative(name: string, value: number): number {

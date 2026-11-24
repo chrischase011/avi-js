@@ -45,6 +45,7 @@ describe('@avijs/core', () => {
       'reply',
       'route',
       'sse',
+      'upgrade',
     ]);
   });
 });

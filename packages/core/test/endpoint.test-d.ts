@@ -10,6 +10,7 @@ import {
   reply,
   route,
   sse,
+  upgrade,
   type Context,
   type Jsonify,
   type MethodEndpoint,
@@ -83,6 +84,11 @@ class UsersController {
     });
   }
 
+  @Get('/live')
+  live(ctx: Context) {
+    return upgrade(ctx, () => undefined, { protocol: 'websocket' });
+  }
+
   @Post('/ping')
   ping() {
     return undefined;
@@ -118,6 +124,12 @@ describe('MethodEndpoint', () => {
     expectTypeOf<
       MethodEndpoint<'/users/ping', UsersController['ping']>['response']
     >().toEqualTypeOf<undefined>();
+  });
+
+  it('gives an upgrade no response', () => {
+    expectTypeOf<
+      MethodEndpoint<'/users/live', UsersController['live']>['response']
+    >().toEqualTypeOf<never>();
   });
 });
 

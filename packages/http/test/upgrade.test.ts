@@ -179,10 +179,10 @@ describe('onUpgrade', () => {
     expect(running.logger.error).not.toHaveBeenCalled();
   });
 
-  it('leaves upgrade requests to Node when there is no handler', async () => {
+  it('routes upgrade requests when there is no handler', async () => {
     running = await startServer(ok);
-    const outcome = await upgrade(running.port).catch((error: unknown) => error);
-    // Node answers them as plain requests or drops them, depending on its version; neither upgrades.
-    expect(outcome).not.toHaveProperty('socket');
+    const outcome = await upgrade(running.port);
+    // Routed like any request; the route does not accept upgrades, so it answers as usual.
+    expect(outcome).toEqual({ status: 200 });
   });
 });

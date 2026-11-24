@@ -54,7 +54,7 @@ export type {
   ValidationIssue,
 } from '@avijs/validation';
 
-export { HTTP_METHODS, HttpError, jsonLogger, logRequests, reply, sse } from '@avijs/http';
+export { HTTP_METHODS, HttpError, jsonLogger, logRequests, reply, sse, upgrade } from '@avijs/http';
 export type {
   AviState,
   Context,
@@ -80,7 +80,10 @@ export type {
   ServerSentEvent,
   SseOptions,
   SseSource,
+  Upgrade,
+  UpgradeConnection,
   UpgradeHandler,
+  UpgradeOptions,
 } from '@avijs/http';
 export { createToken, defineFactory, registerInjects } from '@avijs/di';
 export { defineHook } from './hooks.js';

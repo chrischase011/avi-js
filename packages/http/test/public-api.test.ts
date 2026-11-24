@@ -14,5 +14,6 @@ it('exposes only the reviewed runtime exports', () => {
     'logRequests',
     'reply',
     'sse',
+    'upgrade',
   ]);
 });

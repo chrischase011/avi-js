@@ -14,6 +14,8 @@ export type { Handler, Params, RouteDefinition, RouteMatch } from './router.js';
 export { jsonLogger, logRequests } from './logging.js';
 export type { JsonLoggerOptions, LogRequestsOptions } from './logging.js';
 export { HttpServer } from './server.js';
+export { upgrade } from './upgrade.js';
+export type { Upgrade, UpgradeConnection, UpgradeOptions } from './upgrade.js';
 export type {
   ErrorHandler,
   LogFields,

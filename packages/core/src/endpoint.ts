@@ -51,7 +51,13 @@ interface NodeStream {
   pipe(destination: never, options?: never): unknown;
 }
 
-/** What the client receives for a handler result `R`. */
+/** An accepted upgrade, by shape for the same reason. */
+interface UpgradeShape {
+  readonly protocol: string;
+  accept(connection: never): unknown;
+}
+
+/** What the client receives for a handler result `R`; nothing for an upgrade. */
 export type ResponseBody<R> = unknown extends R
   ? unknown
   : // eslint-disable-next-line @typescript-eslint/no-invalid-void-type -- handlers that return nothing
@@ -59,11 +65,13 @@ export type ResponseBody<R> = unknown extends R
     ? undefined
     : R extends Reply<infer B>
       ? ResponseBody<B>
-      : R extends Uint8Array | ReadableStream | NodeStream
-        ? Response
-        : R extends Response
-          ? unknown
-          : Jsonify<R>;
+      : R extends UpgradeShape
+        ? never
+        : R extends Uint8Array | ReadableStream | NodeStream
+          ? Response
+          : R extends Response
+            ? unknown
+            : Jsonify<R>;
 
 type Input<S, K extends string> =
   S extends Partial<Record<K, infer X>>
