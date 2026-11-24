@@ -314,7 +314,9 @@ export class HttpServer {
     // Node removed its error listener; without one, a reset connection crashes the process.
     socket.on('error', () => socket.destroy());
     const failed = (error: unknown) => {
-      this.#logger.error(`Upgrade handler failed: ${req.method ?? ''} ${req.url ?? ''}`, error);
+      // The path only: a query string can hold a token.
+      const path = (req.url ?? '').split('?')[0] ?? '';
+      this.#logger.error(`Upgrade handler failed: ${req.method ?? ''} ${path}`, error);
       socket.destroy();
     };
     try {

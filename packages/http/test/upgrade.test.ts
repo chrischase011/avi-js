@@ -137,6 +137,27 @@ describe('onUpgrade', () => {
     expect(error?.message).toBe('boom');
   });
 
+  it('logs the path of a failing handler without the query string', async () => {
+    running = await startServer(ok, {
+      onUpgrade: () => {
+        throw new Error('boom');
+      },
+    });
+    await new Promise<void>((resolve) => {
+      const req = request({
+        port: running?.port,
+        host: '127.0.0.1',
+        path: '/live?token=secret',
+        headers: { connection: 'Upgrade', upgrade: 'echo' },
+      });
+      req.on('error', () => {
+        resolve();
+      });
+      req.end();
+    });
+    expect(running.logger.error.mock.calls[0]?.[0]).toBe('Upgrade handler failed: GET /live');
+  });
+
   it('survives a client that resets while the handler is still deciding', async () => {
     let decide: (() => void) | undefined;
     running = await startServer(ok, {
